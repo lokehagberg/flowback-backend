@@ -40,7 +40,7 @@ def poll_proposal_vote_update(*, user_id: int, poll_id: int, data: dict) -> None
         PollVotingTypeRanking.objects.filter(author=poll_vote).delete()
         PollVotingTypeRanking.objects.bulk_create(poll_vote_ranking)
 
-    if poll.poll_type == Poll.PollType.CARDINAL:
+    elif poll.poll_type == Poll.PollType.CARDINAL:
 
         if SCORE_VOTE_CEILING is not None and any([score >= SCORE_VOTE_CEILING for score in data['score']]):
             raise ValidationError(f'Voting scores exceeds ceiling bounds (currently set at {SCORE_VOTE_CEILING})')
@@ -124,7 +124,7 @@ def poll_proposal_delegate_vote_update(*, user_id: int, poll_id: int, data) -> N
         PollVotingTypeRanking.objects.filter(author_delegate=poll_vote).delete()
         PollVotingTypeRanking.objects.bulk_create(poll_vote_ranking)
 
-    if poll.poll_type == Poll.PollType.CARDINAL:
+    elif poll.poll_type == Poll.PollType.CARDINAL:
 
         # Delete votes if no polls are registered
         if not data['proposals']:

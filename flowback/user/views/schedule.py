@@ -40,7 +40,7 @@ class UserScheduleEventUpdateAPI(ScheduleEventUpdateTemplateAPI):
     def post(self, request):
         serializer = self.InputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-
+        
         user_schedule_event_update(user_id=request.user.id, **serializer.validated_data)
         return Response(status=status.HTTP_200_OK)
 

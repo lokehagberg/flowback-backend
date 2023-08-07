@@ -24,7 +24,7 @@ from flowback.poll.models import (Poll, PollProposal)
 
 
 # Create your tests here.
-class GroupDelegationTests(TestCase):
+class GroupDelegationTestsOld(TestCase):
     def setUp(self):
         self.user_creator = User.objects.create_superuser(username='user_creator',
                                                           email='creator@example.com',

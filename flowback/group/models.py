@@ -36,8 +36,8 @@ class Group(BaseModel):
 
     name = models.TextField(unique=True)
     description = models.TextField()
-    image = models.ImageField(upload_to='group/image')
-    cover_image = models.ImageField(upload_to='group/cover_image')
+    image = models.ImageField(upload_to='group/image', null=True, blank=True)
+    cover_image = models.ImageField(upload_to='group/cover_image', null=True, blank=True)
     hide_poll_users = models.BooleanField(default=False)  # Hides users in polls, TODO remove bool from views
     default_quorum = models.IntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(100)])
     schedule = models.ForeignKey(Schedule, null=True, blank=True, on_delete=models.SET_NULL)
@@ -54,9 +54,10 @@ class Group(BaseModel):
             return
 
         if update_fields:
-            fields = [field.name for field in update_fields]
+            if not all(isinstance(field, str) for field in update_fields):
+                update_fields = [field.name for field in update_fields]
 
-            if 'name' in fields:
+            if 'name' in update_fields:
                 instance.schedule.name = instance.name
                 instance.kanban.name = instance.name
                 instance.schedule.save()

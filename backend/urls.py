@@ -1,5 +1,10 @@
 from django.contrib import admin
 from django.urls import path, include
+from django.views.generic import TemplateView
+from drf_spectacular.views import SpectacularRedocView, SpectacularAPIView
+from rest_framework import permissions
+from rest_framework.schemas import get_schema_view
+
 from backend.settings import DEBUG, MEDIA_URL, MEDIA_ROOT, URL_SUBPATH
 from flowback.poll.views import PollUserScheduleListAPI, PollListApi
 from flowback.user.urls import user_patterns
@@ -18,7 +23,9 @@ api_urlpatterns = [
     path('notification/', include((notification_patterns, 'notification'))),
 
     path('home/polls', PollListApi.as_view(), name='home_polls'),
-    path('poll/user/schedule', PollUserScheduleListAPI.as_view(), name='poll_user_schedule')
+    path('poll/user/schedule', PollUserScheduleListAPI.as_view(), name='poll_user_schedule'),
+    path('schema/', SpectacularAPIView.as_view(), name='schema'),
+    path('schema/redoc/', SpectacularRedocView.as_view(url_name='api:schema'), name='redoc'),
 ]
 
 try:

@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Poll
+from .models import Poll, PollProposal, PollPrediction
 
 @admin.register(Poll)
 class PollAdmin(admin.ModelAdmin):
@@ -22,3 +22,11 @@ class PollAdmin(admin.ModelAdmin):
         }),
     )
     ordering = ('-created_by', 'created_by')
+
+@admin.register(PollProposal)
+class PollProposalAdmin(admin.ModelAdmin):
+    list_display = ('poll', 'title', 'description', 'score', 'created_by')
+
+@admin.register(PollPrediction)
+class PollPredictionAdmin(admin.ModelAdmin):
+    list_display = ('prediction_statement', 'created_by')

@@ -30,6 +30,7 @@ env = environ.Env(DEBUG=(bool, False),
                   FLOWBACK_GROUP_ADMIN_USER_LIST_ACCESS_ONLY=(bool, False),
                   FLOWBACK_DEFAULT_PERMISSION=(str, 'rest_framework.permissions.IsAuthenticated'),
                   EMAIL_HOST=(str, None),
+                  EMAIL_SENDER=(str, None),
                   EMAIL_PORT=(str, None),
                   EMAIL_FROM=(str, None),
                   EMAIL_HOST_USER=(str, None),
@@ -97,11 +98,13 @@ INSTALLED_APPS = [
     'flowback.notification',
     'flowback.comment',
     'flowback.schedule',
+    'drf_spectacular'
 ] + env('INTEGRATIONS')
 
 CELERY_BROKER_URL = env('RABBITMQ_BROKER_URL')
 
 REST_FRAMEWORK = {
+    'DEFAULT_SCHEMA_CLASS': 'flowback.common.documentation.CustomAutoSchema',
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.TokenAuthentication'
     ],
@@ -109,6 +112,13 @@ REST_FRAMEWORK = {
         env('FLOWBACK_DEFAULT_PERMISSION'),
     ),
     'EXCEPTION_HANDLER': 'flowback.common.exception_handlers.drf_default_with_modifications_exception_handler'
+}
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Flowback API',
+    'DESCRIPTION': 'Documentation for interfacing with Flowback',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
 }
 
 AUTH_USER_MODEL = 'user.User'
@@ -202,6 +212,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_HOST = env('EMAIL_HOST')
+EMAIL_SENDER = env('EMAIL_SENDER') or EMAIL_HOST
 EMAIL_PORT = env('EMAIL_PORT')
 EMAIL_HOST_USER = env('EMAIL_HOST_USER')
 EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD')

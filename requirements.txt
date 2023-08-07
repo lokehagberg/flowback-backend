@@ -12,3 +12,6 @@ channels_redis==4.0.0
 daphne==4.0.0
 celery==5.2.7
 django-celery-beat==2.5.0
+drf-spectacular==0.26.4
+pyyaml==6.0.1
+uritemplate==4.1.1
