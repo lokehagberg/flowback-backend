@@ -18,8 +18,8 @@ def poll_proposal_create(*, user_id: int, poll_id: int,
     if group_user.group.id != poll.created_by.group.id:
         raise ValidationError('Permission denied')
 
-    if poll.proposal_end_date <= timezone.now():
-        raise ValidationError("Can't create a proposal after proposal end date")
+    if poll.current_phase != 'proposal':
+        raise ValidationError("Can't create a proposal outside of proposal phase")
 
     proposal = PollProposal(created_by=group_user, poll=poll, title=title, description=description)
 
@@ -49,8 +49,8 @@ def poll_proposal_delete(*, user_id: int, proposal_id: int) -> None:
     poll_refresh_cheap(poll_id=proposal.poll.id)  # TODO get celery
 
     if proposal.created_by == group_user and group_user.permission.delete_proposal:
-        if proposal.poll.proposal_end_date <= timezone.now():
-            raise ValidationError("Can't delete a proposal after proposal end date")
+        if proposal.poll.current_phase != 'proposal':
+            raise ValidationError("Can't delete a proposal outside of proposal phase")
 
     elif not group_user.permission.force_delete_proposal or group_user.is_admin:
         raise ValidationError("Deleting other users proposals needs either "

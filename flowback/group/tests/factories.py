@@ -36,7 +36,7 @@ class GroupTagsFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = GroupTags
 
-    tag_name = factory.LazyAttribute(lambda _: faker.unique.first_name().lower())
+    name = factory.LazyAttribute(lambda _: faker.unique.first_name().lower())
     group = factory.SubFactory(GroupFactory)
 
 

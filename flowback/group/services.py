@@ -233,9 +233,9 @@ def group_invite_reject(*, fetched_by: id, group: int, to: int = None) -> None:
     invite.delete()
 
 
-def group_tag_create(*, user: int, group: int, tag_name: str) -> GroupTags:
+def group_tag_create(*, user: int, group: int, name: str) -> GroupTags:
     group_user_permissions(group=group, user=user, permissions=['admin'])
-    tag = GroupTags(tag_name=tag_name, group_id=group)
+    tag = GroupTags(name=name, group_id=group)
     tag.full_clean()
     tag.save()
 
@@ -273,7 +273,7 @@ def group_user_delegate(*, user: int, group: int, delegate_pool_id: int, tags: l
                                          Q(id__in=tags))
     if user_tags.exists():
         raise ValidationError(f'User has already subscribed to '
-                              f'{", ".join([x.tag_name for x in user_tags.all()])}')
+                              f'{", ".join([x.name for x in user_tags.all()])}')
 
     # Check if tags exist in group
     if len(db_tags) < len(tags):
@@ -470,14 +470,15 @@ def group_thread_delete(user_id: int, thread_id: int):
     thread.delete()
 
 
-def group_thread_comment_create(user_id: int, thread_id: int, message: str, parent_id: int = None):
+def group_thread_comment_create(user_id: int, thread_id: int, message: str, attachments: list, parent_id: int = None):
     thread = get_object(GroupThread, id=thread_id)
     group_user = group_user_permissions(user=user_id, group=thread.created_by.group)
 
     comment = comment_create(author_id=group_user.user.id,
                              comment_section_id=thread.comment_section.id,
                              message=message,
-                             parent_id=parent_id)
+                             parent_id=parent_id,
+                             attachments=attachments)
 
     return comment
 

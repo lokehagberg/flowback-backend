@@ -16,9 +16,14 @@ def comment_section_delete(*, comments_id: int):
     CommentSection.objects.get(comments_id=comments_id).delete()
 
 
-def comment_create(*, author_id: int, comment_section_id: int, message: str, parent_id: int) -> Comment:
+def comment_create(*,
+                   author_id: int,
+                   comment_section_id: int,
+                   message: str,
+                   parent_id: int,
+                   attachments: list) -> Comment:
     comment = Comment(author_id=author_id, comment_section_id=comment_section_id,
-                      message=message, parent_id=parent_id)
+                      message=message, parent_id=parent_id, attachments=attachments)
 
     if parent_id:
         parent = get_object(Comment, id=parent_id)

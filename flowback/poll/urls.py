@@ -1,30 +1,36 @@
 from django.urls import path
 
-from .views import (PollListApi,
-                    PollNotificationSubscribeApi,
-                    PollCreateAPI,
-                    PollUpdateAPI,
-                    PollDeleteAPI, PollProposalListAPI, PollProposalDeleteAPI, PollProposalCreateAPI,
-                    PollProposalVoteListAPI, PollProposalVoteUpdateAPI, PollDelegatesListAPI,
-                    PollProposalDelegateVoteUpdateAPI,
-                    PollCommentListAPI, PollCommentCreateAPI, PollCommentUpdateAPI, PollCommentDeleteAPI,
-                    DelegatePollVoteListAPI,
-                    PollPredictionStatementListAPI, PollPredictionListAPI,
-                    PollPredictionStatementCreateAPI, PollPredictionStatementDeleteAPI,
-                    PollPredictionCreateAPI, PollPredictionUpdateAPI, PollPredictionDeleteAPI,
-                    PollPredictionStatementVoteCreateAPI,
-                    PollPredictionStatementVoteUpdateAPI,
-                    PollPredictionStatementVoteDeleteAPI)
-
+from .views.poll import (PollListApi,
+                         PollNotificationSubscribeApi,
+                         PollCreateAPI,
+                         PollUpdateAPI,
+                         PollDeleteAPI,
+                         PollDelegatesListAPI)
+from .views.proposal import PollProposalListAPI, PollProposalDeleteAPI, PollProposalCreateAPI
+from .views.vote import (PollProposalVoteListAPI,
+                         PollProposalVoteUpdateAPI,
+                         PollProposalDelegateVoteUpdateAPI,
+                         DelegatePollVoteListAPI)
+from .views.comment import PollCommentListAPI, PollCommentCreateAPI, PollCommentUpdateAPI, PollCommentDeleteAPI
+from .views.prediction import (PollPredictionStatementListAPI,
+                               PollPredictionBetListAPI,
+                               PollPredictionStatementCreateAPI,
+                               PollPredictionStatementDeleteAPI,
+                               PollPredictionBetCreateAPI,
+                               PollPredictionBetUpdateAPI,
+                               PollPredictionBetDeleteAPI,
+                               PollPredictionStatementVoteCreateAPI,
+                               PollPredictionStatementVoteUpdateAPI,
+                               PollPredictionStatementVoteDeleteAPI)
+from .views.area import PollAreaStatementListAPI, PollAreaVoteAPI
 
 group_poll_patterns = [
     path('list', PollListApi.as_view(), name='polls'),
     path('create', PollCreateAPI.as_view(), name='poll_create'),
 
-    path('prediction/statement/list', PollPredictionListAPI.as_view(), name='poll_prediction_statement_list'),
-    path('prediction/list', PollPredictionListAPI.as_view(), name='poll_prediction_list'),
+    path('prediction/statement/list', PollPredictionStatementListAPI.as_view(), name='poll_prediction_statement_list'),
+    path('prediction/bet/list', PollPredictionBetListAPI.as_view(), name='poll_prediction_bet_list'),
 ]
-
 
 poll_patterns = [
     path('pool/<int:delegate_pool_id>/votes', DelegatePollVoteListAPI.as_view(), name='delegate_votes'),
@@ -48,19 +54,21 @@ poll_patterns = [
          name='poll_prediction_statement_create'),
     path('prediction/<int:prediction_statement_id>/statement/delete', PollPredictionStatementDeleteAPI.as_view(),
          name='poll_prediction_statement_delete'),
-    path('<int:prediction_statement_id>/prediction/create', PollPredictionCreateAPI.as_view(),
-         name='poll_prediction_create'),
-    path('<int:prediction_id>/prediction/update', PollPredictionUpdateAPI.as_view(),
-         name='poll_prediction_update'),
-    path('<int:prediction_id>/prediction/delete', PollPredictionDeleteAPI.as_view(),
-         name='poll_prediction_delete'),
+    path('prediction/<int:prediction_statement_id>/bet/create', PollPredictionBetCreateAPI.as_view(),
+         name='poll_prediction_bet_create'),
+    path('prediction/<int:prediction_statement_id>/bet/update', PollPredictionBetUpdateAPI.as_view(),
+         name='poll_prediction_bet_update'),
+    path('prediction/<int:prediction_statement_id>/bet/delete', PollPredictionBetDeleteAPI.as_view(),
+         name='poll_prediction_bet_delete'),
     path('prediction/<int:prediction_statement_id>/statement/vote/create',
          PollPredictionStatementVoteCreateAPI.as_view(),
          name='poll_prediction_statement_vote_create'),
-    path('prediction/statement/vote/<int:prediction_statement_vote_id>/update',
+    path('prediction/<int:prediction_statement_id>/statement/vote/update',
          PollPredictionStatementVoteUpdateAPI.as_view(),
          name='poll_prediction_statement_vote_update'),
-    path('prediction/statement/vote/<int:prediction_statement_vote_id>/delete',
+    path('prediction/<int:prediction_statement_id>/statement/vote/delete',
          PollPredictionStatementVoteDeleteAPI.as_view(),
          name='poll_prediction_statement_vote_delete'),
+    path('<int:poll_id>/area/list', PollAreaStatementListAPI.as_view(), name='poll_area_list'),
+    path('<int:poll_id>/area/update', PollAreaVoteAPI.as_view(), name='poll_area_update')
 ]

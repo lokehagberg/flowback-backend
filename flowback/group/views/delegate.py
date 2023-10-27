@@ -67,7 +67,7 @@ class GroupUserDelegateListApi(APIView):
         class Tags(serializers.ModelSerializer):
             class Meta:
                 model = GroupTags
-                fields = ('id', 'tag_name')
+                fields = ('id', 'name')
 
         tags = Tags(many=True,
                     read_only=True)

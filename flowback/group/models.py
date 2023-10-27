@@ -103,12 +103,12 @@ class GroupPermissions(BaseModel):
 
 # Permission Tags for each group, and for user to put on delegators
 class GroupTags(BaseModel):
-    tag_name = models.TextField()
+    name = models.TextField()
     group = models.ForeignKey('Group', on_delete=models.CASCADE)
     active = models.BooleanField(default=True)
 
     class Meta:
-        unique_together = ('tag_name', 'group')
+        unique_together = ('name', 'group')
 
 
 # User information for the specific group

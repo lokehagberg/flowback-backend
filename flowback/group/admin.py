@@ -19,7 +19,7 @@ class GroupPermissionsAdmin(admin.ModelAdmin):
 
 @admin.register(GroupTags)
 class GroupTagsAdmin(admin.ModelAdmin):
-    list_display = ('tag_name', 'group', 'active')
+    list_display = ('name', 'group', 'active')
 
 @admin.register(GroupUser)
 class GroupUserAdmin(admin.ModelAdmin):

@@ -17,11 +17,8 @@ def poll_proposal_vote_update(*, user_id: int, poll_id: int, data: dict) -> None
                                         group=poll.created_by.group.id,
                                         permissions=['allow_vote', 'admin'])
 
-    if poll.vote_start_date >= timezone.now():
-        raise ValidationError("Unable to cast votes before vote start date")
-
-    if poll.vote_end_date <= timezone.now():
-        raise ValidationError("Unable to cast votes after vote end date")
+    if poll.current_phase != 'vote':
+        raise ValidationError("Unable to cast votes outside of vote phase")
 
     if poll.poll_type == Poll.PollType.RANKING:
         if not data['votes']:
@@ -100,11 +97,8 @@ def poll_proposal_delegate_vote_update(*, user_id: int, poll_id: int, data) -> N
     if group_user.group.id != poll.created_by.group.id:
         raise ValidationError('Permission denied')
 
-    if poll.vote_start_date >= timezone.now():
-        raise ValidationError("Unable to cast votes before vote start date")
-
-    if poll.delegate_vote_end_date <= timezone.now():
-        raise ValidationError("Unable to cast votes after delegate vote end date")
+    if poll.current_phase != 'delegate_vote':
+        raise ValidationError("Unable to cast votes outside of delegate vote phase")
 
     if poll.poll_type == Poll.PollType.RANKING:
         if not data['votes']:

@@ -8,7 +8,7 @@ from django.utils.translation import gettext_lazy as _
 from rest_framework.exceptions import ValidationError
 
 from backend.settings import SCORE_VOTE_CEILING, SCORE_VOTE_FLOOR
-from flowback.prediction.models import (Prediction,
+from flowback.prediction.models import (PredictionBet,
                                         PredictionStatement,
                                         PredictionStatementSegment,
                                         PredictionStatementVote)
@@ -44,14 +44,15 @@ class Poll(BaseModel):
     # Determines if poll is visible outside of group
     public = models.BooleanField(default=False)
 
-    # Determines the state of this poll
-    start_date = models.DateTimeField()
-    proposal_end_date = models.DateTimeField()
-    vote_start_date = models.DateTimeField()
-    delegate_vote_end_date = models.DateTimeField()
-    vote_end_date = models.DateTimeField()
-    end_date = models.DateTimeField()
-    result = models.BooleanField(default=False)
+    # Poll Phases
+    start_date = models.DateTimeField()  # Poll Start
+    area_vote_end_date = models.DateTimeField()  # Area Selection Phase
+    proposal_end_date = models.DateTimeField()  # Proposal Phase~
+    prediction_statement_end_date = models.DateTimeField()  # Prediction Phase
+    prediction_bet_end_date = models.DateTimeField()  # Prediction Betting Phase
+    delegate_vote_end_date = models.DateTimeField()  # Delegate Voting Phase
+    vote_end_date = models.DateTimeField()  # Voting Phase
+    end_date = models.DateTimeField()  # Result Phase, Prediction Vote afterward indefinitely
 
     """
     Poll Status Code
@@ -60,6 +61,7 @@ class Poll(BaseModel):
     -1 - Failed Quorum
     """
     status = models.IntegerField(default=0)
+    result = models.BooleanField(default=False)
 
     # Comment section
     comment_section = models.ForeignKey(CommentSection, default=comment_section_create, on_delete=models.DO_NOTHING)
@@ -68,29 +70,54 @@ class Poll(BaseModel):
     participants = models.IntegerField(default=0)
     dynamic = models.BooleanField()
 
-    def clean(self):
-        labels = ((self.start_date, 'start date'),
-                  (self.proposal_end_date, 'proposal end date'),
-                  (self.vote_start_date, 'vote start date'),
-                  (self.delegate_vote_end_date, 'delegate vote end date'),
-                  (self.vote_end_date, 'vote end date'),
-                  (self.end_date, 'end date'))
+    @property
+    def labels(self) -> tuple:
+        return ((self.start_date, 'start date', 'area_vote'),
+                (self.area_vote_end_date, 'area vote end date', 'proposal'),
+                (self.proposal_end_date, 'proposal end date', 'prediction_statement'),
+                (self.prediction_statement_end_date, 'prediction statement end date', 'prediction_bet'),
+                (self.prediction_bet_end_date, 'prediction bet end date', 'delegate_vote'),
+                (self.delegate_vote_end_date, 'delegate vote end date', 'vote'),
+                (self.vote_end_date, 'vote end date', 'result'),
+                (self.end_date, 'end date', 'prediction_vote'))
 
+    def clean(self):
+        labels = self.labels
         for x in range(len(labels) - 1):
             if labels[x][0] > labels[x+1][0]:
                 raise ValidationError(f'{labels[x][1].title()} is greater than {labels[x+1][1]}')
 
     class Meta:
-        constraints = [models.CheckConstraint(check=Q(proposal_end_date__gte=F('start_date')),
-                                              name='proposalenddategreaterthanstartdate_check'),
-                       models.CheckConstraint(check=Q(vote_start_date__gte=F('proposal_end_date')),
-                                              name='votestartdategreaterthanproposalenddate_check'),
-                       models.CheckConstraint(check=Q(delegate_vote_end_date__gte=F('vote_start_date')),
-                                              name='delegatevoteenddategreaterthanvotestartdate_check'),
+        constraints = [models.CheckConstraint(check=Q(area_vote_end_date__gte=F('start_date')),
+                                              name='areavoteenddategreaterthanstartdate_check'),
+                       models.CheckConstraint(check=Q(proposal_end_date__gte=F('area_vote_end_date')),
+                                              name='proposalenddategreaterthanareavoteenddate_check'),
+                       models.CheckConstraint(check=Q(prediction_statement_end_date__gte=F('proposal_end_date')),
+                                              name='predictionstatementenddategreaterthanproposalenddate_check'),
+                       models.CheckConstraint(check=Q(prediction_bet_end_date__gte=F('prediction_statement_end_date')),
+                                              name='predictionbetenddategreaterthanpredictionstatementeneddate_check'),
+                       models.CheckConstraint(check=Q(delegate_vote_end_date__gte=F('prediction_bet_end_date')),
+                                              name='delegatevoteenddategreaterthanpredictionbetenddate_check'),
                        models.CheckConstraint(check=Q(vote_end_date__gte=F('delegate_vote_end_date')),
                                               name='voteenddategreaterthandelegatevoteenddate_check'),
                        models.CheckConstraint(check=Q(end_date__gte=F('vote_end_date')),
                                               name='enddategreaterthanvoteenddate_check')]
+
+    @property
+    def current_phase(self) -> str:
+        labels = self.labels
+        current_time = timezone.now()
+
+        for x in reversed(range(len(labels))):
+            if current_time > labels[x][0]:
+                return labels[x][2]
+
+        return 'waiting'
+
+    def check_phase(self, phase: str):
+        current_phase = self.current_phase
+        if current_phase != phase:
+            raise ValidationError(f'Poll is not in {phase}, currently in {current_phase}')
 
 
 class PollProposal(BaseModel):
@@ -200,12 +227,31 @@ class PollVotingTypeForAgainst(BaseModel):
         ]
 
 
+class PollAreaStatement(BaseModel):
+    created_by = models.ForeignKey(GroupUser, on_delete=models.CASCADE)
+    poll = models.ForeignKey(Poll, on_delete=models.CASCADE)
+
+
+class PollAreaStatementSegment(BaseModel):
+    poll_area_statement = models.ForeignKey(PollAreaStatement, on_delete=models.CASCADE)
+    tag = models.ForeignKey(GroupTags, on_delete=models.CASCADE)
+
+
+class PollAreaStatementVote(BaseModel):
+    created_by = models.ForeignKey(GroupUser, on_delete=models.CASCADE)
+    poll_area_statement = models.ForeignKey(PollAreaStatement, on_delete=models.CASCADE)
+    vote = models.BooleanField()
+
+    class Meta:
+        unique_together = ('created_by', 'poll_area_statement')
+
+
 class PollPredictionStatement(PredictionStatement):
     created_by = models.ForeignKey(GroupUser, on_delete=models.CASCADE)
     poll = models.ForeignKey(Poll, on_delete=models.CASCADE)
 
     def clean(self):
-        if self.poll.end_date < self.end_date:
+        if self.poll.end_date > self.end_date:
             raise ValidationError('Poll ends earlier than prediction statement end date')
 
     @receiver(post_delete, sender=PollProposal)
@@ -225,15 +271,21 @@ class PollPredictionStatementVote(PredictionStatementVote):
     prediction_statement = models.ForeignKey(PollPredictionStatement, on_delete=models.CASCADE)
     created_by = models.ForeignKey(GroupUser, on_delete=models.CASCADE)
 
+    class Meta:
+        unique_together = ('prediction_statement', 'created_by')
 
-class PollPrediction(Prediction):
+
+class PollPredictionBet(PredictionBet):
     prediction_statement = models.ForeignKey(PollPredictionStatement, on_delete=models.CASCADE)
     created_by = models.ForeignKey(GroupUser, on_delete=models.CASCADE)
 
+    class Meta:
+        unique_together = ('prediction_statement', 'created_by')
+
     @receiver(post_save, sender=PredictionStatement)
     def reset_prediction_prediction(sender, instance: PredictionStatement, **kwargs):
-        PollPrediction.objects.filter(prediction_statement=instance).delete()
+        PollPredictionBet.objects.filter(prediction_statement=instance).delete()
 
     @receiver(post_save, sender=PollProposal)
     def reset_prediction_proposal(sender, instance: PollProposal, **kwargs):
-        PollPrediction.objects.filter(prediction_statement__pollpredictionstatementsegment__proposal=instance).delete()
+        PollPredictionBet.objects.filter(prediction_statement__pollpredictionstatementsegment__proposal=instance).delete()

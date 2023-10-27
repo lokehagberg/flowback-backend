@@ -8,6 +8,7 @@ from django.utils import timezone
 from datetime import datetime
 
 from flowback.poll.services.vote import poll_proposal_vote_count
+from flowback.poll.tasks import poll_area_vote_count
 
 poll_notification = NotificationManager(sender_type='poll', possible_categories=['timeline',
                                                                                  'poll',
@@ -28,8 +29,11 @@ def poll_create(*, user_id: int,
                 description: str,
                 start_date: datetime,
                 proposal_end_date: datetime,
-                vote_start_date: datetime,
+                prediction_statement_end_date: datetime,
+                area_vote_end_date: datetime,
+                prediction_bet_end_date: datetime,
                 delegate_vote_end_date: datetime,
+                vote_end_date: datetime,
                 end_date: datetime,
                 poll_type: int,
                 public: bool,
@@ -47,9 +51,11 @@ def poll_create(*, user_id: int,
         raise ValidationError("Permission denied for custom poll quorum")
 
     poll = Poll(created_by=group_user, title=title, description=description,
-                start_date=start_date, proposal_end_date=proposal_end_date, vote_start_date=vote_start_date,
-                delegate_vote_end_date=delegate_vote_end_date, vote_end_date=end_date, end_date=end_date,
-                poll_type=poll_type, public=public, tag_id=tag, pinned=pinned, dynamic=dynamic, quorum=quorum)
+                start_date=start_date, proposal_end_date=proposal_end_date,
+                prediction_statement_end_date=prediction_statement_end_date, area_vote_end_date=area_vote_end_date,
+                prediction_bet_end_date=prediction_bet_end_date, delegate_vote_end_date=delegate_vote_end_date,
+                vote_end_date=vote_end_date, end_date=end_date, poll_type=poll_type,
+                public=public, tag_id=tag, pinned=pinned, dynamic=dynamic, quorum=quorum)
     poll.full_clean()
     poll.save()
 
@@ -58,22 +64,12 @@ def poll_create(*, user_id: int,
                               message=f'User {group_user.user.username} created poll {poll.title}',
                               timestamp=start_date, related_id=poll.id)
 
+    poll_area_vote_count.apply_async(kwargs=dict(poll_id=poll.id), eta=poll.area_vote_end_date)
+
     # Poll notification
-    poll_notification.create(sender_id=poll.id, action=poll_notification.Action.update, category='timeline',
-                             message=f'Poll {poll.title} has stopped accepting proposals',
-                             timestamp=proposal_end_date)
-
-    poll_notification.create(sender_id=poll.id, action=poll_notification.Action.update, category='timeline',
-                             message=f'Poll {poll.title} has started accepting votes',
-                             timestamp=vote_start_date)
-
-    poll_notification.create(sender_id=poll.id, action=poll_notification.Action.update, category='timeline',
-                             message=f'Poll {poll.title} has stopped accepting delegate votes',
-                             timestamp=delegate_vote_end_date)
-
-    poll_notification.create(sender_id=poll.id, action=poll_notification.Action.update, category='timeline',
-                             message=f'Poll {poll.title} has finished',
-                             timestamp=end_date)
+    for date, name, phase in poll.labels:
+        poll_notification.create(sender_id=poll.id, action=poll_notification.Action.update, category='timeline',
+                                 message=f'Poll {poll.title} has started {phase.replace("_", " ").capitalize()} phase')
 
     if poll_type == Poll.PollType.SCHEDULE:
         group_notification.create(sender_id=group_id, action=group_notification.Action.update, category='schedule',
@@ -111,27 +107,34 @@ def poll_delete(*, user_id: int, poll_id: int) -> None:
                                                    raise_exception=False)
 
     if poll.created_by == group_user and not force_deletion_access:
-        if poll.start_date < timezone.now():
-            raise ValidationError("Unable to delete ongoing polls")
-
-        if poll.status:
-            raise ValidationError("Unable to delete finished polls")
+        if poll.current_phase != 'waiting':
+            raise ValidationError("Only administrators can delete ongoing/finished polls")
 
     else:
         group_user_permissions(group_user=group_user, permissions=['admin', 'force_delete_poll'])
 
     # Remove future notifications
-    if timezone.now() <= poll.start_date:
+    if poll.current_phase == 'waiting':
         group_notification.delete(sender_id=group_id, category='poll', related_id=poll.id)
 
-    if timezone.now() <= poll.proposal_end_date:
-        poll_notification.delete(sender_id=poll_id, category='timeline', timestamp__gt=poll.proposal_end_date)
-    elif timezone.now() <= poll.vote_start_date:
-        poll_notification.delete(sender_id=poll_id, category='timeline', timestamp__gt=poll.vote_start_date)
-    elif timezone.now() <= poll.delegate_vote_end_date:
-        poll_notification.delete(sender_id=poll_id, category='timeline', timestamp__gt=poll.delegate_vote_end_date)
-    elif timezone.now() <= poll.end_date:
-        poll_notification.delete(sender_id=poll_id, category='timeline', timestamp__gt=poll.end_date)
+    def delete_notifications_after(phase): poll_notification.delete(sender_id=poll_id,
+                                                                    category='timeline',
+                                                                    timestamp__gt=phase)
+    match poll.current_phase:
+        case 'waiting':
+            delete_notifications_after(poll.proposal_end_date)
+        case 'proposal':
+            delete_notifications_after(poll.prediction_statement_end_date)
+        case 'area_vote':
+            delete_notifications_after(poll.area_vote_end_date)
+        case 'prediction_bet':
+            delete_notifications_after(poll.prediction_bet_end_date)
+        case 'delegate_vote':
+            delete_notifications_after(poll.delegate_vote_end_date)
+        case 'vote':
+            delete_notifications_after(poll.vote_end_date)
+        case 'result':
+            delete_notifications_after(poll.end_date)
 
     poll.delete()
 

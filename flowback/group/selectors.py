@@ -192,7 +192,7 @@ class BaseGroupTagsFilter(django_filters.FilterSet):
     class Meta:
         model = GroupTags
         fields = dict(id=['exact'],
-                      tag_name=['exact', 'icontains'],
+                      name=['exact', 'icontains'],
                       active=['exact'])
 
 
@@ -211,8 +211,8 @@ class BaseGroupUserDelegateFilter(django_filters.FilterSet):
     delegate_id = django_filters.NumberFilter()
     delegate_user_id = django_filters.NumberFilter(field_name='delegate__user_id')
     delegate_name__icontains = django_filters.CharFilter(field_name='delegate__user__username__icontains')
-    tag_id = django_filters.NumberFilter(field_name='tags__tag_id')
-    tag_name = django_filters.CharFilter(field_name='tags__tag_name')
+    tag_id = django_filters.NumberFilter(field_name='tags__id')
+    tag_name = django_filters.CharFilter(field_name='tags__name')
     tag_name__icontains = django_filters.CharFilter(field_name='tags__tag_name', lookup_expr='icontains')
 
     class Meta:

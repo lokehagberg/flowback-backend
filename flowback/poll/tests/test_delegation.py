@@ -13,25 +13,17 @@ from flowback.poll.services.proposal import poll_proposal_create
 from flowback.poll.services.vote import poll_proposal_vote_update, poll_proposal_delegate_vote_update
 from flowback.poll.views import DelegatePollVoteListAPI
 from flowback.user.models import User
+from flowback.user.tests.factories import UserFactory
 
 
 class GroupDelegationTests(TestCase):
     def setUp(self):
-        self.user_creator = User.objects.create_superuser(username='user_creator',
-                                                          email='creator@example.com',
-                                                          password='password123')
-        self.user_delegate = User.objects.create_user(username='user_delegate',
-                                                      email='member@example.com',
-                                                      password='password123')
-        self.user_delegator = User.objects.create_user(username='user_delegator',
-                                                       email='member_2@example.com',
-                                                       password='password123')
-        self.user_non_delegate = User.objects.create_user(username='user_non_delegate',
-                                                          email='member_3@example.com',
-                                                          password='password123')
-        self.user_non_member = User.objects.create_user(username='user_non_member',
-                                                        email='member_4@example.com',
-                                                        password='password123')
+        (self.user_creator,
+        self.user_delegate,
+        self.user_delegator,
+        self.user_non_delegate,
+        self.user_non_member) = [UserFactory.create() for i in range(5)]
+
         self.group = group_create(user=self.user_creator.id,
                                   name='test_group',
                                   description='desc',

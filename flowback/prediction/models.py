@@ -32,7 +32,7 @@ class PredictionStatementVote(BaseModel):
         abstract = True
 
 
-class Prediction(BaseModel):
+class PredictionBet(BaseModel):
     score = models.IntegerField(validators=[MaxValueValidator(5), MinValueValidator(0)])
     # prediction_statement: represents prediction statement
     # created_by: represents ownership
