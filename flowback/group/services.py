@@ -478,7 +478,8 @@ def group_thread_comment_create(user_id: int, thread_id: int, message: str, atta
                              comment_section_id=thread.comment_section.id,
                              message=message,
                              parent_id=parent_id,
-                             attachments=attachments)
+                             attachments=attachments,
+                             attachment_upload_to="group/thread/attachments")
 
     return comment
 
@@ -496,6 +497,7 @@ def group_thread_comment_update(user_id: int, thread_id: int, comment_id: int, d
                           comment_section_id=thread.comment_section_id,
                           comment_id=comment_id,
                           data=data)
+
 
 def group_thread_comment_delete(user_id: int, thread_id: int, comment_id: int):
     thread = get_object(GroupThread, id=thread_id)

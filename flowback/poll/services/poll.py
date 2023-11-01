@@ -1,5 +1,6 @@
 from rest_framework.exceptions import ValidationError
 from flowback.common.services import get_object, model_update
+from flowback.files.services import upload_collection
 from flowback.group.services import group_notification, group_schedule
 from flowback.notification.services import NotificationManager
 from flowback.poll.models import Poll, PollProposal
@@ -40,6 +41,7 @@ def poll_create(*, user_id: int,
                 tag: int,
                 pinned: bool,
                 dynamic: bool,
+                attachments: list = None,
                 quorum: int = None
                 ) -> Poll:
     group_user = group_user_permissions(user=user_id, group=group_id, permissions=['create_poll', 'admin'])
@@ -50,12 +52,20 @@ def poll_create(*, user_id: int,
     if quorum is not None and not group_user.permission.poll_quorum and not group_user.is_admin:
         raise ValidationError("Permission denied for custom poll quorum")
 
+    collection = None
+    if attachments:
+        collection = upload_collection(user_id=user_id,
+                                       file=attachments,
+                                       upload_to="group/poll/attachments")
+
     poll = Poll(created_by=group_user, title=title, description=description,
                 start_date=start_date, proposal_end_date=proposal_end_date,
                 prediction_statement_end_date=prediction_statement_end_date, area_vote_end_date=area_vote_end_date,
                 prediction_bet_end_date=prediction_bet_end_date, delegate_vote_end_date=delegate_vote_end_date,
                 vote_end_date=vote_end_date, end_date=end_date, poll_type=poll_type,
-                public=public, tag_id=tag, pinned=pinned, dynamic=dynamic, quorum=quorum)
+                public=public, tag_id=tag, pinned=pinned, dynamic=dynamic, quorum=quorum,
+                attachments=collection)
+
     poll.full_clean()
     poll.save()
 
@@ -136,6 +146,7 @@ def poll_delete(*, user_id: int, poll_id: int) -> None:
         case 'result':
             delete_notifications_after(poll.end_date)
 
+    poll.attachments.delete()
     poll.delete()
 
 

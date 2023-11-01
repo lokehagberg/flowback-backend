@@ -14,7 +14,8 @@ def poll_comment_create(*, author_id: int, poll_id: int, message: str, attachmen
                              comment_section_id=poll.comment_section.id,
                              message=message,
                              parent_id=parent_id,
-                             attachments=attachments)
+                             attachments=attachments,
+                             attachment_upload_to="group/poll/comment/attachments")
 
     poll_notification.create(sender_id=poll_id,
                              action=poll_notification.Action.create,

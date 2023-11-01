@@ -2,6 +2,8 @@ from rest_framework.exceptions import ValidationError
 
 from flowback.comment.models import CommentSection, Comment
 from flowback.common.services import model_update, get_object
+from flowback.files.services import upload_collection
+from flowback.user.models import User
 
 
 def comment_section_create(*, active: bool = True) -> CommentSection:
@@ -21,9 +23,21 @@ def comment_create(*,
                    comment_section_id: int,
                    message: str,
                    parent_id: int,
-                   attachments: list) -> Comment:
+                   attachments: list = None,
+                   attachment_upload_to="",
+                   attachment_upload_to_include_timestamp=True) -> Comment:
+
+    if attachments:
+        collection = upload_collection(user_id=author_id,
+                                       file=attachments,
+                                       upload_to=attachment_upload_to,
+                                       upload_to_include_timestamp=attachment_upload_to_include_timestamp)
+
+    else:
+        collection = None
+
     comment = Comment(author_id=author_id, comment_section_id=comment_section_id,
-                      message=message, parent_id=parent_id, attachments=attachments)
+                      message=message, parent_id=parent_id, attachments=collection)
 
     if parent_id:
         parent = get_object(Comment, id=parent_id)
@@ -62,6 +76,8 @@ def comment_delete(*, fetched_by: int, comment_section_id: int, comment_id: int)
 
     if not comment.active:
         raise ValidationError("Comment has already been removed")
+
+    comment.attachments.delete()
 
     comment.active = False
     comment.message = '[Deleted]'

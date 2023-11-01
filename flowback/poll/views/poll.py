@@ -48,12 +48,16 @@ class PollListApi(APIView):
         status = serializers.IntegerField(required=False)
 
     class OutputSerializer(serializers.ModelSerializer):
+        class FileSerializer(serializers.Serializer):  # TODO why is it updated_at?
+            file = serializers.CharField(source='updated_at')
+
         created_by = GroupUserSerializer()
         group_joined = serializers.BooleanField(required=False)
         group_id = serializers.IntegerField(source='created_by.group_id')
         group_name = serializers.CharField(source='created_by.group.name')
         group_image = serializers.ImageField(source='created_by.group.image')
         tag_name = serializers.CharField(source='tag.name')
+        attachments = FileSerializer(many=True, source='attachments.filesegment_set', allow_null=True)
         hide_poll_users = serializers.BooleanField(source='created_by.group.hide_poll_users')
         total_comments = serializers.IntegerField()
 
@@ -86,7 +90,8 @@ class PollListApi(APIView):
                       'dynamic',
                       'total_comments',
                       'quorum',
-                      'status')
+                      'status',
+                      'attachments')
 
     def get(self, request, group_id: int = None):
         filter_serializer = self.FilterSerializer(data=request.query_params)
@@ -121,12 +126,13 @@ class PollCreateAPI(APIView):
         tag = serializers.IntegerField()
         quorum = serializers.IntegerField(required=False)
         public = serializers.BooleanField(default=False)
+        attachments = serializers.ListField(child=serializers.FileField(), required=False, max_length=10)
 
         class Meta:
             model = Poll
             fields = ('title', 'description', 'start_date', 'proposal_end_date', 'prediction_statement_end_date',
                       'area_vote_end_date', 'prediction_bet_end_date', 'delegate_vote_end_date', 'vote_end_date',
-                      'end_date', 'poll_type', 'public', 'tag', 'pinned', 'dynamic', 'quorum')
+                      'end_date', 'poll_type', 'public', 'tag', 'pinned', 'dynamic', 'quorum', 'attachments')
 
     def post(self, request, group_id: int):
         serializer = self.InputSerializer(data=request.data)

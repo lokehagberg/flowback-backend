@@ -21,6 +21,9 @@ class CommentListAPI(APIView):
         score__gt = serializers.IntegerField(required=False)
 
     class OutputSerializer(serializers.Serializer):
+        class FileSerializer(serializers.Serializer):  # TODO why is it updated_at?
+            file = serializers.CharField(source='updated_at')
+
         id = serializers.IntegerField()
         author_id = serializers.IntegerField()
         author_name = serializers.CharField(source='author.username')
@@ -30,7 +33,7 @@ class CommentListAPI(APIView):
         edited = serializers.BooleanField()
         active = serializers.BooleanField()
         message = serializers.CharField()
-        attachments = serializers.ListField(child=serializers.FileField(), required=False)
+        attachments = FileSerializer(source="attachments.filesegment_set", many=True, allow_null=True)
         score = serializers.IntegerField()
 
     def get(self, request, comment_section_id: int):
@@ -51,7 +54,7 @@ class CommentCreateAPI(APIView):
     class InputSerializer(serializers.Serializer):
         parent_id = serializers.IntegerField(required=False)
         message = serializers.CharField()
-        attachments = serializers.ListField(child=serializers.FileField(), required=False)
+        attachments = serializers.ListField(child=serializers.FileField(), required=False, max_length=10)
 
     def post(self, request, comment_section_id: int):
         serializer = self.InputSerializer(data=request.data)

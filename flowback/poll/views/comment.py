@@ -9,6 +9,9 @@ from ..selectors.comment import poll_comment_list
 from ..services.comment import poll_comment_create, poll_comment_update, poll_comment_delete
 
 from flowback.comment.views import CommentListAPI, CommentCreateAPI, CommentUpdateAPI, CommentDeleteAPI
+from ...comment.models import Comment
+from ...files.models import FileSegment
+from ...user.models import User
 
 
 @extend_schema(tags=['poll'])
@@ -18,6 +21,8 @@ class PollCommentListAPI(CommentListAPI):
         serializer.is_valid(raise_exception=True)
 
         comments = poll_comment_list(fetched_by=request.user, poll_id=poll, filters=serializer.validated_data)
+
+        print(FileSegment.objects.first().file)
 
         return get_paginated_response(pagination_class=self.Pagination,
                                       serializer_class=self.OutputSerializer,

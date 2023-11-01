@@ -103,6 +103,7 @@ INSTALLED_APPS = [
     'flowback.notification',
     'flowback.comment',
     'flowback.schedule',
+    'flowback.files',
     'drf_spectacular'
 ] + env('INTEGRATIONS')
 
