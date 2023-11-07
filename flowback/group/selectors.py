@@ -49,7 +49,7 @@ def group_user_permissions(*,
     permissions = permissions or []
 
     if user and group:
-        group_user = get_object(GroupUser, 'User is not in group', group=group, user=user)
+        group_user = get_object(GroupUser, 'User is not in group', group=group, user=user, active=True)
 
     elif group_user:
         if type(group_user) == int:
@@ -138,7 +138,7 @@ def group_user_list(*, group: int, fetched_by: User, filters=None):
     filters = filters or {}
     is_delegate = GroupUser.objects.filter(group_id=group, groupuserdelegate__group_user=OuterRef('pk'),
                                            groupuserdelegate__group=OuterRef('group'))
-    qs = GroupUser.objects.filter(group_id=group).annotate(delegate=Exists(is_delegate)).all()
+    qs = GroupUser.objects.filter(group_id=group, active=True).annotate(delegate=Exists(is_delegate)).all()
     return BaseGroupUserFilter(filters, qs).qs
 
 

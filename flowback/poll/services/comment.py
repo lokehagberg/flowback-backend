@@ -6,7 +6,7 @@ from flowback.comment.services import comment_create, comment_update, comment_de
 from flowback.poll.services.poll import poll_notification
 
 
-def poll_comment_create(*, author_id: int, poll_id: int, message: str, attachments: list, parent_id: int = None) -> Comment:
+def poll_comment_create(*, author_id: int, poll_id: int, message: str, attachments: list = None, parent_id: int = None) -> Comment:
     poll = get_object(Poll, id=poll_id)
     group_user = group_user_permissions(group=poll.created_by.group.id, user=author_id)
 

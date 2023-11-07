@@ -117,6 +117,7 @@ class GroupUser(BaseModel):
     group = models.ForeignKey(Group, on_delete=models.CASCADE)
     is_admin = models.BooleanField(default=False)
     permission = models.ForeignKey(GroupPermissions, null=True, blank=True, on_delete=models.SET_NULL)
+    active = models.BooleanField(default=True)
 
     @classmethod
     # Updates Schedule name

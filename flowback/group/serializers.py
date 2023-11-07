@@ -25,4 +25,5 @@ class GroupUserSerializer(serializers.ModelSerializer):
                   'permission_name',
                   'permission_id',
                   'group_name',
-                  'group_image')
+                  'group_image',
+                  'active')

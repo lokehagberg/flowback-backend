@@ -147,11 +147,19 @@ def group_join(*, user: int, group: int) -> Union[GroupUser, GroupUserInvite]:
         group_notification.create(sender_id=group.id, action=group_notification.Action.update,
                                   category='invite', message=f'User {user.username} requested to join {group.name}')
 
-    else:
-        user_status = GroupUser(user=user, group=group)
+        user_status.full_clean()
+        user_status.save()
 
-    user_status.full_clean()
-    user_status.save()
+    else:
+        try:
+            user_status = GroupUser.objects.get(user=user, group=group)
+            user_status.active = True
+            user_status.save()
+        except GroupUser.DoesNotExist:
+            user_status = GroupUser(user=user, group=group)
+            user_status.full_clean()
+            user_status.save()
+
     group_notification.create(sender_id=group.id, action=group_notification.Action.create,
                               category='members', message=f'User {user.username} joined the group {group.name}')
 
@@ -178,9 +186,10 @@ def group_leave(*, user: int, group: int) -> None:
     user = group_user_permissions(group=group, user=user)
 
     if user.user.id == user.group.created_by:
-        raise ValidationError("Creators aren't allowed to leave, deleting the group is an option")
+        raise ValidationError("Group owner isn't allowed to leave, deleting the group is an option")
 
-    user.delete()
+    user.active = False
+    user.save()
 
     group_notification.create(sender_id=group, action=group_notification.Action.create,
                               category='members', message=f'User {user.user.username} left the group {user.group.name}')

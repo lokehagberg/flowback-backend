@@ -29,7 +29,7 @@ class GroupUserFactory(factory.django.DjangoModelFactory):
         model = GroupUser
 
     user = factory.SubFactory(UserFactory)
-    group = factory.SubFactory(Group)
+    group = factory.SubFactory(GroupFactory, created_by=user)
 
 
 class GroupTagsFactory(factory.django.DjangoModelFactory):
