@@ -10,6 +10,7 @@ class UserFactory(factory.django.DjangoModelFactory):
 
     email = factory.LazyAttribute(lambda _: faker.unique.email())
     username = factory.LazyAttribute(lambda _: faker.unique.first_name().lower())
+    password = 'password123abc.!?'
 
 
 class OnboardUserFactory(factory.django.DjangoModelFactory):

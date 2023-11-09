@@ -1,3 +1,5 @@
+import uuid
+
 from django.core.mail import send_mail
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
@@ -105,6 +107,26 @@ def user_update(*, user: User, data) -> User:
                                      data=data)
 
     return user
+
+
+def user_delete(*, user_id: int) -> None:
+    user = get_object(User, id=user_id)
+
+    if user.is_active:
+        user.is_active = False
+        user.username = 'deleted_user_' + uuid.uuid4().hex
+        user.email = user.username + '@example.com'
+        user.profile_image = None
+        user.banner_image = None
+        user.email_notifications = False
+        user.bio = None
+        user.website = None
+
+        user.full_clean()
+        user.save()
+
+        user.schedule.delete()
+        user.kanban.delete()
 
 
 def user_schedule_event_create(*,
