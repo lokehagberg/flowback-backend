@@ -110,16 +110,24 @@ class Poll(BaseModel):
         labels = self.labels
         current_time = timezone.now()
 
-        for x in reversed(range(len(labels))):
-            if current_time > labels[x][0]:
-                return labels[x][2]
+        if not self.dynamic:
+            for x in reversed(range(len(labels))):
+                if current_time >= labels[x][0]:
+                    return labels[x][2]
+
+        else:
+            if current_time >= labels[-1][0]:  # Return dynamic_end if finished
+                return 'dynamic_end'
+
+            if current_time >= labels[0][0]:  # Return dynamic if running
+                return 'dynamic'
 
         return 'waiting'
 
-    def check_phase(self, phase: str):
+    def check_phase(self, *phases: str):
         current_phase = self.current_phase
-        if current_phase != phase:
-            raise ValidationError(f'Poll is not in {phase}, currently in {current_phase}')
+        if current_phase not in phases:
+            raise ValidationError(f'Poll is not in {" or ".join(phases)}, currently in {current_phase}')
 
 
 class PollProposal(BaseModel):

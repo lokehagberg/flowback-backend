@@ -29,8 +29,7 @@ def poll_prediction_statement_create(poll: int,
                                                   poll=poll).all()
     prediction_statement.full_clean()
 
-    if poll.current_phase != 'prediction_statement':
-        raise ValidationError("Unable to create prediction statement outside of prediction statement phase")
+    poll.check_phase('prediction_statement')
 
     if len(segments) < 1:
         raise ValidationError('Prediction statement must contain atleast one statement')
@@ -55,8 +54,7 @@ def poll_prediction_statement_update(user: Union[int, User], prediction_statemen
     prediction_statement = get_object(PollPredictionStatement, id=prediction_statement_id)
     group_user = group_user_permissions(group=prediction_statement.poll.created_by.group, user=user)
 
-    if prediction_statement.poll.current_phase != 'prediction_statement':
-        raise ValidationError("Unable to create prediction statement outside of prediction statement phase")
+    prediction_statement.poll.check_phase('prediction_statement')
 
     if not prediction_statement.created_by == group_user:
         raise ValidationError('Prediction statement not created by user')
@@ -66,8 +64,7 @@ def poll_prediction_statement_delete(user: Union[int, User], prediction_statemen
     prediction_statement = get_object(PollPredictionStatement, id=prediction_statement_id)
     group_user = group_user_permissions(group=prediction_statement.poll.created_by.group, user=user)
 
-    if prediction_statement.poll.current_phase != 'prediction_statement':
-        raise ValidationError("Unable to delete prediction statement outside of prediction statement phase")
+    prediction_statement.poll.check_phase('prediction_statement')
 
     if not prediction_statement.created_by == group_user:
         raise ValidationError('Prediction statement not created by user')
@@ -79,8 +76,7 @@ def poll_prediction_bet_create(user: Union[int, User], prediction_statement_id: 
     prediction_statement = get_object(PollPredictionStatement, id=prediction_statement_id)
     group_user = group_user_permissions(group=prediction_statement.poll.created_by.group, user=user)
 
-    if prediction_statement.poll.current_phase != 'prediction_bet':
-        raise ValidationError("Unable to create prediction bets outside of prediction bet phase")
+    prediction_statement.poll.check_phase('prediction_bet')
 
     prediction = PollPredictionBet(created_by=group_user,
                                    prediction_statement=prediction_statement,
@@ -96,8 +92,7 @@ def poll_prediction_bet_update(user: Union[int, User], prediction_statement_id: 
     group_user = group_user_permissions(group=prediction.prediction_statement.poll.created_by.group,
                                         user=user)
 
-    if prediction.prediction_statement.poll.current_phase != 'prediction_bet':
-        raise ValidationError("Unable to update prediction bets outside of prediction bet phase")
+    prediction.prediction_statement.poll.check_phase('prediction_bet')
 
     if not prediction.created_by == group_user:
         raise ValidationError('Prediction bet not created by user')
@@ -117,8 +112,7 @@ def poll_prediction_bet_delete(user: Union[int, User], prediction_statement_id: 
     group_user = group_user_permissions(group=prediction.prediction_statement.poll.created_by.group,
                                         user=user)
 
-    if prediction.prediction_statement.poll.current_phase != 'prediction_bet':
-        raise ValidationError("Unable to delete prediction bets outside of prediction bet phase")
+    prediction.prediction_statement.poll.check_phase('prediction_bet')
 
     if not prediction.created_by == group_user:
         raise ValidationError('Prediction bet not created by user')
@@ -130,8 +124,7 @@ def poll_prediction_statement_vote_create(user: Union[int, User], prediction_sta
     prediction_statement = get_object(PollPredictionStatement, id=prediction_statement_id)
     group_user = group_user_permissions(group=prediction_statement.poll.created_by.group, user=user)
 
-    if prediction_statement.poll.current_phase != 'prediction_vote':
-        raise ValidationError("Unable to vote outside of prediction vote phase")
+    prediction_statement.poll.check_phase('prediction_vote')
 
     prediction_vote = PollPredictionStatementVote(created_by=group_user,
                                                   prediction_statement=prediction_statement,

@@ -1,3 +1,5 @@
+import os.path
+
 from django.db import models
 from django.utils import timezone
 
@@ -30,3 +32,4 @@ class FileSegment(BaseModel):
 
     collection = models.ForeignKey(FileCollection, on_delete=models.CASCADE)
     file = models.FileField(upload_to=upload_directory)
+    file_name = models.CharField(max_length=255)

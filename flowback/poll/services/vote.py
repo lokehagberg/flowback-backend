@@ -17,8 +17,7 @@ def poll_proposal_vote_update(*, user_id: int, poll_id: int, data: dict) -> None
                                         group=poll.created_by.group.id,
                                         permissions=['allow_vote', 'admin'])
 
-    if poll.current_phase != 'vote':
-        raise ValidationError("Unable to cast votes outside of vote phase")
+    poll.check_phase('vote', 'dynamic')
 
     if poll.poll_type == Poll.PollType.RANKING:
         if not data['votes']:
@@ -97,8 +96,7 @@ def poll_proposal_delegate_vote_update(*, user_id: int, poll_id: int, data) -> N
     if group_user.group.id != poll.created_by.group.id:
         raise ValidationError('Permission denied')
 
-    if poll.current_phase != 'delegate_vote':
-        raise ValidationError("Unable to cast votes outside of delegate vote phase")
+    poll.check_phase('delegate_vote', 'dynamic')
 
     if poll.poll_type == Poll.PollType.RANKING:
         if not data['votes']:
@@ -125,7 +123,7 @@ def poll_proposal_delegate_vote_update(*, user_id: int, poll_id: int, data) -> N
             PollDelegateVoting.objects.filter(created_by=delegate_pool, poll=poll).delete()
             return
 
-        if len(data['scores'] != len(data['proposals'])):
+        if len(data['scores']) != len(data['proposals']):
             raise ValidationError("The amount of votes don't match the amount of polls")
 
         proposals = poll.pollproposal_set.filter(id__in=data['proposals']).all()

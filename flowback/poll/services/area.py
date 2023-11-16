@@ -13,7 +13,7 @@ def poll_area_statement_create(user_id: int, poll_id: int, tags: list[int]):
     poll = get_object(Poll, id=poll_id)
     group_user = group_user_permissions(user=user_id, group=poll.created_by.group)
 
-    poll.check_phase('area_vote')
+    poll.check_phase('area_vote', 'dynamic')
 
     # Create Statement
     poll_area_statement = PollAreaStatement(created_by=group_user, poll=poll)
@@ -45,7 +45,7 @@ def poll_area_statement_vote_update(user_id: int, poll_id: int, tag: int, vote: 
     except IndexError:
         poll_area_statement = poll_area_statement_create(user_id=user_id, poll_id=poll_id, tags=tags)
 
-    poll.check_phase('area_vote')
+    poll.check_phase('area_vote', 'dynamic')
 
     # Create or Update
     PollAreaStatementVote.objects.update_or_create(created_by=group_user,

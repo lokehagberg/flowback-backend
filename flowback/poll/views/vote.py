@@ -205,7 +205,7 @@ class PollProposalDelegateVoteUpdateAPI(APIView):
 
         serializer = input_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        poll_refresh_cheap(poll_id=poll)  # TODO get celery
-        poll_proposal_delegate_vote_update(user_id=request.user.id, poll_id=poll, data=serializer.validated_data)
+        poll_refresh_cheap(poll_id=poll.id)  # TODO get celery
+        poll_proposal_delegate_vote_update(user_id=request.user.id, poll_id=poll.id, data=serializer.validated_data)
         return Response(status=status.HTTP_200_OK)
 
