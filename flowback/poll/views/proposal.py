@@ -30,6 +30,9 @@ class PollProposalListAPI(APIView):
         end_date = serializers.DateTimeField(required=False)
 
     class OutputSerializer(serializers.ModelSerializer):
+        approval_positive = serializers.IntegerField()
+        approval_negative = serializers.IntegerField()
+
         class Meta:
             model = PollProposal
             fields = ('id',
@@ -42,6 +45,8 @@ class PollProposalListAPI(APIView):
     class OutputSerializerTypeSchedule(OutputSerializer):
         start_date = serializers.DateTimeField(source='pollproposaltypeschedule.start_date')
         end_date = serializers.DateTimeField(source='pollproposaltypeschedule.end_date')
+        approval_positive = serializers.IntegerField()
+        approval_negative = serializers.IntegerField()
 
         class Meta:
             model = PollProposal
