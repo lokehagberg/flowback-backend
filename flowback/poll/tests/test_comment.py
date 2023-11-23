@@ -6,6 +6,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from flowback.comment.models import Comment
 from .factories import PollFactory
 from ...comment.tests.factories import CommentFactory
+from ...files.models import FileSegment
 from ...files.tests.factories import FileCollectionFactory, FileSegmentFactory
 from ...poll.views.comment import PollCommentCreateAPI, PollCommentListAPI
 
@@ -68,8 +69,8 @@ class PollCommentTest(APITransactionTestCase):
         comment_ex = Comment.objects.get(id=comment_id_ex)
         files_ex = comment_ex.attachments.filesegment_set
 
-        self.assertEqual(all('test' not in x.updated_at for x in files.all()), True)
-        self.assertEqual(all('test' not in x.updated_at for x in files_ex.all()), True)
+        self.assertEqual(all('test' not in x.file for x in files.all()), True)
+        self.assertEqual(all('test' not in x.file for x in files_ex.all()), True)
         self.assertEqual(files.count(), len(data['attachments']))
 
     def test_poll_comment_list(self):
@@ -81,4 +82,6 @@ class PollCommentTest(APITransactionTestCase):
         response = view(request, poll=self.poll.id)
 
         data = json.loads(response.rendered_content)
+        print(self.poll_comment_three.attachments.filesegment_set.first().__dict__)
+        print(FileSegment.objects.first().__dict__)
         print(data)

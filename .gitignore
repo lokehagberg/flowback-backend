@@ -8,6 +8,7 @@ media
 .flowback_pgpass
 flowback_addon/*
 general.log
+static/*
 
 # Backup files #
 *.bak
@@ -190,3 +191,4 @@ GitHub.sublime-settings
 !.vscode/launch.json
 !.vscode/extensions.json
 .history
+/static/

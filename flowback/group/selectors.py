@@ -232,7 +232,8 @@ def group_user_delegate_list(*, group: int, fetched_by: User, filters=None):
 class BaseGroupThreadFilter(django_filters.FilterSet):
     order_by = django_filters.OrderingFilter(
         fields=(('created_at', 'created_at_asc'),
-                ('-created_at', 'created_at_desc')))
+                ('-created_at', 'created_at_desc'),
+                ('pinned', 'pinned')))
 
     class Meta:
         model = GroupThread

@@ -151,7 +151,8 @@ ROOT_URLCONF = 'backend.urls'
 
 MEDIA_ROOT = str(BASE_DIR) + '/media'
 MEDIA_URL = '/media/'
-STATIC_URL = 'static/'
+STATIC_ROOT = str(BASE_DIR) + '/static'
+STATIC_URL = '/static/'
 
 
 # Optional AWS Storage Manager

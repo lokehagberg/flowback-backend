@@ -20,3 +20,4 @@ class FileSegmentFactory(factory.django.DjangoModelFactory):
     collection = factory.SubFactory(FileCollectionFactory)
     file = SimpleUploadedFile('something.txt',
                               f'Silver?'.encode())
+    file_name = 'something.txt'

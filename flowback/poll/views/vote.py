@@ -97,7 +97,7 @@ class DelegatePollVoteListAPI(APIView):
             proposal_id = serializers.IntegerField()
             proposal_title = serializers.CharField(source='proposal.title')
             proposal_created_by_id = serializers.IntegerField(source='proposal.created_by.user_id')
-            proposal_created_by_name = serializers.IntegerField(source='proposal.created_by.user.username')
+            proposal_created_by_name = serializers.CharField(source='proposal.created_by.user.username')
             priority = serializers.IntegerField()
             score = serializers.IntegerField()
 
@@ -108,7 +108,7 @@ class DelegatePollVoteListAPI(APIView):
             proposal_id = serializers.IntegerField()
             proposal_title = serializers.CharField(source='proposal.title')
             proposal_created_by_id = serializers.IntegerField(source='proposal.created_by.user_id')
-            proposal_created_by_name = serializers.IntegerField(source='proposal.created_by.user.username')
+            proposal_created_by_name = serializers.CharField(source='proposal.created_by.user.username')
             score = serializers.IntegerField()
 
             class Meta:
@@ -118,7 +118,7 @@ class DelegatePollVoteListAPI(APIView):
             proposal_id = serializers.IntegerField()
             proposal_title = serializers.CharField(source='proposal.title')
             proposal_created_by_id = serializers.IntegerField(source='proposal.created_by.user_id')
-            proposal_created_by_name = serializers.IntegerField(source='proposal.created_by.user.username')
+            proposal_created_by_name = serializers.CharField(source='proposal.created_by.user.username')
             score = serializers.IntegerField()
             total_delegators = serializers.IntegerField()
 
@@ -126,14 +126,31 @@ class DelegatePollVoteListAPI(APIView):
                 ordering = ['vote']
 
         def get_vote(self, obj):
-            if hasattr(obj, 'poll_voting_type_ranking'):
-                return self.VoteRankingOutputSerializer
+            poll_type = obj.poll.poll_type
 
-            elif hasattr(obj, 'poll_voting_type_for_against'):
-                return self.VoteForAgainstOutputSerializer
+            if poll_type == Poll.PollType.RANKING:
+                serializer = self.VoteRankingOutputSerializer(obj.pollvotingtyperanking_set,
+                                                              many=True,
+                                                              allow_null=True,
+                                                              required=False)
 
-            elif hasattr(obj, 'poll_voting_type_cardinal'):
-                return self.VoteCardinalOutputSerializer
+                return serializer.data
+
+            elif poll_type == Poll.PollType.FOR_AGAINST:
+                serializer = self.VoteForAgainstOutputSerializer(obj.pollvotingtypeforagainst_set,
+                                                                 many=True,
+                                                                 allow_null=True,
+                                                                 required=False)
+
+                return serializer.data
+
+            elif poll_type == Poll.PollType.CARDINAL:
+                serializer = self.VoteCardinalOutputSerializer(obj.pollvotingtypecardinal_set,
+                                                               many=True,
+                                                               allow_null=True,
+                                                               required=False)
+
+                return serializer.data
 
             else:
                 return None
@@ -208,4 +225,3 @@ class PollProposalDelegateVoteUpdateAPI(APIView):
         poll_refresh_cheap(poll_id=poll.id)  # TODO get celery
         poll_proposal_delegate_vote_update(user_id=request.user.id, poll_id=poll.id, data=serializer.validated_data)
         return Response(status=status.HTTP_200_OK)
-

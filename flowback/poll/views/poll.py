@@ -48,8 +48,9 @@ class PollListApi(APIView):
         status = serializers.IntegerField(required=False)
 
     class OutputSerializer(serializers.ModelSerializer):
-        class FileSerializer(serializers.Serializer):  # TODO why is it updated_at?
-            file = serializers.CharField(source='updated_at')
+        class FileSerializer(serializers.Serializer):
+            file = serializers.CharField()
+            file_name = serializers.CharField()
 
         created_by = GroupUserSerializer()
         group_joined = serializers.BooleanField(required=False)

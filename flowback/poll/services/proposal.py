@@ -2,6 +2,7 @@ from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
 from flowback.common.services import get_object
+from flowback.files.services import upload_collection
 from flowback.group.selectors import group_user_permissions
 from flowback.poll.models import PollProposal, Poll, PollProposalTypeSchedule
 
@@ -11,7 +12,7 @@ from flowback.poll.services.poll import poll_refresh_cheap
 
 
 def poll_proposal_create(*, user_id: int, poll_id: int,
-                         title: str = None, description: str = None, **data) -> PollProposal:
+                         title: str = None, description: str = None, attachments=None, **data) -> PollProposal:
     poll = get_object(Poll, id=poll_id)
     group_user = group_user_permissions(user=user_id, group=poll.created_by.group.id, permissions=['create_proposal', 'admin'])
 
@@ -21,8 +22,13 @@ def poll_proposal_create(*, user_id: int, poll_id: int,
     poll.check_phase('proposal', 'dynamic')
 
     proposal = PollProposal(created_by=group_user, poll=poll, title=title, description=description)
-
     proposal.full_clean()
+
+    collection = None
+    if attachments:
+        collection = upload_collection(user_id=user_id, file=attachments, upload_to="group/poll/proposals")
+
+    proposal.attachments = collection
     proposal.save()
 
     extra = []

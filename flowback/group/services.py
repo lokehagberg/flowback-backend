@@ -451,9 +451,16 @@ def group_kanban_entry_delete(*,
     return group_kanban.kanban_entry_delete(origin_id=group_id, entry_id=entry_id)
 
 
-def group_thread_create(user_id: int, group_id: int, title: str):
+def group_thread_create(user_id: int, group_id: int, pinned: bool, title: str):
     group_user = group_user_permissions(user=user_id, group=group_id)
-    thread = GroupThread(created_by=group_user, title=title)
+
+    if pinned:
+        group_user_permissions(user=user_id, group=group_user.group, permissions=['admin'])
+
+    else:
+        group_user_permissions(user=user_id, group=group_user.group)
+
+    thread = GroupThread(created_by=group_user, title=title, pinned=pinned)
     thread.full_clean()
     thread.save()
 
@@ -462,8 +469,13 @@ def group_thread_create(user_id: int, group_id: int, title: str):
 
 def group_thread_update(user_id: int, thread_id: int, data):
     thread = get_object(GroupThread, id=thread_id)
-    group_user_permissions(user=user_id, group=thread.created_by.group)
     non_side_effect_fields = ['title']
+
+    if 'pinned' in data.keys():
+        group_user_permissions(user=user_id, group=thread.created_by.group, permissions=['admin'])
+
+    else:
+        group_user_permissions(user=user_id, group=thread.created_by.group)
 
     thread, has_updated = model_update(instance=thread,
                                        fields=non_side_effect_fields,

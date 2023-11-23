@@ -34,7 +34,7 @@ class Migration(migrations.Migration):
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now)),
                 ('updated_at', models.DateTimeField(auto_now=True)),
-                ('file', models.FileField(upload_to=flowback.files.models.FileSegment.upload_directory)),
+                ('file', models.FileField()),
                 ('collection', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='files.filecollection')),
             ],
             options={

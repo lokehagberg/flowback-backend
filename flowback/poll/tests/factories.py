@@ -88,6 +88,7 @@ class PollVotingTypeCardinalFactory(factory.django.DjangoModelFactory):
         model = PollVotingTypeCardinal
 
     proposal = factory.SubFactory(PollProposalFactory)
+    score = factory.LazyAttribute(lambda _: faker.pyint())
 
 
 class PollVotingTypeForAgainstFactory(factory.django.DjangoModelFactory):

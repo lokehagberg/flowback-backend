@@ -21,8 +21,9 @@ class CommentListAPI(APIView):
         score__gt = serializers.IntegerField(required=False)
 
     class OutputSerializer(serializers.Serializer):
-        class FileSerializer(serializers.Serializer):  # TODO why is it updated_at?
-            file = serializers.CharField(source='updated_at')
+        class FileSerializer(serializers.Serializer):
+            file = serializers.CharField()
+            file_name = serializers.CharField()
 
         id = serializers.IntegerField()
         author_id = serializers.IntegerField()
