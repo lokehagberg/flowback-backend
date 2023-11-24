@@ -26,6 +26,7 @@ class GroupThreadListAPI(APIView):
     class OutputSerializer(serializers.Serializer):
         created_by = BasicUserSerializer(source='created_by.user')
         title = serializers.CharField()
+        pinned = serializers.BooleanField()
 
     def get(self, request, group_id: int):
         serializer = self.FilterSerializer(data=request.query_params)
