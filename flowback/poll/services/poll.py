@@ -1,4 +1,6 @@
 from rest_framework.exceptions import ValidationError
+
+from backend.settings import FLOWBACK_ALLOW_DYNAMIC_POLL
 from flowback.common.services import get_object, model_update
 from flowback.files.services import upload_collection
 from flowback.group.services import group_notification, group_schedule
@@ -51,6 +53,9 @@ def poll_create(*, user_id: int,
 
     if quorum is not None and not group_user.permission.poll_quorum and not group_user.is_admin:
         raise ValidationError("Permission denied for custom poll quorum")
+
+    if dynamic and not FLOWBACK_ALLOW_DYNAMIC_POLL:
+        raise ValidationError("Dynamic polls are not permitted on this instance")
 
     collection = None
     if attachments:

@@ -32,6 +32,7 @@ env = environ.Env(DEBUG=(bool, False),
                   AWS_S3_CUSTOM_URL=(str, None),
                   DISABLE_DEFAULT_USER_REGISTRATION=(bool, False),
                   FLOWBACK_DEFAULT_GROUP_JOIN=(str, None),
+                  FLOWBACK_ALLOW_DYNAMIC_POLL=(bool, False),
                   FLOWBACK_ALLOW_GROUP_CREATION=(bool, True),
                   FLOWBACK_GROUP_ADMIN_USER_LIST_ACCESS_ONLY=(bool, False),
                   FLOWBACK_DEFAULT_PERMISSION=(str, 'rest_framework.permissions.IsAuthenticated'),
@@ -270,6 +271,7 @@ DEFAULT_FROM_EMAIL = env('EMAIL_FROM', default=env('EMAIL_HOST_USER'))
 # Poll related settings
 SCORE_VOTE_CEILING = env('SCORE_VOTE_CEILING')
 SCORE_VOTE_FLOOR = env('SCORE_VOTE_FLOOR')
+FLOWBACK_ALLOW_DYNAMIC_POLL = env('FLOWBACK_ALLOW_DYNAMIC_POLL')
 
 
 # Logging
