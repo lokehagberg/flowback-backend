@@ -107,8 +107,15 @@ class UserGetApi(APIView):
     class OutputSerializer(serializers.ModelSerializer):
         class Meta:
             model = User
-            fields = 'id', 'email', 'username', 'profile_image', \
-                     'banner_image', 'bio', 'website', 'dark_theme'
+            fields = ('id',
+                      'email',
+                      'username',
+                      'profile_image',
+                      'banner_image',
+                      'bio',
+                      'website',
+                      'dark_theme',
+                      'configuration')
 
     def get(self, request):
         user = get_user(request.user.id)
@@ -117,16 +124,14 @@ class UserGetApi(APIView):
 
 
 class UserUpdateApi(APIView):
-    class InputSerializer(serializers.ModelSerializer):
+    class InputSerializer(serializers.Serializer):
         username = serializers.CharField(required=False)
         profile_image = serializers.ImageField(required=False)
         banner_image = serializers.ImageField(required=False)
         bio = serializers.CharField(required=False)
         website = serializers.CharField(required=False)
-
-        class Meta:
-            model = User
-            fields = 'username', 'profile_image', 'banner_image', 'bio', 'website', 'dark_theme'
+        dark_theme = serializers.CharField(required=False)
+        configuration = serializers.CharField(required=False)
 
     def post(self, request):
         serializer = self.InputSerializer(data=request.data)
