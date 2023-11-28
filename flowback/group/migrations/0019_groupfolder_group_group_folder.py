@@ -8,7 +8,7 @@ import django.utils.timezone
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('group', '0017_groupuser_active'),
+        ('group', '0018_groupthread_pinned'),
     ]
 
     operations = [
