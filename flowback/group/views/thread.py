@@ -25,7 +25,6 @@ class GroupThreadListAPI(APIView):
 
     class OutputSerializer(serializers.Serializer):
         created_by = BasicUserSerializer(source='created_by.user')
-        id = serializers.IntegerField()
         title = serializers.CharField()
         pinned = serializers.BooleanField()
 
