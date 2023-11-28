@@ -1,5 +1,9 @@
 from django.contrib import admin
-from .models import Group, GroupPermissions, GroupTags, GroupUser, GroupUserInvite, GroupUserDelegatePool, GroupUserDelegate, GroupUserDelegator
+from .models import Group, GroupPermissions, GroupTags, GroupUser, GroupUserInvite, GroupUserDelegatePool, GroupUserDelegate, GroupUserDelegator, GroupFolder
+
+@admin.register(GroupFolder)
+class GroupFolderAdmin(admin.ModelAdmin):
+    list_display = ('name',)
 
 
 @admin.register(Group)
@@ -7,7 +11,7 @@ class GroupAdmin(admin.ModelAdmin):
     list_display = ('created_by', 'active', 'direct_join',
                     'public', 'default_permission', 'name',
                     'description', 'image', 'cover_image',
-                    'hide_poll_users', 'schedule', 'kanban', 'jitsi_room')
+                    'hide_poll_users', 'schedule', 'kanban', 'jitsi_room', 'group_folder')
     
 
 @admin.register(GroupPermissions)

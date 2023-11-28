@@ -10,7 +10,7 @@ from flowback.common.services import get_object
 from flowback.kanban.selectors import kanban_entry_list
 from flowback.user.models import User
 from flowback.group.models import Group, GroupUser, GroupUserInvite, GroupPermissions, GroupTags, GroupUserDelegator, \
-    GroupUserDelegatePool, GroupThread
+    GroupUserDelegatePool, GroupThread, GroupFolder
 from flowback.schedule.selectors import schedule_event_list
 from rest_framework.exceptions import ValidationError
 
@@ -88,12 +88,14 @@ def _group_get_visible_for(user: User):
 
 class BaseGroupFilter(django_filters.FilterSet):
     joined = django_filters.BooleanFilter(lookup_expr='exact')
+    exclude_folders = django_filters.BooleanFilter(lookup_expr='isnull')
 
     class Meta:
         model = Group
         fields = dict(id=['exact'],
                       name=['exact', 'icontains'],
-                      direct_join=['exact'])
+                      direct_join=['exact'],
+                      group_folder_id=['exact'])
 
 
 def group_list(*, fetched_by: User, filters=None):
@@ -103,6 +105,9 @@ def group_list(*, fetched_by: User, filters=None):
                                                           member_count=Count('groupuser')).order_by('created_at').all()
     qs = BaseGroupFilter(filters, qs).qs
     return qs
+
+def group_folder_list():
+    return GroupFolder.objects.all()
 
 
 def group_kanban_entry_list(*, fetched_by: User, group_id: int, filters=None):

@@ -17,6 +17,12 @@ from django.db import models
 
 
 # Create your models here.
+class GroupFolder(BaseModel):
+    name = models.CharField(max_length=255)
+
+    def __str__(self) -> str:
+        return f'{self.id} - {self.name}'
+
 class Group(BaseModel):
     created_by = models.ForeignKey(User, on_delete=models.CASCADE)
     active = models.BooleanField(default=True)
@@ -42,6 +48,7 @@ class Group(BaseModel):
     default_quorum = models.IntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(100)])
     schedule = models.ForeignKey(Schedule, null=True, blank=True, on_delete=models.SET_NULL)
     kanban = models.ForeignKey(Kanban, null=True, blank=True, on_delete=models.SET_NULL)
+    group_folder = models.ForeignKey(GroupFolder, null=True, blank=True, on_delete=models.SET_NULL)
 
     jitsi_room = models.UUIDField(unique=True, default=uuid.uuid4)
 
