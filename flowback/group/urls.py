@@ -104,10 +104,10 @@ group_patterns = [
     path('thread/<int:thread_id>/comment/create',
          GroupThreadCommentCreateAPI.as_view(),
          name='group_thread_comment_create'),
-    path('thread/<int:thread_id>/comment/<int:comment_id>',
+    path('thread/<int:thread_id>/comment/<int:comment_id>/update',
          GroupThreadCommentUpdateAPI.as_view(),
          name='group_thread_comment_update'),
-    path('thread/<int:thread_id>/comment/<int:comment_id>',
+    path('thread/<int:thread_id>/comment/<int:comment_id>/delete',
          GroupThreadCommentDeleteAPI.as_view(),
          name='group_thread_comment_delete'),
 ]
