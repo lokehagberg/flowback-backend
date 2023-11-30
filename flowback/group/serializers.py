@@ -14,6 +14,7 @@ class GroupUserSerializer(serializers.ModelSerializer):
 
     permission_id = serializers.IntegerField(allow_null=True)
     permission_name = serializers.CharField(source='permission.role_name', default='Member')
+    group_id = serializers.IntegerField()
     group_name = serializers.CharField(source='group.name')
     group_image = serializers.CharField(source='group.image')
 

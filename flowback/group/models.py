@@ -23,6 +23,7 @@ class GroupFolder(BaseModel):
     def __str__(self) -> str:
         return f'{self.id} - {self.name}'
 
+
 class Group(BaseModel):
     created_by = models.ForeignKey(User, on_delete=models.CASCADE)
     active = models.BooleanField(default=True)
