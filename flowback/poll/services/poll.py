@@ -31,13 +31,13 @@ def poll_create(*, user_id: int,
                 title: str,
                 description: str,
                 start_date: datetime,
-                proposal_end_date: datetime,
-                prediction_statement_end_date: datetime,
-                area_vote_end_date: datetime,
-                prediction_bet_end_date: datetime,
-                delegate_vote_end_date: datetime,
-                vote_end_date: datetime,
-                end_date: datetime,
+                proposal_end_date: datetime = None,
+                prediction_statement_end_date: datetime = None,
+                area_vote_end_date: datetime = None,
+                prediction_bet_end_date: datetime = None,
+                delegate_vote_end_date: datetime = None,
+                vote_end_date: datetime = None,
+                end_date: datetime = None,
                 poll_type: int,
                 public: bool,
                 tag: int,
@@ -46,6 +46,7 @@ def poll_create(*, user_id: int,
                 attachments: list = None,
                 quorum: int = None
                 ) -> Poll:
+
     group_user = group_user_permissions(user=user_id, group=group_id, permissions=['create_poll', 'admin'])
 
     if not group_user.is_admin and pinned:
@@ -62,6 +63,18 @@ def poll_create(*, user_id: int,
         collection = upload_collection(user_id=user_id,
                                        file=attachments,
                                        upload_to="group/poll/attachments")
+
+    if poll_type == Poll.PollType.SCHEDULE and not end_date:
+        raise ValidationError('Missing required parameter(s) for schedule poll')
+
+    elif not all([proposal_end_date,
+                  prediction_statement_end_date,
+                  area_vote_end_date,
+                  prediction_bet_end_date,
+                  delegate_vote_end_date,
+                  vote_end_date,
+                  end_date]):
+        raise ValidationError('Missing required parameter(s) for generic poll')
 
     poll = Poll(created_by=group_user, title=title, description=description,
                 start_date=start_date, proposal_end_date=proposal_end_date,

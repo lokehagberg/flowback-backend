@@ -129,6 +129,14 @@ class PollCreateAPI(APIView):
         public = serializers.BooleanField(default=False)
         attachments = serializers.ListField(child=serializers.FileField(), required=False, max_length=10)
 
+        proposal_end_date = serializers.DateTimeField(required=False)
+        prediction_statement_end_date = serializers.DateTimeField(required=False)
+        area_vote_end_date = serializers.DateTimeField(required=False)
+        prediction_bet_end_date = serializers.DateTimeField(required=False)
+        delegate_vote_end_date = serializers.DateTimeField(required=False)
+        vote_end_date = serializers.DateTimeField(required=False)
+        end_date = serializers.DateTimeField(required=False)
+
         class Meta:
             model = Poll
             fields = ('title', 'description', 'start_date', 'proposal_end_date', 'prediction_statement_end_date',

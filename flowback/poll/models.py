@@ -7,7 +7,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from rest_framework.exceptions import ValidationError
 
-from backend.settings import SCORE_VOTE_CEILING, SCORE_VOTE_FLOOR
+from backend.settings import SCORE_VOTE_CEILING, SCORE_VOTE_FLOOR, DEBUG
 from flowback.files.models import FileCollection
 from flowback.prediction.models import (PredictionBet,
                                         PredictionStatement,
@@ -18,6 +18,9 @@ from flowback.common.models import BaseModel
 from flowback.group.models import Group, GroupUser, GroupUserDelegatePool, GroupTags
 from flowback.comment.models import CommentSection
 import pgtrigger
+
+from flowback.schedule.models import Schedule, ScheduleEvent
+from flowback.schedule.services import create_schedule
 
 
 # Create your models here.
@@ -48,12 +51,12 @@ class Poll(BaseModel):
 
     # Poll Phases
     start_date = models.DateTimeField()  # Poll Start
-    area_vote_end_date = models.DateTimeField()  # Area Selection Phase
-    proposal_end_date = models.DateTimeField()  # Proposal Phase~
-    prediction_statement_end_date = models.DateTimeField()  # Prediction Phase
-    prediction_bet_end_date = models.DateTimeField()  # Prediction Betting Phase
-    delegate_vote_end_date = models.DateTimeField()  # Delegate Voting Phase
-    vote_end_date = models.DateTimeField()  # Voting Phase
+    area_vote_end_date = models.DateTimeField(null=True, blank=True)  # Area Selection Phase
+    proposal_end_date = models.DateTimeField(null=True, blank=True)  # Proposal Phase
+    prediction_statement_end_date = models.DateTimeField(null=True, blank=True)  # Prediction Phase
+    prediction_bet_end_date = models.DateTimeField(null=True, blank=True)  # Prediction Betting Phase
+    delegate_vote_end_date = models.DateTimeField(null=True, blank=True)  # Delegate Voting Phase
+    vote_end_date = models.DateTimeField(null=True, blank=True)  # Voting Phase
     end_date = models.DateTimeField()  # Result Phase, Prediction Vote afterward indefinitely
 
     """
@@ -74,6 +77,14 @@ class Poll(BaseModel):
 
     @property
     def labels(self) -> tuple:
+        if self.dynamic:
+            return ((self.start_date, 'start date', 'dynamic'),
+                    (self.end_date, 'end date', 'result'))
+
+        if self.poll_type == self.PollType.SCHEDULE:
+            return ((self.start_date, 'start date', 'schedule'),
+                    (self.end_date, 'end date', 'result'))
+
         return ((self.start_date, 'start date', 'area_vote'),
                 (self.area_vote_end_date, 'area vote end date', 'proposal'),
                 (self.proposal_end_date, 'proposal end date', 'prediction_statement'),
@@ -90,37 +101,39 @@ class Poll(BaseModel):
                 raise ValidationError(f'{labels[x][1].title()} is greater than {labels[x+1][1]}')
 
     class Meta:
-        constraints = [models.CheckConstraint(check=Q(area_vote_end_date__gte=F('start_date')),
+        constraints = [models.CheckConstraint(check=Q(Q(area_vote_end_date__isnull=True)
+                                                      | Q(area_vote_end_date__gte=F('start_date'))),
                                               name='areavoteenddategreaterthanstartdate_check'),
-                       models.CheckConstraint(check=Q(proposal_end_date__gte=F('area_vote_end_date')),
+                       models.CheckConstraint(check=Q(Q(proposal_end_date__isnull=True)
+                                                      | Q(proposal_end_date__gte=F('area_vote_end_date'))),
                                               name='proposalenddategreaterthanareavoteenddate_check'),
-                       models.CheckConstraint(check=Q(prediction_statement_end_date__gte=F('proposal_end_date')),
+                       models.CheckConstraint(check=Q(Q(prediction_statement_end_date__isnull=True)
+                                                      | Q(prediction_statement_end_date__gte=F('proposal_end_date'))),
                                               name='predictionstatementenddategreaterthanproposalenddate_check'),
-                       models.CheckConstraint(check=Q(prediction_bet_end_date__gte=F('prediction_statement_end_date')),
+                       models.CheckConstraint(check=Q(Q(prediction_bet_end_date__isnull=True)
+                                                      | Q(prediction_bet_end_date__gte=F('prediction_statement_end_date'))),
                                               name='predictionbetenddategreaterthanpredictionstatementeneddate_check'),
-                       models.CheckConstraint(check=Q(delegate_vote_end_date__gte=F('prediction_bet_end_date')),
+                       models.CheckConstraint(check=Q(Q(delegate_vote_end_date__isnull=True)
+                                                      | Q(delegate_vote_end_date__gte=F('prediction_bet_end_date'))),
                                               name='delegatevoteenddategreaterthanpredictionbetenddate_check'),
-                       models.CheckConstraint(check=Q(vote_end_date__gte=F('delegate_vote_end_date')),
+                       models.CheckConstraint(check=Q(Q(vote_end_date__isnull=True)
+                                                      | Q(vote_end_date__gte=F('delegate_vote_end_date'))),
                                               name='voteenddategreaterthandelegatevoteenddate_check'),
-                       models.CheckConstraint(check=Q(end_date__gte=F('vote_end_date')),
-                                              name='enddategreaterthanvoteenddate_check')]
+                       models.CheckConstraint(check=Q(Q(end_date__isnull=True)
+                                                      | Q(end_date__gte=F('vote_end_date'))),
+                                              name='enddategreaterthanvoteenddate_check'),
+
+                       models.CheckConstraint(check=~Q(Q(poll_type=3) & Q(dynamic=True)),
+                                              name='polltypeisscheduleanddynamic_check')]
 
     @property
     def current_phase(self) -> str:
         labels = self.labels
         current_time = timezone.now()
 
-        if not self.dynamic:
-            for x in reversed(range(len(labels))):
-                if current_time >= labels[x][0]:
-                    return labels[x][2]
-
-        else:
-            if current_time >= labels[-1][0]:  # Return dynamic_end if finished
-                return 'dynamic_end'
-
-            if current_time >= labels[0][0]:  # Return dynamic if running
-                return 'dynamic'
+        for x in reversed(range(len(labels))):
+            if current_time >= labels[x][0]:
+                return labels[x][2]
 
         return 'waiting'
 
@@ -128,6 +141,23 @@ class Poll(BaseModel):
         current_phase = self.current_phase
         if current_phase not in phases:
             raise ValidationError(f'Poll is not in {" or ".join(phases)}, currently in {current_phase}')
+
+    def post_save(cls, instance, created, update_fields, **kwargs):
+        if created and instance.poll_type == cls.PollType.SCHEDULE:
+            try:
+                schedule = create_schedule(name='group_poll_schedule', origin_name='group_poll', origin_id=instance.id)
+                schedule_poll = PollTypeSchedule(poll=instance, schedule=schedule)
+                schedule_poll.full_clean()
+                schedule_poll.save()
+
+            except Exception as e:
+                instance.delete()
+                raise Exception('Internal server error when creating poll' + f':\n{e}' if DEBUG else '')
+
+
+class PollTypeSchedule(BaseModel):
+    poll = models.OneToOneField(Poll, on_delete=models.CASCADE)
+    schedule = models.OneToOneField(Schedule, on_delete=models.CASCADE)
 
 
 class PollProposal(BaseModel):
@@ -141,8 +171,7 @@ class PollProposal(BaseModel):
 
 class PollProposalTypeSchedule(BaseModel):
     proposal = models.OneToOneField(PollProposal, on_delete=models.CASCADE)
-    start_date = models.DateTimeField()
-    end_date = models.DateTimeField()
+    event = models.OneToOneField(ScheduleEvent, on_delete=models.CASCADE)
 
 
 class PollVoting(BaseModel):

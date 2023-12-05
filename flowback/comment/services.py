@@ -77,7 +77,8 @@ def comment_delete(*, fetched_by: int, comment_section_id: int, comment_id: int)
     if not comment.active:
         raise ValidationError("Comment has already been removed")
 
-    comment.attachments.delete()
+    if comment.attachments:
+        comment.attachments.delete()
 
     comment.active = False
     comment.message = '[Deleted]'
