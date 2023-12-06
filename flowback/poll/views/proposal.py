@@ -43,8 +43,8 @@ class PollProposalListAPI(APIView):
                       'score')
 
     class OutputSerializerTypeSchedule(OutputSerializer):
-        start_date = serializers.DateTimeField(source='pollproposaltypeschedule.start_date')
-        end_date = serializers.DateTimeField(source='pollproposaltypeschedule.end_date')
+        start_date = serializers.DateTimeField(source='pollproposaltypeschedule.event.start_date')
+        end_date = serializers.DateTimeField(source='pollproposaltypeschedule.event.end_date')
         approval_positive = serializers.IntegerField()
         approval_negative = serializers.IntegerField()
 

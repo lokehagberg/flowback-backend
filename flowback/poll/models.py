@@ -127,6 +127,10 @@ class Poll(BaseModel):
                                               name='polltypeisscheduleanddynamic_check')]
 
     @property
+    def schedule_origin(self):
+        return 'group_poll'
+
+    @property
     def current_phase(self) -> str:
         labels = self.labels
         current_time = timezone.now()
@@ -142,6 +146,7 @@ class Poll(BaseModel):
         if current_phase not in phases:
             raise ValidationError(f'Poll is not in {" or ".join(phases)}, currently in {current_phase}')
 
+    @classmethod
     def post_save(cls, instance, created, update_fields, **kwargs):
         if created and instance.poll_type == cls.PollType.SCHEDULE:
             try:
@@ -153,6 +158,14 @@ class Poll(BaseModel):
             except Exception as e:
                 instance.delete()
                 raise Exception('Internal server error when creating poll' + f':\n{e}' if DEBUG else '')
+
+    @classmethod
+    def post_delete(cls, instance, **kwargs):
+        instance.schedule.delete()
+
+
+post_save.connect(Poll.post_save, sender=Poll)
+post_delete.connect(Poll.post_delete, sender=Poll)
 
 
 class PollTypeSchedule(BaseModel):
@@ -172,6 +185,13 @@ class PollProposal(BaseModel):
 class PollProposalTypeSchedule(BaseModel):
     proposal = models.OneToOneField(PollProposal, on_delete=models.CASCADE)
     event = models.OneToOneField(ScheduleEvent, on_delete=models.CASCADE)
+
+    @classmethod
+    def post_delete(cls, instance, **kwargs):
+        instance.event.delete()
+
+
+post_delete.connect(PollProposalTypeSchedule.post_delete, PollProposalTypeSchedule)
 
 
 class PollVoting(BaseModel):

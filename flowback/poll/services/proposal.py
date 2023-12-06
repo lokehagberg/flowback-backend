@@ -6,20 +6,24 @@ from flowback.files.services import upload_collection
 from flowback.group.selectors import group_user_permissions
 from flowback.poll.models import PollProposal, Poll, PollProposalTypeSchedule
 
-
 # TODO proposal can be created without schedule, dangerous
 from flowback.poll.services.poll import poll_refresh_cheap
+from flowback.schedule.models import ScheduleEvent
 
 
 def poll_proposal_create(*, user_id: int, poll_id: int,
                          title: str = None, description: str = None, attachments=None, **data) -> PollProposal:
     poll = get_object(Poll, id=poll_id)
-    group_user = group_user_permissions(user=user_id, group=poll.created_by.group.id, permissions=['create_proposal', 'admin'])
+    group_user = group_user_permissions(user=user_id, group=poll.created_by.group.id,
+                                        permissions=['create_proposal', 'admin'])
 
     if group_user.group.id != poll.created_by.group.id:
         raise ValidationError('Permission denied')
 
-    poll.check_phase('proposal', 'dynamic')
+    poll.check_phase('proposal', 'dynamic', 'schedule')
+
+    if poll.poll_type == Poll.PollType.SCHEDULE and group_user.user.id != poll.created_by.user.id:
+        raise ValidationError('Only poll author can create proposals for schedule polls')
 
     proposal = PollProposal(created_by=group_user, poll=poll, title=title, description=description)
     proposal.full_clean()
@@ -31,17 +35,30 @@ def poll_proposal_create(*, user_id: int, poll_id: int,
     proposal.attachments = collection
     proposal.save()
 
-    extra = []
     if poll.poll_type == Poll.PollType.SCHEDULE:
-        if not data.get('start_date') and not data.get('end_date'):
+        if not (data.get('start_date') and data.get('end_date')):
             raise Exception('Missing start_date and/or end_date, for proposal schedule creation')
 
-        extra.append(PollProposalTypeSchedule(proposal=proposal, start_date=data['start_date'],
-                                              end_date=data['end_date']))
+        try:
+            event = ScheduleEvent(schedule=poll.polltypeschedule.schedule,
+                                  title=f"group_poll_{poll_id}_event",
+                                  start_date=data['start_date'],
+                                  end_date=data['end_date'],
+                                  origin_name='group_poll_proposal',
+                                  origin_id=proposal.id)
 
-    for extension in extra:
-        extension.full_clean()
-        extension.save()
+            event.full_clean()
+            event.save()
+
+            schedule_proposal = PollProposalTypeSchedule(proposal=proposal,
+                                                         start_date=data['start_date'],
+                                                         end_date=data['end_date'])
+
+            schedule_proposal.full_clean()
+            schedule_proposal.save()
+
+        except Exception:
+            raise Exception('Failed to create poll proposal schedule')
 
     return proposal
 
