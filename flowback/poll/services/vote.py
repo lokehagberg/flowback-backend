@@ -1,4 +1,5 @@
-from django.db.models import Sum, Q, Count, F, OuterRef, Subquery
+from django.db import models
+from django.db.models import Sum, Q, Count, F, OuterRef, Subquery, When, Case
 from rest_framework.exceptions import ValidationError
 
 from backend.settings import SCORE_VOTE_CEILING, SCORE_VOTE_FLOOR
@@ -169,6 +170,27 @@ def poll_proposal_vote_count(*, poll_id: int) -> None:
     group = poll.created_by.group
     total_proposals = poll.pollproposal_set.count()
 
+    def save_participants_count(voting_type_class):
+        blank_votes = voting_type_class.objects.filter(author__poll=OuterRef('poll'), score=0).count()
+        blank_votes += voting_type_class.objects.filter(
+            author_delegate__poll=OuterRef('poll'), score=0
+        ).aggregate(total_blank_votes=Subquery(mandate_subquery))['total_blank_votes']
+
+        participants = voting_type_class.objects.filter(author__poll=poll).count()
+        participants += voting_type_class.objects.filter(author_delegate__poll=poll
+                                                         ).aggregate(
+            participants=Subquery(mandate_subquery), output_field=models.IntegerField())['participants']
+
+        positive_votes = voting_type_class.objects.filter(author__poll=OuterRef('poll'), score__gt=0
+                                                          ).count()
+        positive_votes += voting_type_class.objects.filter(author_delegate__poll=OuterRef('poll'), score__gt=0
+                                                           ).aggregate(
+            total_positive_votes=Subquery(mandate_subquery), output_field=models.IntegerField())
+
+        PollProposal.objects.filter(poll=poll).update(blank_votes=blank_votes,
+                                                      participants=participants,
+                                                      positive_votes=positive_votes)
+
     # Count mandate for each delegate, multiply it by score
     mandate = GroupUserDelegatePool.objects.filter(polldelegatevoting__poll=poll).aggregate(
         mandate=Count('groupuserdelegator',
@@ -211,6 +233,8 @@ def poll_proposal_vote_count(*, poll_id: int) -> None:
             for i in proposals:
                 PollProposal.objects.filter(id=i['pk']).update(score=i['score'])
 
+            save_participants_count(PollVotingTypeRanking)
+
             # TODO make this work aswell, replace above
             # PollProposal.objects.bulk_update(proposals, fields=('score',))
 
@@ -226,6 +250,8 @@ def poll_proposal_vote_count(*, poll_id: int) -> None:
 
             PollProposal.objects.filter(poll=poll).update(
                 score=Subquery(user_proposal_scores) + Subquery(delegate_proposal_scores))
+
+            save_participants_count(PollVotingTypeCardinal)
 
     if poll.poll_type == Poll.PollType.SCHEDULE:
         if poll.tag:

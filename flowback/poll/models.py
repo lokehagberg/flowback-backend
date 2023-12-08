@@ -179,6 +179,11 @@ class PollProposal(BaseModel):
 
     title = models.CharField(max_length=255, null=True, blank=True)
     description = models.TextField(null=True, blank=True)
+
+    participants = models.IntegerField(null=True, blank=True)
+    blank_votes = models.IntegerField(null=True, blank=True)
+    positive_votes = models.IntegerField(null=True, blank=True)
+
     score = models.IntegerField(null=True, blank=True)
 
 
