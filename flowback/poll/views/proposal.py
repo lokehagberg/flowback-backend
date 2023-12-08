@@ -40,7 +40,10 @@ class PollProposalListAPI(APIView):
                       'poll',
                       'title',
                       'description',
-                      'score')
+                      'score',
+                      'blank_votes',
+                      'positive_votes',
+                      'participants')
 
     class OutputSerializerTypeSchedule(OutputSerializer):
         start_date = serializers.DateTimeField(source='pollproposaltypeschedule.event.start_date')
