@@ -36,7 +36,7 @@ class PollListApi(APIView):
     class FilterSerializer(serializers.Serializer):
         id = serializers.IntegerField(required=False)
         id_list = serializers.ListField(child=serializers.IntegerField(), required=False)
-        order_by = serializers.CharField(default='created_at_desc')
+        order_by = serializers.CharField(default='start_date_desc')
         pinned = serializers.BooleanField(required=False, default=None, allow_null=True)
 
         title = serializers.CharField(required=False)
