@@ -107,6 +107,9 @@ class GroupPermissions(BaseModel):
     force_delete_poll = models.BooleanField(default=False)
     force_delete_proposal = models.BooleanField(default=False)
     force_delete_comment = models.BooleanField(default=False)
+    create_kanban_task = models.BooleanField(default=True)
+    update_kanban_task = models.BooleanField(default=True)
+    delete_kanban_task = models.BooleanField(default=True)
 
 
 # Permission Tags for each group, and for user to put on delegators
@@ -172,7 +175,7 @@ class GroupUserDelegatePool(BaseModel):
 
 
 class GroupUserDelegate(BaseModel):
-    group = models.ForeignKey(Group, on_delete=models.CASCADE)
+    group = models.ForeignKey(Group, on_delete=models.CASCADE)  # TODO no need for two-way group references
     group_user = models.ForeignKey(GroupUser, on_delete=models.CASCADE)
     pool = models.ForeignKey(GroupUserDelegatePool, on_delete=models.CASCADE)
 

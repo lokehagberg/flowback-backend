@@ -123,7 +123,7 @@ class Poll(BaseModel):
                                                       | Q(end_date__gte=F('vote_end_date'))),
                                               name='enddategreaterthanvoteenddate_check'),
 
-                       models.CheckConstraint(check=~Q(Q(poll_type=3) & Q(dynamic=True)),
+                       models.CheckConstraint(check=~Q(Q(poll_type=3) & Q(dynamic=False)),
                                               name='polltypeisscheduleanddynamic_check')]
 
     @property
@@ -161,7 +161,8 @@ class Poll(BaseModel):
 
     @classmethod
     def post_delete(cls, instance, **kwargs):
-        instance.schedule.delete()
+        if hasattr(instance, 'schedule'):
+            instance.schedule.delete()
 
 
 post_save.connect(Poll.post_save, sender=Poll)
@@ -185,6 +186,10 @@ class PollProposal(BaseModel):
     positive_votes = models.IntegerField(null=True, blank=True)
 
     score = models.IntegerField(null=True, blank=True)
+
+    @property
+    def schedule_origin(self):
+        return 'group_poll_proposal'
 
 
 class PollProposalTypeSchedule(BaseModel):

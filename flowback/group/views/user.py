@@ -24,6 +24,9 @@ class GroupUserListApi(APIView):
         is_admin = serializers.BooleanField(required=False, default=None, allow_null=True)
         permission = serializers.IntegerField(required=False)
 
+    class OutputSerializer(GroupUserSerializer):
+        is_delegate = serializers.BooleanField(source='delegate')
+
     def get(self, request, group: int):
         filter_serializer = self.FilterSerializer(data=request.query_params)
         filter_serializer.is_valid(raise_exception=True)
@@ -34,7 +37,7 @@ class GroupUserListApi(APIView):
 
         return get_paginated_response(
             pagination_class=self.Pagination,
-            serializer_class=GroupUserSerializer,
+            serializer_class=self.OutputSerializer,
             queryset=users,
             request=request,
             view=self

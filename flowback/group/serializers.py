@@ -9,23 +9,14 @@ class BasicGroupSerializer(serializers.ModelSerializer):
         fields = ('id', 'name', 'image', 'cover_image', 'hide_poll_users')
 
 
-class GroupUserSerializer(serializers.ModelSerializer):
+class GroupUserSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
     user = BasicUserSerializer()
+    is_admin = serializers.BooleanField()
+    active = serializers.BooleanField()
 
     permission_id = serializers.IntegerField(allow_null=True)
     permission_name = serializers.CharField(source='permission.role_name', default='Member')
     group_id = serializers.IntegerField()
     group_name = serializers.CharField(source='group.name')
     group_image = serializers.CharField(source='group.image')
-
-    class Meta:
-        model = GroupUser
-        fields = ('id',
-                  'user',
-                  'is_admin',
-                  'permission_name',
-                  'permission_id',
-                  'group_id',
-                  'group_name',
-                  'group_image',
-                  'active')

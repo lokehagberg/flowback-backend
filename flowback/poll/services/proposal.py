@@ -39,26 +39,21 @@ def poll_proposal_create(*, user_id: int, poll_id: int,
         if not (data.get('start_date') and data.get('end_date')):
             raise Exception('Missing start_date and/or end_date, for proposal schedule creation')
 
-        try:
-            event = ScheduleEvent(schedule=poll.polltypeschedule.schedule,
-                                  title=f"group_poll_{poll_id}_event",
-                                  start_date=data['start_date'],
-                                  end_date=data['end_date'],
-                                  origin_name='group_poll_proposal',
-                                  origin_id=proposal.id)
+        event = ScheduleEvent(schedule=poll.polltypeschedule.schedule,
+                              title=f"group_poll_{poll_id}_event",
+                              start_date=data['start_date'],
+                              end_date=data['end_date'],
+                              origin_name=PollProposal.schedule_origin,
+                              origin_id=proposal.id)
 
-            event.full_clean()
-            event.save()
+        event.full_clean()
+        event.save()
 
-            schedule_proposal = PollProposalTypeSchedule(proposal=proposal,
-                                                         start_date=data['start_date'],
-                                                         end_date=data['end_date'])
+        schedule_proposal = PollProposalTypeSchedule(proposal=proposal,
+                                                     event=event)
 
-            schedule_proposal.full_clean()
-            schedule_proposal.save()
-
-        except Exception:
-            raise Exception('Failed to create poll proposal schedule')
+        schedule_proposal.full_clean()
+        schedule_proposal.save()
 
     return proposal
 

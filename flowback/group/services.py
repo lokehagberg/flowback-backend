@@ -421,7 +421,7 @@ def group_kanban_entry_create(*,
                               tag: int,
                               end_date: timezone.datetime = None
                               ) -> KanbanEntry:
-    group_user_permissions(group=group_id, user=fetched_by_id)
+    group_user_permissions(group=group_id, user=fetched_by_id, permissions=['admin', 'create_kanban_task'])
     return group_kanban.kanban_entry_create(origin_id=group_id,
                                             created_by_id=fetched_by_id,
                                             assignee_id=assignee_id,
@@ -437,7 +437,7 @@ def group_kanban_entry_update(*,
                               group_id: int,
                               entry_id: int,
                               data) -> KanbanEntry:
-    group_user_permissions(group=group_id, user=fetched_by_id)
+    group_user_permissions(group=group_id, user=fetched_by_id, permissions=['admin', 'update_kanban_task'])
     return group_kanban.kanban_entry_update(origin_id=group_id,
                                             entry_id=entry_id,
                                             data=data)
@@ -447,7 +447,7 @@ def group_kanban_entry_delete(*,
                               fetched_by_id: int,
                               group_id: int,
                               entry_id: int):
-    group_user_permissions(group=group_id, user=fetched_by_id)
+    group_user_permissions(group=group_id, user=fetched_by_id, permissions=['admin', 'delete_kanban_task'])
     return group_kanban.kanban_entry_delete(origin_id=group_id, entry_id=entry_id)
 
 

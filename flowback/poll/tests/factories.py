@@ -19,6 +19,7 @@ from flowback.poll.models import (Poll,
                                   PollAreaStatementSegment,
                                   PollAreaStatementVote)
 from flowback.poll.tests.utils import generate_poll_phase_kwargs
+from flowback.schedule.tests.factories import ScheduleEventFactory
 
 
 class PollFactory(factory.django.DjangoModelFactory):
@@ -29,7 +30,7 @@ class PollFactory(factory.django.DjangoModelFactory):
     title = factory.LazyAttribute(lambda _: faker.unique.first_name().lower())
     description = factory.LazyAttribute(lambda _: faker.bs())
     poll_type = factory.LazyAttribute(lambda _: faker.pyint(min_value=1, max_value=4))
-    dynamic = factory.LazyAttribute(lambda _: faker.pybool())
+    dynamic = factory.LazyAttribute(lambda o: True if o.poll_type == 3 else faker.pybool())
 
     start_date = factory.LazyAttribute(lambda _: timezone.now())
     area_vote_end_date = factory.LazyAttribute(lambda _: timezone.now() + timezone.timedelta(hours=1))
@@ -44,6 +45,14 @@ class PollFactory(factory.django.DjangoModelFactory):
 class PollProposalFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = PollProposal
+
+    @factory.post_generation
+    def generate_schedule_event(obj, create, extracted, **kwargs):
+        if not create:
+            return
+
+        if obj.poll.poll_type == Poll.PollType.SCHEDULE:
+            PollProposalTypeScheduleFactory(proposal=obj, **kwargs)
     
     created_by = factory.SubFactory(GroupUserFactory)
     poll = factory.SubFactory(PollFactory)
@@ -55,9 +64,11 @@ class PollProposalTypeScheduleFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = PollProposalTypeSchedule
 
-    proposal = factory.SubFactory(PollProposalFactory)
-    start_date = factory.LazyAttribute(lambda _: timezone.now())
-    end_date = factory.LazyAttribute(lambda _: timezone.now() + timezone.timedelta(hours=1))
+    proposal = factory.SubFactory(PollProposalFactory, poll__poll_type=3)
+    event = factory.SubFactory(ScheduleEventFactory,
+                               schedule=factory.SelfAttribute('..proposal.poll.polltypeschedule.schedule'),
+                               origin_id=factory.SelfAttribute('..proposal.id'),
+                               origin_name=factory.SelfAttribute('..proposal.schedule_origin'))
 
 
 class PollVotingFactory(factory.django.DjangoModelFactory):
