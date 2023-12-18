@@ -60,15 +60,13 @@ def poll_proposal_create(*, user_id: int, poll_id: int,
 
 def poll_proposal_delete(*, user_id: int, proposal_id: int) -> None:
     proposal = get_object(PollProposal, id=proposal_id)
-    group_user = group_user_permissions(group=proposal.group, user=user_id,
-                                        permissions=['admin', 'delete_proposal' 'force_delete_proposal'],
-                                        raise_exception=False)
+    group_user = group_user_permissions(group=proposal.created_by.group, user=user_id)
     poll_refresh_cheap(poll_id=proposal.poll.id)  # TODO get celery
 
-    if proposal.created_by == group_user and group_user.permission.delete_proposal:
+    if proposal.created_by == group_user and group_user.check_permission(delete_proposal=True):
         proposal.poll.check_phase('proposal', 'dynamic')
 
-    elif not group_user.permission.force_delete_proposal or group_user.is_admin:
+    elif not (group_user.check_permission(force_delete_permission=True) or group_user.is_admin):
         raise ValidationError("Deleting other users proposals needs either "
                               "group admin or force_delete_proposal permission")
 

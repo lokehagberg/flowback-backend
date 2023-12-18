@@ -24,7 +24,7 @@ def group_default_permissions(*, group: Union[Group, int]):
 
     fields = GroupPermissions._meta.get_fields()
     fields = [field for field in fields if not field.auto_created
-              and field.name not in ['created_at', 'updated_at', 'role_name', 'author']]
+              and field.name not in GroupPermissions.negate_field_perms()]
 
     defaults = dict()
     for field in fields:
@@ -37,7 +37,7 @@ def group_user_permissions(*,
                            user: Union[User, int] = None,
                            group: Union[Group, int] = None,
                            group_user: [GroupUser, int] = None,
-                           permissions: list[str] = None,
+                           permissions: Union[list[str], str] = None,
                            raise_exception: bool = True) -> Union[GroupUser, bool]:
 
     if type(user) == int:
@@ -47,6 +47,9 @@ def group_user_permissions(*,
         group = get_object(Group, id=group)
 
     permissions = permissions or []
+
+    if isinstance(permissions, str):
+        permissions = [permissions]
 
     if user and group:
         group_user = get_object(GroupUser, 'User is not in group', group=group, user=user, active=True)

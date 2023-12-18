@@ -97,3 +97,26 @@ class ProposalTest(APITransactionTestCase):
                                         title='Test Proposal', description='Test')
 
         self.assertEqual(response.status_code, 400)
+
+    @staticmethod
+    def proposal_delete(proposal, user):
+        factory = APIRequestFactory()
+        view = PollProposalDeleteAPI.as_view()
+        request = factory.post('')
+        force_authenticate(request, user=user)
+
+        return view(request, proposal=proposal.id)
+
+    def test_proposal_delete(self):
+        user = self.group_user_one.user
+        proposal = self.poll_schedule_proposal_one
+
+        response = self.proposal_delete(proposal, user)
+        self.assertEqual(response.status_code, 400)
+
+    def test_proposal_delete_admin(self):
+        user = self.group_user_creator.user
+        proposal = self.poll_schedule_proposal_one
+
+        response = self.proposal_delete(proposal, user)
+        self.assertEqual(response.status_code, 200, response.data)

@@ -2,6 +2,8 @@ import uuid
 
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db.models.signals import post_save, post_delete
+from django.forms import model_to_dict
+from rest_framework.exceptions import ValidationError
 
 from backend.settings import FLOWBACK_DEFAULT_GROUP_JOIN
 from flowback.comment.models import CommentSection
@@ -111,6 +113,10 @@ class GroupPermissions(BaseModel):
     update_kanban_task = models.BooleanField(default=True)
     delete_kanban_task = models.BooleanField(default=True)
 
+    @staticmethod
+    def negate_field_perms():
+        return ['id', 'created_at', 'updated_at', 'role_name', 'author']
+
 
 # Permission Tags for each group, and for user to put on delegators
 class GroupTags(BaseModel):
@@ -129,6 +135,32 @@ class GroupUser(BaseModel):
     is_admin = models.BooleanField(default=False)
     permission = models.ForeignKey(GroupPermissions, null=True, blank=True, on_delete=models.SET_NULL)
     active = models.BooleanField(default=True)
+
+    def check_permission(self, raise_exception: bool = False, **permissions):
+        if self.permission:
+            user_permissions = model_to_dict(self.permission)
+        else:
+            if self.group.default_permission:
+                user_permissions = model_to_dict(self.group.default_permission)
+            else:
+                fields = [field for field in GroupPermissions._meta.get_fields() if not (field.auto_created
+                          or field.name in GroupPermissions.negate_field_perms())]
+                user_permissions = {field.name: field.default for field in fields}
+
+        def validate_perms():
+            for perm, val in permissions.items():
+                if user_permissions.get(perm) != val:
+                    yield f"{perm} must be {val}"
+
+        failed_permissions = validate_perms()
+        if failed_permissions:
+            if not raise_exception:
+                return False
+
+            raise ValidationError("Unmatched permissions: ", ", ".join(failed_permissions))
+
+        return True
+
 
     @classmethod
     # Updates Schedule name
