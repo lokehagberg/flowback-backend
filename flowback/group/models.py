@@ -152,7 +152,7 @@ class GroupUser(BaseModel):
                 if user_permissions.get(perm) != val:
                     yield f"{perm} must be {val}"
 
-        failed_permissions = validate_perms()
+        failed_permissions = list(validate_perms())
         if failed_permissions:
             if not raise_exception:
                 return False

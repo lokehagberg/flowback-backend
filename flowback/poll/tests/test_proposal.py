@@ -10,7 +10,8 @@ from .utils import generate_poll_phase_kwargs
 from ..models import PollProposal, Poll
 from ..views.proposal import PollProposalListAPI, PollProposalCreateAPI, PollProposalDeleteAPI
 from ...files.tests.factories import FileSegmentFactory
-from ...group.tests.factories import GroupFactory, GroupUserFactory, GroupTagsFactory
+from ...group.tests.factories import GroupFactory, GroupUserFactory, GroupTagsFactory, GroupPermissionsFactory
+from ...schedule.models import ScheduleEvent
 from ...user.models import User
 
 
@@ -109,14 +110,55 @@ class ProposalTest(APITransactionTestCase):
 
     def test_proposal_delete(self):
         user = self.group_user_one.user
-        proposal = self.poll_schedule_proposal_one
+        proposal = self.poll_ranking_proposal_one
+
+        response = self.proposal_delete(proposal, user)
+        self.assertEqual(response.status_code, 200, response.data)
+
+    def test_proposal_delete_no_permission(self):
+        self.group_user_one.permission = GroupPermissionsFactory(author=self.group_user_one.group,
+                                                                 delete_proposal=False)
+        self.group_user_one.save()
+        user = self.group_user_one.user
+        proposal = self.poll_ranking_proposal_one
 
         response = self.proposal_delete(proposal, user)
         self.assertEqual(response.status_code, 400)
 
     def test_proposal_delete_admin(self):
         user = self.group_user_creator.user
-        proposal = self.poll_schedule_proposal_one
+        proposal = self.poll_ranking_proposal_one
 
         response = self.proposal_delete(proposal, user)
         self.assertEqual(response.status_code, 200, response.data)
+
+    def test_proposal_schedule_delete(self):
+        user = self.group_user_one.user
+        proposal = self.poll_schedule_proposal_one
+        event_id = proposal.pollproposaltypeschedule.event.id
+
+        response = self.proposal_delete(proposal, user)
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(ScheduleEvent.objects.filter(id=event_id).exists())
+
+    def test_proposal_schedule_delete_no_permission(self):
+        self.group_user_one.permission = GroupPermissionsFactory(author=self.group_user_one.group,
+                                                                 delete_proposal=False)
+        self.group_user_one.save()
+        user = self.group_user_one.user
+        proposal = self.poll_schedule_proposal_one
+        event_id = proposal.pollproposaltypeschedule.event.id
+
+        response = self.proposal_delete(proposal, user)
+        self.assertEqual(response.status_code, 400)
+        self.assertTrue(ScheduleEvent.objects.filter(id=event_id).exists())
+
+    def test_proposal_schedule_delete_admin(self):
+        user = self.group_user_creator.user
+        proposal = self.poll_schedule_proposal_one
+        event_id = proposal.pollproposaltypeschedule.event.id
+        self.assertTrue(ScheduleEvent.objects.filter(id=event_id).exists())
+
+        response = self.proposal_delete(proposal, user)
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertFalse(ScheduleEvent.objects.filter(id=event_id).exists())
