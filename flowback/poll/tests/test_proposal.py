@@ -1,7 +1,3 @@
-import json
-from datetime import timedelta
-
-from django.core.files.uploadedfile import SimpleUploadedFile
 from django.utils import timezone
 from rest_framework.test import APIRequestFactory, force_authenticate, APITransactionTestCase
 from .factories import PollFactory, PollProposalFactory
@@ -9,7 +5,6 @@ from .factories import PollFactory, PollProposalFactory
 from .utils import generate_poll_phase_kwargs
 from ..models import PollProposal, Poll
 from ..views.proposal import PollProposalListAPI, PollProposalCreateAPI, PollProposalDeleteAPI
-from ...files.tests.factories import FileSegmentFactory
 from ...group.tests.factories import GroupFactory, GroupUserFactory, GroupTagsFactory, GroupPermissionsFactory
 from ...schedule.models import ScheduleEvent
 from ...user.models import User

@@ -56,9 +56,9 @@ class PollVoteTest(APITransactionTestCase):
 
         voting_account = PollVoting.objects.get(created_by=self.group_user_one)
         self.assertEqual(PollVotingTypeCardinal.objects.get(author=voting_account,
-                                                            proposal_id=proposals[0].id).score, scores[0])
+                                                            proposal_id=proposals[0].id).raw_score, scores[0])
         self.assertEqual(PollVotingTypeCardinal.objects.get(author=voting_account,
-                                                            proposal_id=proposals[1].id).score, scores[1])
+                                                            proposal_id=proposals[1].id).raw_score, scores[1])
 
     def test_vote_update_cardinal_reset(self):
         self.test_vote_update_cardinal()
@@ -75,7 +75,7 @@ class PollVoteTest(APITransactionTestCase):
 
         for x in range(3):
             self.assertEqual(PollVotingTypeCardinal.objects.get(author=voting_account,
-                                                                proposal_id=proposals[x].id).score, scores[x])
+                                                                proposal_id=proposals[x].id).raw_score, scores[x])
 
     def test_vote_update_cardinal_duplicate(self):
         user = self.group_user_one.user

@@ -5,7 +5,7 @@
 __pycache__
 db.sqlite3
 media
-.flowback_pgpass
+.flowback*
 flowback_addon/*
 general.log
 static/*

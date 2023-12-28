@@ -77,7 +77,7 @@ class Poll(BaseModel):
 
     @property
     def finished(self):
-        return self.end_date <= timezone.now()
+        return self.vote_end_date <= timezone.now()
 
     @property
     def labels(self) -> tuple:
