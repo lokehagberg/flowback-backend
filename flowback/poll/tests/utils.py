@@ -7,21 +7,21 @@ def generate_poll_phase_kwargs(poll_start_phase: str) -> dict:
         case 'waiting':
             poll_offset_hours = -1
         case 'area_vote':
-            poll_offset_hours = 1
+            poll_offset_hours = 0
         case 'proposal':
-            poll_offset_hours = 2
+            poll_offset_hours = 1
         case 'prediction_statement':
-            poll_offset_hours = 3
+            poll_offset_hours = 2
         case 'prediction_bet':
-            poll_offset_hours = 4
+            poll_offset_hours = 3
         case 'delegate_vote':
-            poll_offset_hours = 5
+            poll_offset_hours = 4
         case 'vote':
-            poll_offset_hours = 6
+            poll_offset_hours = 5
         case 'result':
-            poll_offset_hours = 7
+            poll_offset_hours = 6
         case 'prediction_vote':
-            poll_offset_hours = 8
+            poll_offset_hours = 7
         case _:
             poll_offset_hours = 0
 
