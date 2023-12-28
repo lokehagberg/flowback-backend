@@ -76,6 +76,10 @@ class Poll(BaseModel):
     dynamic = models.BooleanField()
 
     @property
+    def finished(self):
+        return self.end_date <= timezone.now()
+
+    @property
     def labels(self) -> tuple:
         if self.dynamic:
             return ((self.start_date, 'start date', 'dynamic'),
@@ -215,6 +219,7 @@ class PollVoting(BaseModel):
 class PollDelegateVoting(BaseModel):
     created_by = models.ForeignKey(GroupUserDelegatePool, on_delete=models.CASCADE)
     poll = models.ForeignKey(Poll, on_delete=models.CASCADE)
+    mandate = models.IntegerField(default=0)
 
     class Meta:
         unique_together = ('created_by', 'poll')
@@ -249,13 +254,14 @@ class PollVotingTypeCardinal(BaseModel):
     author_delegate = models.ForeignKey(PollDelegateVoting, null=True, blank=True, on_delete=models.CASCADE)
 
     proposal = models.ForeignKey(PollProposal, on_delete=models.CASCADE)
-    score = models.IntegerField()  # Raw vote score
+    raw_score = models.IntegerField()  # Raw vote score
+    score = models.IntegerField(null=True, blank=True)
 
     def clean(self):
-        if SCORE_VOTE_CEILING is not None and self.score >= SCORE_VOTE_CEILING:
+        if SCORE_VOTE_CEILING is not None and self.raw_score >= SCORE_VOTE_CEILING:
             raise ValidationError(f'Voting scores exceeds ceiling bounds (currently set at {SCORE_VOTE_CEILING})')
 
-        if SCORE_VOTE_FLOOR is not None and self.score <= SCORE_VOTE_FLOOR:
+        if SCORE_VOTE_FLOOR is not None and self.raw_score <= SCORE_VOTE_FLOOR:
             raise ValidationError(f'Voting scores exceeds floor bounds (currently set at {SCORE_VOTE_FLOOR})')
 
     class Meta:

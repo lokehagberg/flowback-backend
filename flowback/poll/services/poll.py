@@ -204,7 +204,6 @@ def poll_refresh_cheap(*, poll_id: int) -> None:
     if (poll.dynamic and not poll.status) or (poll.status and timezone.now() >= poll.end_date):
         poll_proposal_vote_count(poll_id=poll_id)
         poll.refresh_from_db()
-        poll.result = True
 
         # Add the event if the poll finished
         if poll.poll_type == Poll.PollType.SCHEDULE:

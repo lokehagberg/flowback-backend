@@ -176,7 +176,7 @@ class DelegatePollVoteListAPI(APIView):
 class PollProposalVoteUpdateAPI(APIView):
     # For Ranking, Schedule
     class InputSerializerDefault(serializers.Serializer):
-        votes = serializers.ListField(child=serializers.IntegerField())
+        proposals = serializers.ListField(child=serializers.IntegerField())
 
     class InputSerializerCardinal(serializers.Serializer):
         proposals = serializers.ListField(child=serializers.IntegerField())
