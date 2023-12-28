@@ -171,21 +171,24 @@ def poll_proposal_vote_count(*, poll_id: int) -> None:
     total_proposals = poll.pollproposal_set.count()
 
     def save_participants_count(voting_type_class):
-        blank_votes = voting_type_class.objects.filter(author__poll=OuterRef('poll'), score=0).count()
+        blank_votes = voting_type_class.objects.filter(author__poll=poll, score=0).count()
         blank_votes += voting_type_class.objects.filter(
-            author_delegate__poll=OuterRef('poll'), score=0
-        ).aggregate(total_blank_votes=Subquery(mandate_subquery))['total_blank_votes']
+            author_delegate__poll=poll, score=0
+        ).annotate(total_blank_votes=Subquery(mandate_subquery)).aggregate(blank_votes=Sum('total_blank_votes')
+                                                                           ).get('total_blank_votes') or 0
 
         participants = voting_type_class.objects.filter(author__poll=poll).count()
         participants += voting_type_class.objects.filter(author_delegate__poll=poll
-                                                         ).aggregate(
-            participants=Subquery(mandate_subquery), output_field=models.IntegerField())['participants']
+                                                         ).annotate(participants=Subquery(mandate_subquery)
+                                                                    ).aggregate(total_participants=Sum(participants)
+                                                                                ).get('total_participants') or 0
 
-        positive_votes = voting_type_class.objects.filter(author__poll=OuterRef('poll'), score__gt=0
+        positive_votes = voting_type_class.objects.filter(author__poll=poll, score__gt=0
                                                           ).count()
-        positive_votes += voting_type_class.objects.filter(author_delegate__poll=OuterRef('poll'), score__gt=0
-                                                           ).aggregate(
-            total_positive_votes=Subquery(mandate_subquery), output_field=models.IntegerField())
+        positive_votes += voting_type_class.objects.filter(author_delegate__poll=poll, score__gt=0
+                                                           ).annotate(
+            positive_votes=Subquery(mandate_subquery)).aggregate(total_positive_votes=Sum('positive_votes')
+                                                                 ).get('total_positive_votes') or 0
 
         PollProposal.objects.filter(poll=poll).update(blank_votes=blank_votes,
                                                       participants=participants,
