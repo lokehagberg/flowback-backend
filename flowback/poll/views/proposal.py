@@ -62,7 +62,7 @@ class PollProposalListAPI(APIView):
 
     def get(self, request, poll: int = None):
         poll = get_object(Poll, id=poll)
-        if poll.poll_type == Poll.PollType.RANKING:
+        if poll.poll_type != Poll.PollType.SCHEDULE:
             filter_serializer = self.FilterSerializer(data=request.query_params)
             output_serializer = self.OutputSerializer
 
