@@ -11,6 +11,7 @@ from flowback.poll.models import Poll, PollProposal
 from ..selectors.proposal import poll_proposal_list
 from ..services.poll import poll_refresh_cheap
 from ..services.proposal import poll_proposal_create, poll_proposal_delete
+from ...group.serializers import GroupUserSerializer
 
 
 # TODO check alternative solution for schedule
@@ -29,36 +30,17 @@ class PollProposalListAPI(APIView):
         start_date = serializers.DateTimeField(required=False)
         end_date = serializers.DateTimeField(required=False)
 
-    class OutputSerializer(serializers.ModelSerializer):
-        approval_positive = serializers.IntegerField()
-        approval_negative = serializers.IntegerField()
-
-        class Meta:
-            model = PollProposal
-            fields = ('id',
-                      'created_by',
-                      'poll',
-                      'title',
-                      'description',
-                      'score',
-                      'blank_votes',
-                      'positive_votes',
-                      'participants')
+    class OutputSerializer(serializers.Serializer):
+        id = serializers.IntegerField()
+        created_by = GroupUserSerializer()
+        poll = serializers.IntegerField(source='poll_id')
+        title = serializers.CharField()
+        description = serializers.CharField()
+        score = serializers.IntegerField()
 
     class OutputSerializerTypeSchedule(OutputSerializer):
         start_date = serializers.DateTimeField(source='pollproposaltypeschedule.event.start_date')
         end_date = serializers.DateTimeField(source='pollproposaltypeschedule.event.end_date')
-        approval_positive = serializers.IntegerField()
-        approval_negative = serializers.IntegerField()
-
-        class Meta:
-            model = PollProposal
-            fields = ('id',
-                      'created_by',
-                      'poll',
-                      'score',
-                      'start_date',
-                      'end_date')
 
     def get(self, request, poll: int = None):
         poll = get_object(Poll, id=poll)

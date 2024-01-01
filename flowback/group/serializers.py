@@ -3,6 +3,7 @@ from rest_framework import serializers
 from flowback.group.models import Group, GroupUser
 from flowback.user.serializers import BasicUserSerializer
 
+
 class BasicGroupSerializer(serializers.ModelSerializer):
     class Meta:
         model = Group
