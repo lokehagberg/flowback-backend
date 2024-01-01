@@ -63,7 +63,7 @@ def poll_proposal_list(*, fetched_by: User, poll_id: int, filters=None):
 
         filters = filters or {}
         qs = (PollProposal.objects.filter(created_by__group_id=poll.created_by.group.id, poll=poll)
-            .annotate(approval_postitive=Subquery(positive_subquery),
+            .annotate(approval_positive=Subquery(positive_subquery),
                       approval_negative=Subquery(negative_subquery))
             .order_by(F('score').desc(nulls_last=True)).all())
 

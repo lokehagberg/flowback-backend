@@ -38,19 +38,26 @@ class PollProposalListAPI(APIView):
         description = serializers.CharField()
         score = serializers.IntegerField()
 
+    class OutputSerializerTypeCardinal(OutputSerializer):
+        approval_positive = serializers.IntegerField()
+        approval_negative = serializers.IntegerField()
+
     class OutputSerializerTypeSchedule(OutputSerializer):
         start_date = serializers.DateTimeField(source='pollproposaltypeschedule.event.start_date')
         end_date = serializers.DateTimeField(source='pollproposaltypeschedule.event.end_date')
 
     def get(self, request, poll: int = None):
         poll = get_object(Poll, id=poll)
-        if poll.poll_type != Poll.PollType.SCHEDULE:
+        if poll.poll_type == Poll.PollType.CARDINAL:
             filter_serializer = self.FilterSerializer(data=request.query_params)
-            output_serializer = self.OutputSerializer
+            output_serializer = self.OutputSerializerTypeCardinal
 
-        else:
+        elif poll.poll_type == Poll.PollType.SCHEDULE:
             filter_serializer = self.FilterSerializerTypeSchedule(data=request.query_params)
             output_serializer = self.OutputSerializerTypeSchedule
+
+        else:
+            raise ValidationError('Unsupported poll type')
 
         filter_serializer.is_valid(raise_exception=True)
         poll_refresh_cheap(poll_id=poll.id)  # TODO get celery
