@@ -31,11 +31,11 @@ class BasePollProposalScheduleFilter(django_filters.FilterSet):
     start_date__lt = django_filters.DateTimeFilter(field_name='pollproposaltypeschedule.event.start_date',
                                                    lookup_expr='lt')
     start_date__gte = django_filters.DateTimeFilter(field_name='pollproposaltypeschedule.event.start_date',
-                                                   lookup_expr='gte')
+                                                    lookup_expr='gte')
     end_date__lt = django_filters.DateTimeFilter(field_name='pollproposaltypeschedule.event.end_date',
                                                  lookup_expr='lt')
     end_date__gte = django_filters.DateTimeFilter(field_name='pollproposaltypeschedule.event.end_date',
-                                                 lookup_expr='gte')
+                                                  lookup_expr='gte')
 
     poll_title = django_filters.CharFilter(field_name='poll.title', lookup_expr='exact')
     poll_title__icontains = django_filters.CharFilter(field_name='poll.title', lookup_expr='icontains')
@@ -63,9 +63,9 @@ def poll_proposal_list(*, fetched_by: User, poll_id: int, filters=None):
 
         filters = filters or {}
         qs = (PollProposal.objects.filter(created_by__group_id=poll.created_by.group.id, poll=poll)
-            .annotate(approval_positive=Subquery(positive_subquery),
-                      approval_negative=Subquery(negative_subquery))
-            .order_by(F('score').desc(nulls_last=True)).all())
+              .annotate(approval_positive=Subquery(positive_subquery),
+                        approval_negative=Subquery(negative_subquery))
+              .order_by(F('score').desc(nulls_last=True)).all())
 
         if poll.poll_type == Poll.PollType.SCHEDULE:
             return BasePollProposalScheduleFilter(filters, qs).qs
@@ -77,7 +77,7 @@ def poll_user_schedule_list(*, fetched_by: User, filters=None):
     filters = filters or {}
     qs = PollProposal.objects.filter(created_by__group__groupuser__user__in=[fetched_by],
                                      poll__poll_type=Poll.PollType.SCHEDULE,
-                                     poll__status=1).order_by('poll', 'score')\
+                                     poll__status=1).order_by('poll', 'score') \
         .distinct('poll').all()
 
     return BasePollProposalScheduleFilter(filters, qs).qs
