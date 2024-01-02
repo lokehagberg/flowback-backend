@@ -73,15 +73,18 @@ class PollCommentTest(APITransactionTestCase):
         self.assertEqual(all('test' not in x.file for x in files_ex.all()), True)
         self.assertEqual(files.count(), len(data['attachments']))
 
+        return comment_id_ex
+
     def test_poll_comment_list(self):
         factory = APIRequestFactory()
         view = PollCommentListAPI.as_view()
+
+        target = self.test_poll_comment_create_with_attachments()
 
         request = factory.get('')
         force_authenticate(request, user=self.poll.created_by.user)
         response = view(request, poll=self.poll.id)
 
-        data = json.loads(response.rendered_content)
-        print(self.poll_comment_three.attachments.filesegment_set.first().__dict__)
-        print(FileSegment.objects.first().__dict__)
-        print(data)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len([i['attachments'] for i in response.data['results'] if i['id'] == target][0]), 2)
+
