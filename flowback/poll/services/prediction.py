@@ -3,7 +3,7 @@ from typing import Union
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
-from ..models import (PollPrediction,
+from ..models import (PollPredictionBet,
                       PollPredictionStatement,
                       PollPredictionStatementSegment,
                       PollPredictionStatementVote,
@@ -19,24 +19,23 @@ def poll_prediction_statement_create(poll: int,
                                      end_date: timezone.datetime,
                                      segments: list[dict]) -> int:
     poll = get_object(Poll, id=poll)
-    group_user = group_user_permissions(group=poll.group, user=user)
+    group_user = group_user_permissions(group=poll.created_by.group, user=user)
     prediction_statement = PollPredictionStatement(created_by=group_user,
                                                    poll=poll,
                                                    description=description,
                                                    end_date=end_date)
 
     valid_proposals = PollProposal.objects.filter(id__in=[i.get('proposal_id') for i in segments],
-                                                  poll__group=group_user.group).all()
+                                                  poll=poll).all()
     prediction_statement.full_clean()
 
-    if prediction_statement.poll.vote_start_date > timezone.now():
-        raise ValidationError("Unable to create prediction statement before poll proposal start date")
+    poll.check_phase('prediction_statement')
 
-    if len(segments < 1):
+    if len(segments) < 1:
         raise ValidationError('Prediction statement must contain atleast one statement')
 
     elif len(valid_proposals) == len(segments):
-        prediction_statement_segment = [PollPredictionStatementSegment(proposal=segment['proposal'],
+        prediction_statement_segment = [PollPredictionStatementSegment(proposal_id=segment['proposal_id'],
                                                                        is_true=segment['is_true'],
                                                                        prediction_statement=prediction_statement)
                                         for segment in segments]
@@ -49,11 +48,13 @@ def poll_prediction_statement_create(poll: int,
         raise ValidationError('Prediction statement segment(s) contains invalid proposal(s)')
 
 
-# Prediction Statement Update (with segments)
+# PredictionBet Statement Update (with segments)
 # TODO add or remove
 def poll_prediction_statement_update(user: Union[int, User], prediction_statement_id: int) -> None:
     prediction_statement = get_object(PollPredictionStatement, id=prediction_statement_id)
-    group_user = group_user_permissions(group=prediction_statement.poll.group, user=user)
+    group_user = group_user_permissions(group=prediction_statement.poll.created_by.group, user=user)
+
+    prediction_statement.poll.check_phase('prediction_statement')
 
     if not prediction_statement.created_by == group_user:
         raise ValidationError('Prediction statement not created by user')
@@ -61,7 +62,9 @@ def poll_prediction_statement_update(user: Union[int, User], prediction_statemen
 
 def poll_prediction_statement_delete(user: Union[int, User], prediction_statement_id: int) -> None:
     prediction_statement = get_object(PollPredictionStatement, id=prediction_statement_id)
-    group_user = group_user_permissions(group=prediction_statement.poll.group, user=user)
+    group_user = group_user_permissions(group=prediction_statement.poll.created_by.group, user=user)
+
+    prediction_statement.poll.check_phase('prediction_statement')
 
     if not prediction_statement.created_by == group_user:
         raise ValidationError('Prediction statement not created by user')
@@ -69,31 +72,30 @@ def poll_prediction_statement_delete(user: Union[int, User], prediction_statemen
     prediction_statement.delete()
 
 
-def poll_prediction_create(user: Union[int, User], prediction_statement_id: int, score: int) -> int:
+def poll_prediction_bet_create(user: Union[int, User], prediction_statement_id: int, score: int) -> int:
     prediction_statement = get_object(PollPredictionStatement, id=prediction_statement_id)
-    group_user = group_user_permissions(group=prediction_statement.poll.group, user=user)
+    group_user = group_user_permissions(group=prediction_statement.poll.created_by.group, user=user)
 
-    if prediction_statement.end_date < timezone.now():
-        raise ValidationError("Unable to create predictions after prediction statement end date")
+    prediction_statement.poll.check_phase('prediction_bet')
 
-    prediction = PollPrediction(created_by=group_user,
-                                prediction_statement=prediction_statement,
-                                score=score)
+    prediction = PollPredictionBet(created_by=group_user,
+                                   prediction_statement=prediction_statement,
+                                   score=score)
     prediction.full_clean()
     prediction.save()
 
     return prediction.id
 
 
-def poll_prediction_update(user: Union[int, User], prediction_id: int, data) -> int:
-    prediction = get_object(PollPrediction, id=prediction_id)
-    group_user = group_user_permissions(group=prediction.poll.group, user=user)
+def poll_prediction_bet_update(user: Union[int, User], prediction_statement_id: int, data) -> int:
+    prediction = get_object(PollPredictionBet, prediction_statement_id=prediction_statement_id, created_by__user=user)
+    group_user = group_user_permissions(group=prediction.prediction_statement.poll.created_by.group,
+                                        user=user)
 
-    if prediction.prediction_statement.end_date < timezone.now():
-        raise ValidationError("Unable to update predictions after prediction statement end date")
+    prediction.prediction_statement.poll.check_phase('prediction_bet')
 
     if not prediction.created_by == group_user:
-        raise ValidationError('Prediction not created by user')
+        raise ValidationError('Prediction bet not created by user')
 
     non_side_effect_fields = ['score']
     prediction, has_updated = model_update(instance=prediction,
@@ -105,25 +107,24 @@ def poll_prediction_update(user: Union[int, User], prediction_id: int, data) -> 
     return prediction.id
 
 
-def poll_prediction_delete(user: Union[int, User], prediction_id: int):
-    prediction = get_object(PollPrediction, id=prediction_id)
-    group_user = group_user_permissions(group=prediction.poll.group, user=user)
+def poll_prediction_bet_delete(user: Union[int, User], prediction_statement_id: int):
+    prediction = get_object(PollPredictionBet, prediction_statement_id=prediction_statement_id, created_by__user=user)
+    group_user = group_user_permissions(group=prediction.prediction_statement.poll.created_by.group,
+                                        user=user)
 
-    if prediction.prediction_statement.end_date < timezone.now():
-        raise ValidationError("Unable to delete predictions after prediction statement end date")
+    prediction.prediction_statement.poll.check_phase('prediction_bet')
 
     if not prediction.created_by == group_user:
-        raise ValidationError('Prediction not created by user')
+        raise ValidationError('Prediction bet not created by user')
 
     prediction.delete()
 
 
 def poll_prediction_statement_vote_create(user: Union[int, User], prediction_statement_id: int, vote: bool):
     prediction_statement = get_object(PollPredictionStatement, id=prediction_statement_id)
-    group_user = group_user_permissions(group=prediction_statement.poll.group, user=user)
+    group_user = group_user_permissions(group=prediction_statement.poll.created_by.group, user=user)
 
-    if prediction_statement.end_date < timezone.now():
-        raise ValidationError("Unable to vote ahead of prediction statement end date")
+    prediction_statement.poll.check_phase('prediction_vote')
 
     prediction_vote = PollPredictionStatementVote(created_by=group_user,
                                                   prediction_statement=prediction_statement,
@@ -133,10 +134,13 @@ def poll_prediction_statement_vote_create(user: Union[int, User], prediction_sta
 
 
 def poll_prediction_statement_vote_update(user: Union[int, User],
-                                          prediction_statement_vote_id: int,
+                                          prediction_statement_id: int,
                                           data) -> PollPredictionStatementVote:
-    prediction_statement_vote = get_object(PollPredictionStatementVote, id=prediction_statement_vote_id)
-    group_user = group_user_permissions(group=prediction_statement_vote.prediction_statement.poll.group, user=user)
+    prediction_statement_vote = get_object(PollPredictionStatementVote,
+                                           prediction_statement_id=prediction_statement_id,
+                                           created_by__user=user)
+    group_user = group_user_permissions(group=prediction_statement_vote.prediction_statement.poll.created_by.group,
+                                        user=user)
 
     if prediction_statement_vote.created_by != group_user:
         raise ValidationError('Prediction statement vote not created by user')
@@ -149,9 +153,12 @@ def poll_prediction_statement_vote_update(user: Union[int, User],
     return prediction_statement_vote
 
 
-def poll_prediction_statement_vote_delete(user: Union[int, User], prediction_statement_vote_id: int):
-    prediction_statement_vote = get_object(PollPredictionStatementVote, id=prediction_statement_vote_id)
-    group_user = group_user_permissions(group=prediction_statement_vote.prediction_statement.poll.group, user=user)
+def poll_prediction_statement_vote_delete(user: Union[int, User], prediction_statement_id: int):
+    prediction_statement_vote = get_object(PollPredictionStatementVote,
+                                           prediction_statement_id=prediction_statement_id,
+                                           created_by__user=user)
+    group_user = group_user_permissions(group=prediction_statement_vote.prediction_statement.poll.created_by.group,
+                                        user=user)
 
     if prediction_statement_vote.created_by != group_user:
         raise ValidationError('Prediction statement vote not created by user')

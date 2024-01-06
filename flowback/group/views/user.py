@@ -20,9 +20,12 @@ class GroupUserListApi(APIView):
         id = serializers.IntegerField(required=False, source='group_user_id')
         user_id = serializers.IntegerField(required=False)
         username__icontains = serializers.CharField(required=False)
-        delegate = serializers.NullBooleanField(required=False, default=None)
-        is_admin = serializers.NullBooleanField(required=False, default=None)
+        delegate = serializers.BooleanField(required=False, default=None, allow_null=True)
+        is_admin = serializers.BooleanField(required=False, default=None, allow_null=True)
         permission = serializers.IntegerField(required=False)
+
+    class OutputSerializer(GroupUserSerializer):
+        is_delegate = serializers.BooleanField(source='delegate')
 
     def get(self, request, group: int):
         filter_serializer = self.FilterSerializer(data=request.query_params)
@@ -34,7 +37,7 @@ class GroupUserListApi(APIView):
 
         return get_paginated_response(
             pagination_class=self.Pagination,
-            serializer_class=GroupUserSerializer,
+            serializer_class=self.OutputSerializer,
             queryset=users,
             request=request,
             view=self
@@ -97,7 +100,7 @@ class GroupLeaveApi(APIView):
 class GroupUserUpdateApi(APIView):
     class InputSerializer(serializers.Serializer):
         user = serializers.IntegerField(required=False)
-        delegate = serializers.NullBooleanField(required=False, default=None)
+        delegate = serializers.BooleanField(required=False, default=None, allow_null=True)
         permission = serializers.IntegerField(required=False, allow_null=True, source='permission_id')
         is_admin = serializers.IntegerField(required=False)
 

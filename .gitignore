@@ -5,8 +5,10 @@
 __pycache__
 db.sqlite3
 media
-.flowback_pgpass
+.flowback*
 flowback_addon/*
+general.log
+static/*
 
 # Backup files #
 *.bak
@@ -189,3 +191,4 @@ GitHub.sublime-settings
 !.vscode/launch.json
 !.vscode/extensions.json
 .history
+/static/

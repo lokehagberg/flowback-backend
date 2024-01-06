@@ -13,7 +13,7 @@ class CommentListAPI(APIView):
         default_limit = 20
         max_limit = 100
 
-    class InputSerializer(serializers.Serializer):
+    class FilterSerializer(serializers.Serializer):
         order_by = serializers.CharField(required=False)
         id = serializers.IntegerField(required=False)
         author_id = serializers.IntegerField(required=False)
@@ -21,6 +21,10 @@ class CommentListAPI(APIView):
         score__gt = serializers.IntegerField(required=False)
 
     class OutputSerializer(serializers.Serializer):
+        class FileSerializer(serializers.Serializer):
+            file = serializers.CharField()
+            file_name = serializers.CharField()
+
         id = serializers.IntegerField()
         author_id = serializers.IntegerField()
         author_name = serializers.CharField(source='author.username')
@@ -30,10 +34,11 @@ class CommentListAPI(APIView):
         edited = serializers.BooleanField()
         active = serializers.BooleanField()
         message = serializers.CharField()
+        attachments = FileSerializer(source="attachments.filesegment_set", many=True, allow_null=True)
         score = serializers.IntegerField()
 
     def get(self, request, comment_section_id: int):
-        serializer = self.InputSerializer(data=request.query_params)
+        serializer = self.FilterSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
 
         comments = comment_list(comment_section_id=comment_section_id,
@@ -50,6 +55,7 @@ class CommentCreateAPI(APIView):
     class InputSerializer(serializers.Serializer):
         parent_id = serializers.IntegerField(required=False)
         message = serializers.CharField()
+        attachments = serializers.ListField(child=serializers.FileField(), required=False, max_length=10)
 
     def post(self, request, comment_section_id: int):
         serializer = self.InputSerializer(data=request.data)

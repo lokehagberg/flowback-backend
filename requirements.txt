@@ -1,14 +1,22 @@
-Django==4.0.8
+Django==4.2.7
 django-extensions==3.2.1
-djangorestframework==3.13.1
+djangorestframework==3.14.0
 psycopg2==2.9.3
 django-environ==0.8.1
-pillow==9.0.1
+pillow==10.0.1
 django-filter==21.1
 django-cors-headers==3.13.0
 django-pgtrigger==4.5.3
+django-storages==1.14.2
+boto3==1.28.69
+factory-boy==3.3.0
+Faker==19.2.0
 channels==4.0.0
 channels_redis==4.0.0
 daphne==4.0.0
 celery==5.2.7
 django-celery-beat==2.5.0
+drf-spectacular==0.26.4
+pyyaml==6.0.1
+uritemplate==4.1.1
+twisted>=23.10.0rc1 # not directly required, pinned by Snyk to avoid a vulnerability

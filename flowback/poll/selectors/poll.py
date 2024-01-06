@@ -26,7 +26,7 @@ class BasePollFilter(django_filters.FilterSet):
                       poll_type=['exact'],
                       public=['exact'],
                       tag=['exact'],
-                      finished=['exact'],
+                      status=['exact'],
                       pinned=['exact'])
 
 

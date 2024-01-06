@@ -7,6 +7,7 @@ from flowback.user.views.user import (UserCreateApi,
                                       UserListApi,
                                       UserGetApi,
                                       UserUpdateApi,
+                                      UserDeleteAPI,
                                       UserForgotPasswordApi,
                                       UserForgotPasswordVerifyApi)
 from flowback.user.views.schedule import (UserScheduleEventListAPI,
@@ -26,6 +27,7 @@ user_patterns = [
     path('user', UserGetApi.as_view(), name='user'),
     path('user/detail', UserGetApi.as_view(), name='user'),
     path('user/update', UserUpdateApi.as_view(), name='user_update'),
+    path('user/delete', UserDeleteAPI.as_view(), name='user_delete'),
 
     path('user/schedule', UserScheduleEventListAPI.as_view(), name='user_schedule'),
     path('user/schedule/create', UserScheduleEventCreateAPI.as_view(), name='user_schedule_create'),
