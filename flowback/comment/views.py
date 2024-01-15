@@ -6,6 +6,7 @@ from rest_framework.views import APIView
 from flowback.comment.selectors import comment_list
 from flowback.comment.services import comment_create, comment_update, comment_delete
 from flowback.common.pagination import LimitOffsetPagination, get_paginated_response
+from flowback.files.serializers import FileSerializer
 
 
 class CommentListAPI(APIView):
@@ -21,10 +22,6 @@ class CommentListAPI(APIView):
         score__gt = serializers.IntegerField(required=False)
 
     class OutputSerializer(serializers.Serializer):
-        class FileSerializer(serializers.Serializer):
-            file = serializers.CharField()
-            file_name = serializers.CharField()
-
         id = serializers.IntegerField()
         author_id = serializers.IntegerField()
         author_name = serializers.CharField(source='author.username')

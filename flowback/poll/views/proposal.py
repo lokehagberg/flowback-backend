@@ -11,6 +11,7 @@ from flowback.poll.models import Poll, PollProposal
 from ..selectors.proposal import poll_proposal_list
 from ..services.poll import poll_refresh_cheap
 from ..services.proposal import poll_proposal_create, poll_proposal_delete
+from ...files.serializers import FileSerializer
 from ...group.serializers import GroupUserSerializer
 
 
@@ -36,6 +37,7 @@ class PollProposalListAPI(APIView):
         poll = serializers.IntegerField(source='poll_id')
         title = serializers.CharField()
         description = serializers.CharField()
+        attachments = FileSerializer(many=True, source="attachments.filesegment_set", allow_null=True)
         score = serializers.IntegerField()
 
     class OutputSerializerTypeCardinal(OutputSerializer):
