@@ -184,6 +184,7 @@ class PollProposal(BaseModel):
 
     title = models.CharField(max_length=255, null=True, blank=True)
     description = models.TextField(null=True, blank=True)
+    attachments = models.ForeignKey(FileCollection, on_delete=models.CASCADE, null=True, blank=True)
 
     participants = models.IntegerField(null=True, blank=True)
     blank_votes = models.IntegerField(null=True, blank=True)
