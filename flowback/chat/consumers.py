@@ -1,4 +1,5 @@
 import json
+from typing import Union
 
 from asgiref.sync import sync_to_async
 from channels.db import database_sync_to_async
@@ -7,86 +8,23 @@ from django.shortcuts import get_object_or_404
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
+from flowback.chat.models import MessageChannelParticipant
+from flowback.chat.services import message_create
 from flowback.common.services import get_object
 from flowback.user.models import User
 from flowback.group.models import Group
 from flowback.group.services import group_user_permissions
-from flowback.chat.models import GroupMessage, DirectMessage
+from flowback.user.serializers import BasicUserSerializer
 
-# TODO Delete
-class GroupChatConsumer(AsyncWebsocketConsumer):
-    async def connect(self):
-        self.user = self.scope['user']
-        self.group_id = self.scope['url_route']['kwargs'].get('group')
-        self.chat_id = f'group_{self.group_id}'
 
-        if self.scope['user'].is_anonymous or not self.group_id:
-            await self.close()
+# create message
+# update message
+# delete message
 
-        self.group = await self.group_channel_connect()
-
-        # Join room group
-        await self.channel_layer.group_add(
-            self.chat_id,
-            self.channel_name
-        )
-
-        await self.accept()
-
-    async def disconnect(self, close_code):
-        # Leave room group
-        await self.channel_layer.group_discard(
-            self.chat_id,
-            self.channel_name
-        )
-
-    # Receive message from WebSocket
-    async def receive(self, text_data):
-        text_data = json.loads(text_data)
-        message = text_data['message']
-
-        class OutputSerializer(serializers.ModelSerializer):
-            class Meta:
-                model = User
-                fields = 'id', 'username', 'profile_image'
-
-        await self.group_channel_message(message)
-
-        # Send message to room group
-        await self.channel_layer.group_send(
-            self.chat_id,
-            {
-                'type': 'chat_message',
-                'user': OutputSerializer(self.user).data,
-                'message': message
-            }
-        )
-
-    # Receive message from room group
-    async def chat_message(self, content: dict):
-        # Send message to WebSocket
-        await self.send(text_data=json.dumps({
-            'message': content.get('message'),
-            'user': content.get('user')
-        }))
-
-    @database_sync_to_async
-    def group_channel_connect(self):
-        group = get_object_or_404(Group, pk=self.group_id)
-        group_user_permissions(user=self.user.id,
-                               group=self.group_id)
-
-        return group
-
-    @database_sync_to_async
-    def group_channel_message(self, message):
-        group_user = group_user_permissions(group=self.group_id, user=self.user.id)
-        obj = GroupMessage(group_user=group_user,
-                           message=message)
-
-        obj.full_clean()
-        obj.save()
-
+# TODO Create websocket that only connects to one channel at a time.
+#  In future create webhook for subscribing to notifications, in meantime use 10s
+#  space between preview list api.
+#  Additionally each module will have their own chat consumer to allow permission check
 
 class ChatConsumer(AsyncWebsocketConsumer):
     async def connect(self):
@@ -94,185 +32,120 @@ class ChatConsumer(AsyncWebsocketConsumer):
         if self.scope['user'].is_anonymous:
             await self.close()
 
-        # chat_id: user_<id:int>
-        self.chat_groups = await self.get_chat_groups()
-
-        # Join room group
-        for group in self.chat_groups:
+        self.user_channel = f"user_{self.user.id}"
+        self.participating_channels = await self.get_participating_channels()
+        self.participating_channels.append(self.user_channel)
+        for channel in self.participating_channels:
             await self.channel_layer.group_add(
-                group,
+                channel,
                 self.channel_name
             )
 
         await self.accept()
 
     async def disconnect(self, close_code):
-        # Leave room group
-        for group in self.chat_groups:
+        for group in self.participating_channels:
             await self.channel_layer.group_discard(
                 group,
-                self.channel_name
-            )
+                self.channel_name)
 
     # Receive message from WebSocket
     async def receive(self, text_data):
-        class FilterSerializer(serializers.Serializer):
-            target_type = serializers.ChoiceField(('group', 'direct'))
+        data = json.loads(text_data or '{}')
+
+        # Message endpoint
+        if data.get('type') == 'message':
+            await self.send_message(data=data)
+
+        elif data.get('type') == 'connect_channel':
+            await self.connect_channel(data=data)
+
+        elif data.get('type') == 'disconnect_channel':
+            await self.connect_channel(data=data, disconnect=True)
+
+    # Send message to WebSocket
+    # TODO Check if redundant
+    async def chat_message(self, content: dict):
+        await self.send(text_data=json.dumps(content))
+
+    @database_sync_to_async
+    def get_participating_channels(self):
+        return MessageChannelParticipant.objects.filter(user=self.user).values_list('channel_id', flat=True)
+
+    @database_sync_to_async
+    def create_message(self, *, user_id: int, channel_id: int, message: str, attachments_id: int, parent_id: int):
+        try:
+            message = message_create(user_id=user_id, channel_id=channel_id, message=message,
+                                     attachments_id=attachments_id, parent_id=parent_id)
+
+        except ValidationError as e:
+            return e.detail
+
+        return message
+
+    async def send_message(self, data: dict):
+        class MessageInputSerializer(serializers.Serializer):
+            channel_id = serializers.IntegerField()
             message = serializers.CharField()
-            target = serializers.IntegerField()
+            attachments_id = serializers.IntegerField()
+            parent_id = serializers.IntegerField()
 
-        class OutputSerializer(serializers.ModelSerializer):
-            class Meta:
-                model = User
-                fields = 'id', 'username', 'profile_image'
-
-        serializer = FilterSerializer(data=json.loads(text_data or '{}'))
+        serializer = MessageInputSerializer(data=data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
-        target_type = data.get('target_type')
+        channel_id = data.get('channel_id')
         message = data.get('message')
-        target = data.get('target')
-
-        data = dict(user=OutputSerializer(self.user).data,
-                    message=data.get('message'),
-                    type='chat_message',
-                    target_type=target_type)
+        attachments_id = data.get('attachments_id')
+        parent_id = data.get('parent_id')
 
         # Save message to database
-        if target_type == 'direct':
-            await self.direct_message(message=message, target=target)
+        message = await self.create_message(user_id=self.user.id,
+                                            channel_id=channel_id,
+                                            message=message,
+                                            attachments_id=attachments_id,
+                                            parent_id=parent_id)
 
-        elif target_type == 'group':
-            data['group'] = target
-            await self.group_message(message=message, target=target)
+        # Send error message to user if string returned
+        if isinstance(message, str):
+            await self.channel_layer.group_send(
+                self.user_channel,
+                dict(channel_id=channel_id,
+                     type="error",
+                     message=message))
 
-        else:
-            raise ValidationError('Unknown target type')
+            return False
 
         # Send message to room group
+        data['type'] = 'message'
+
         await self.channel_layer.group_send(
-            await self.get_message_target(target=target, target_type=target_type),
+            channel_id,
             data
         )
 
-    # Receive message from room group
-    async def chat_message(self, content: dict):
-        data = dict(message=content.get('message'),
-                    user=content.get('user'),
-                    target_type=content.get('target_type'))
+        return True
 
-        if data.get('target_type'):
-            data['group'] = content.get('group')
+    async def connect_channel(self, data, disconnect=False):
+        class ConnectChannelInputSerializer(serializers.Serializer):
+            channel_id = serializers.IntegerField()
 
-        # Send message to WebSocket
-        await self.send(text_data=json.dumps(data))
-
-    @database_sync_to_async
-    def get_message_target(self, target: int, target_type: str):
-        return f'user_{target}' if target_type == 'direct' else f'group_{target}'
-
-    # TODO TypeError: Field 'id' expected a number but got
-    #  <django.contrib.auth.models.AnonymousUser object at 0x7f16f50f08e0>.
-    @database_sync_to_async
-    def get_chat_groups(self):
-        user_groups = Group.objects.filter(groupuser__user__in=[self.user]).all()
-        return [f'group_{x.id}' for x in user_groups] + [f'user_{self.user.id}']
-
-    @database_sync_to_async
-    def direct_message(self, *, message: str, target: int):
-        target = get_object(User, pk=target)
-
-        obj = DirectMessage(user=self.user,
-                            target_id=target.id,
-                            message=message)
-
-        obj.full_clean()
-        obj.save()
-
-    @database_sync_to_async
-    def group_message(self, message: str, target: int):
-        group_user = group_user_permissions(group=target, user=self.user.id)
-        obj = GroupMessage(group_user=group_user,
-                           message=message)
-
-        obj.full_clean()
-        obj.save()
-
-
-# TODO Delete
-class DirectChatConsumer(AsyncWebsocketConsumer):
-    async def connect(self):
-        self.user = self.scope['user']
-
-        if self.scope['user'].is_anonymous:
-            await self.close()
-
-        # chat_id: user_<id:int>
-        self.group_name = f'user_{self.user.id}'
-
-        # Join room group
-        await self.channel_layer.group_add(
-            self.group_name,
-            self.channel_name
-        )
-
-        await self.accept()
-
-    async def disconnect(self, close_code):
-        # Leave room group
-        await self.channel_layer.group_discard(
-            self.group_name,
-            self.channel_name
-        )
-
-    # Receive message from WebSocket
-    async def receive(self, text_data):
-        class FilterSerializer(serializers.Serializer):
-            message = serializers.CharField()
-            target = serializers.IntegerField()
-
-        class OutputSerializer(serializers.ModelSerializer):
-            class Meta:
-                model = User
-                fields = 'id', 'username', 'profile_image'
-
-        serializer = FilterSerializer(data=json.loads(text_data or '{}'))
+        serializer = ConnectChannelInputSerializer(data=data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
-        await self.direct_message(**data)
+        channel_id = data.get('channel_id')
 
-        # Send message to room group
-        await self.channel_layer.group_send(
-            await self.get_message_target(data.get('target')),
-            {
-                'type': 'chat_message',
-                'user': OutputSerializer(self.user).data,
-                'message': data.get('message'),
-            }
-        )
+        if not disconnect and channel_id in await self.get_participating_channels():
+            await self.channel_layer.group_add(channel_id, self.channel_name)
+            self.participating_channels.append(channel_id)
 
-    # Receive message from room group
-    async def chat_message(self, content: dict):
+        elif disconnect and channel_id in self.participating_channels:
+            await self.channel_layer.group_discard(channel_id, self.channel_name)
 
-        # Send message to WebSocket
-        await self.send(text_data=json.dumps({
-            'message': content.get('message'),
-            'user': content.get('user')
-        }))
+        else:
+            await self.channel_layer.group_send(self.user_channel,
+                                                dict(channel_id=channel_id,
+                                                     type="error",
+                                                     message="Unknown operation"))
 
-    @database_sync_to_async
-    def get_message_target(self, target: int):
-        get_object(User, pk=target)
-
-        return f'user_{target}'
-
-    @database_sync_to_async
-    def direct_message(self, *, message: str, target: int):
-        obj = DirectMessage(user=self.user,
-                            target_id=target,
-                            message=message)
-
-        obj.full_clean()
-        obj.save()
-
+        return True

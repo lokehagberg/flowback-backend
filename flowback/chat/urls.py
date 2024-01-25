@@ -1,23 +1,23 @@
 from django.urls import path
 
 from backend.settings import URL_SUBPATH
-from .consumers import GroupChatConsumer, DirectChatConsumer, ChatConsumer
-from .views import GroupMessageListApi, GroupMessagePreviewApi, DirectMessageListApi, DirectMessagePreviewApi, \
-                   DirectMessageTimestampApi, GroupMessageTimestampApi
+from .consumers import ChatConsumer
+from .views import (MessageListAPI,
+                    MessageChannelPreviewAPI,
+                    MessageFileCollectionUploadAPI,
+                    MessageChannelUserDataUpdateAPI)
 
 subpath = f'{URL_SUBPATH}/' if URL_SUBPATH else ''
 
 chat_patterns = [
-    path('group/<int:group>', GroupMessageListApi.as_view(), name='chat-group-list'),
-    path('group/preview', GroupMessagePreviewApi.as_view(), name='chat-group-preview'),
-    path('group/<int:group>/timestamp', GroupMessageTimestampApi.as_view(), name='chat-group-timestamp'),
-    path('direct/<int:target>', DirectMessageListApi.as_view(), name='chat-dm-list'),
-    path('direct/preview', DirectMessagePreviewApi.as_view(), name='chat-dm-preview'),
-    path('direct/<int:target>/timestamp', DirectMessageTimestampApi.as_view(), name='chat-dm-timestamp'),
+    path('message/channel/<int:channel_id>/list', MessageListAPI.as_view(), name='message_list'),
+    path('message/channel/list', MessageChannelPreviewAPI.as_view(), name='message_channel_preview'),
+    path('message/channel/<int:channel_id>/file/upload', MessageFileCollectionUploadAPI.as_view(),
+         name='message_channel_file_upload'),
+    path('message/channel/userdata/update', MessageChannelUserDataUpdateAPI.as_view(),
+         name='message_channel_userdata_update'),
 ]
 
 chat_ws_patterns = [
-    path(subpath + 'chat/ws/group/<int:group>', GroupChatConsumer.as_asgi(), name='ws_chat_group'),
     path(subpath + 'chat/ws', ChatConsumer.as_asgi(), name='ws_chat'),
-    path(subpath + 'chat/ws/direct', DirectChatConsumer.as_asgi(), name='ws_chat_direct')
 ]

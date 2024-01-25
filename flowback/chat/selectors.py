@@ -1,113 +1,59 @@
-from django.db import models
-from django.db.models import Q, OuterRef, Subquery, When, Case, F
+from django.db.models import Q, OuterRef, Subquery, Case, When
 import django_filters
 
-from .models import GroupMessage, DirectMessage, GroupMessageUserData, DirectMessageUserData
+from .models import MessageChannel, Message, MessageChannelParticipant
 from flowback.user.models import User
-from flowback.group.models import GroupUser, Group
-from flowback.group.services import group_user_permissions
+from ..common.services import get_object
 
 
-class BaseGroupMessageFilter(django_filters.FilterSet):
-    username__icontains = django_filters.CharFilter(field_name='group_user__user__username', lookup_expr='icontains')
-    user = django_filters.NumberFilter(field_name='group_user__user', lookup_expr='exact')
-    order_by = django_filters.OrderingFilter(
-        fields=(
-            ('created_at', 'created_at_asc'),
-            ('-created_at', 'created_at_desc')
-        )
-    )
+class BaseMessageFilter(django_filters.FilterSet):
+    order_by = django_filters.OrderingFilter(fields=(('created_at', 'created_at_asc'),
+                                                     ('-created_at', 'created_at_desc')))
 
     class Meta:
-        model = GroupMessage
+        model = Message
         fields = dict(id=['exact'],
+                      user_id=['exact'],
                       message=['icontains'],
-                      created_at=['gt', 'lt'])
+                      parent_id=['exact'],
+                      created_at=['gte', 'lte'])
 
 
-class BaseGroupMessagePreviewFilter(django_filters.FilterSet):
-    group = django_filters.NumberFilter(field_name='group_user__group', lookup_expr='exact')
-    group_name__icontains = django_filters.CharFilter(field_name='group_user__group__name', lookup_expr='icontains')
+def message_list(*, user: User, channel_id: int, filters):
+    filters = filters or {}
+    channel = get_object(MessageChannel, id=channel_id, user=user)
 
-    class Meta:
-        model = GroupMessage
-        fields = dict(id=['exact'],
-                      message=['icontains'],
-                      created_at=['gt', 'lt'])
+    qs = Message.objects.filter(Q(channel=channel)).all()
+
+    return BaseMessageFilter(filters, qs).qs
 
 
-class BaseDirectMessageFilter(django_filters.FilterSet):
-    order_by = django_filters.OrderingFilter(
-        fields=(
-            ('created_at', 'created_at_asc'),
-            ('-created_at', 'created_at_desc')
-        )
-    )
+class BaseMessageChannelPreviewFilter(django_filters.FilterSet):
+    order_by = django_filters.OrderingFilter(fields=(('timestamp', 'timestamp_asc'),
+                                                     ('-timestamp', 'timestamp_desc')))
 
-    class Meta:
-        model = DirectMessage
-        fields = dict(id=['exact'],
-                      target=['exact'],
-                      message=['icontains'],
-                      created_at=['gt', 'lt'])
-
-
-class BaseDirectMessagePreviewFilter(django_filters.FilterSet):
     username__icontains = django_filters.CharFilter(field_name='target__username', lookup_expr='icontains')
+    origin_name = django_filters.CharFilter(field_name='channel__origin_name', lookup_expr='exact')
 
     class Meta:
-        model = DirectMessage
+        model = Message
         fields = dict(id=['exact'],
-                      created_at=['gt', 'lt'],
-                      target=['exact'])
+                      user_id=['exact'],
+                      created_at=['gte', 'lte'],
+                      channel_id=['exact'])
 
 
-def group_message_list(*, user: User, group: int, filters=None):
-    group_user_permissions(user=user, group=group)
+def message_channel_preview_list(*, user: User, filters):
     filters = filters or {}
 
-    qs = GroupMessage.objects.filter(group_user__group=group).all()
+    timestamp = MessageChannelParticipant.objects.filter(user=user, channel=OuterRef('channel')).values('timestamp')
+    active = MessageChannelParticipant.objects.filter(user=user, channel=OuterRef('channel')).annotate(
+        active=Case(When(closed_at__isnull=True, then=True),
+                    When(closed_at__gt=OuterRef('created_at'), then=False),
+                    default=True)).values('active')
+    qs = Message.objects.filter(Q(channel__messagechannelparticipant__user=user) & Q(channel__origin_name=origin_name)
+                                ).annotate(timestamp=Subquery(timestamp), active=Subquery(active)
+                                           ).filter(active=True).distinct('channel').all()
 
-    return BaseGroupMessageFilter(filters, qs).qs
+    return BaseMessageChannelPreviewFilter(filters, qs).qs
 
-
-def group_message_preview(*, user: User, filters=None):
-    filters = filters or {}
-    subquery = GroupMessageUserData.objects.filter(group_user__group=OuterRef('group_user__group'),
-                                                   group_user__user=user).values('timestamp')
-    qs = GroupMessage.objects.filter(group_user__group__groupuser__user__in=[user]).all()\
-        .order_by('group_user__group_id')\
-        .distinct('group_user__group_id').values('id')
-
-    qs = GroupMessage.objects.filter(id__in=Subquery(qs)).all()\
-        .annotate(timestamp=Subquery(subquery[:1]))\
-        .order_by('-created_at')
-
-    return BaseGroupMessagePreviewFilter(filters, qs).qs
-
-
-def direct_message_list(*, user: User, target: int, filters=None):
-    filters = filters or {}
-    qs = DirectMessage.objects.filter(Q(user=user, target_id=target) | Q(user_id=target, target=user)).all()
-
-    return BaseDirectMessageFilter(filters, qs).qs
-
-
-def direct_message_preview(*, user: User, filters=None):
-    filters = filters or {}
-    subquery = DirectMessageUserData.objects.filter(user=user,
-                                                    target=Case(When(user=OuterRef('user'), then=OuterRef('target')),
-                                                                default=OuterRef('user'))).values('timestamp')
-
-    qs = DirectMessage.objects.filter(Q(user=user) | Q(target=user)
-                                      ).annotate(recipient_id=Case(When(user=user, then=F('target')),
-                                                                   When(target=user, then=F('user')))
-                                                 ).order_by('recipient_id', '-created_at'
-                                                            ).distinct('recipient_id').all()
-
-    # TODO Find a better way to order this
-    qs = DirectMessage.objects.filter(id__in=[q.id for q in qs]).annotate(timestamp=Subquery(subquery,
-                                                                          output_field=models.DateTimeField()),
-                                                                          ).order_by('-created_at').all()
-
-    return BaseDirectMessagePreviewFilter(filters, qs).qs

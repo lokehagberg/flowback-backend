@@ -74,6 +74,10 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     objects = CustomUserManager()
 
+    @property
+    def message_channel_origin(self) -> str:
+        return "user"
+
     @classmethod
     # Updates Schedule name
     def post_save(cls, instance, created, update_fields, **kwargs):

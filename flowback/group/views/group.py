@@ -17,6 +17,7 @@ class GroupListApi(APIView):
         id = serializers.IntegerField(required=False)
         name = serializers.CharField(required=False)
         name__icontains = serializers.CharField(required=False)
+        chat_ids = serializers.ListField(child=serializers.IntegerField(), required=False)
         direct_join = serializers.BooleanField(required=False, default=None, allow_null=True)
         joined = serializers.BooleanField(required=False, default=None, allow_null=True)
 

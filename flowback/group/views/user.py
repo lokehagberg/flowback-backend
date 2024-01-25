@@ -93,7 +93,6 @@ class GroupJoinApi(APIView):
 class GroupLeaveApi(APIView):
     def post(self, request, group: int):
         group_leave(user=request.user.id, group=group)
-
         return Response(status=status.HTTP_200_OK)
 
 

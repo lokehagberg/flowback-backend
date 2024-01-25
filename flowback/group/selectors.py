@@ -2,7 +2,7 @@
 #  groupdefaultpermission, grouppermissions, grouptags, groupuserdelegates
 import django_filters
 from typing import Union
-from django.db.models import Q, Exists, OuterRef, Count
+from django.db.models import Q, Exists, OuterRef, Count, Case, When, F
 from django.forms import model_to_dict
 
 from flowback.comment.selectors import comment_list
@@ -39,7 +39,6 @@ def group_user_permissions(*,
                            group_user: [GroupUser, int] = None,
                            permissions: Union[list[str], str] = None,
                            raise_exception: bool = True) -> Union[GroupUser, bool]:
-
     if type(user) == int:
         user = get_object(User, id=user)
 
@@ -62,7 +61,8 @@ def group_user_permissions(*,
         raise Exception('group_user_permissions is missing appropiate parameters')
 
     perobj = GroupPermissions()
-    user_permissions = model_to_dict(group_user.permission) if group_user.permission else group_default_permissions(group=group_user.group)
+    user_permissions = model_to_dict(group_user.permission) if group_user.permission else group_default_permissions(
+        group=group_user.group)
 
     # Check if admin permission is present
     if 'admin' in permissions:
@@ -77,7 +77,8 @@ def group_user_permissions(*,
     validated_permissions = any([user_permissions.get(key, False) for key in permissions]) or not permissions
     if not validated_permissions:
         if raise_exception:
-            raise ValidationError(f'Permission denied, requires one of following permissions: {", ".join(permissions)})')
+            raise ValidationError(
+                f'Permission denied, requires one of following permissions: {", ".join(permissions)})')
         else:
             return False
 
@@ -91,6 +92,7 @@ def _group_get_visible_for(user: User):
 
 class BaseGroupFilter(django_filters.FilterSet):
     joined = django_filters.BooleanFilter(lookup_expr='exact')
+    chat_ids = django_filters.NumberFilter(lookup_expr='in')
     exclude_folders = django_filters.BooleanFilter(lookup_expr='isnull')
 
     class Meta:
@@ -104,10 +106,14 @@ class BaseGroupFilter(django_filters.FilterSet):
 def group_list(*, fetched_by: User, filters=None):
     filters = filters or {}
     joined_groups = Group.objects.filter(id=OuterRef('pk'), groupuser__user__in=[fetched_by])
-    qs = _group_get_visible_for(user=fetched_by).annotate(joined=Exists(joined_groups),
-                                                          member_count=Count('groupuser')).order_by('created_at').all()
+    qs = _group_get_visible_for(user=fetched_by
+                                ).annotate(joined=Exists(joined_groups),
+                                           member_count=Count('groupuser')
+                                           ).annotate(chat_id=Case(When(joined=True, then=F('chat_id')),
+                                                                   default=None)).order_by('created_at').all()
     qs = BaseGroupFilter(filters, qs).qs
     return qs
+
 
 def group_folder_list():
     return GroupFolder.objects.all()

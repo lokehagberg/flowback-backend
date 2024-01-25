@@ -7,7 +7,7 @@ from rest_framework.views import APIView
 from flowback.user.models import OnboardUser, User
 from flowback.user.selectors import get_user, user_list
 from flowback.user.services import (user_create, user_create_verify, user_forgot_password,
-                                    user_forgot_password_verify, user_update, user_delete)
+                                    user_forgot_password_verify, user_update, user_delete, user_get_chat_channel)
 
 
 class UserCreateApi(APIView):
@@ -146,3 +146,12 @@ class UserDeleteAPI(APIView):
         user_delete(user_id=request.user.id)
 
         return Response(status=status.HTTP_200_OK)
+
+
+class UserGetChatChannelAPI(APIView):
+    class OutputSerializer(serializers.Serializer):
+        id = serializers.IntegerField()
+
+    def get(self, request, target_user_id: int):
+        data = user_get_chat_channel(user_id=request.user.id, target_user_id=target_user_id)
+        return Response(status=status.HTTP_200_OK, data=self.OutputSerializer(data).data)

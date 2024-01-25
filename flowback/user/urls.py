@@ -9,7 +9,7 @@ from flowback.user.views.user import (UserCreateApi,
                                       UserUpdateApi,
                                       UserDeleteAPI,
                                       UserForgotPasswordApi,
-                                      UserForgotPasswordVerifyApi)
+                                      UserForgotPasswordVerifyApi, UserGetChatChannelAPI)
 from flowback.user.views.schedule import (UserScheduleEventListAPI,
                                           UserScheduleEventCreateAPI,
                                           UserScheduleEventUpdateAPI,
@@ -39,6 +39,8 @@ user_patterns = [
     path('user/kanban/entry/create', UserKanbanEntryCreateAPI.as_view(), name='user_kanban_entry_create'),
     path('user/kanban/entry/update', UserKanbanEntryUpdateAPI.as_view(), name='user_kanban_entry_update'),
     path('user/kanban/entry/delete', UserKanbanEntryDeleteAPI.as_view(), name='user_kanban_entry_delete'),
+
+    path('user/chat/<int:target_user_id>', UserGetChatChannelAPI.as_view(), name='user_get_chat_channel')
 ]
 
 if not DISABLE_DEFAULT_USER_REGISTRATION:
