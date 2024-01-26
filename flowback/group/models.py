@@ -67,6 +67,7 @@ class Group(BaseModel):
         if created:
             instance.schedule = create_schedule(name=instance.name, origin_name='group', origin_id=instance.id)
             instance.kanban = kanban_create(name=instance.name, origin_type='group', origin_id=instance.id)
+            instance.save()
 
         if update_fields:
             if not all(isinstance(field, str) for field in update_fields):

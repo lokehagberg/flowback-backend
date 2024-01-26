@@ -109,8 +109,7 @@ def group_list(*, fetched_by: User, filters=None):
     qs = _group_get_visible_for(user=fetched_by
                                 ).annotate(joined=Exists(joined_groups),
                                            member_count=Count('groupuser')
-                                           ).annotate(chat_id=Case(When(joined=True, then=F('chat_id')),
-                                                                   default=None)).order_by('created_at').all()
+                                           ).order_by('created_at').all()
     qs = BaseGroupFilter(filters, qs).qs
     return qs
 

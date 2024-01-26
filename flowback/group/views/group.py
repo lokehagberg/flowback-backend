@@ -37,6 +37,7 @@ class GroupListApi(APIView):
                       'image',
                       'cover_image',
                       'joined',
+                      'chat_id',
                       'member_count')
 
     def get(self, request):
