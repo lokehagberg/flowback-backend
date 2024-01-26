@@ -1,7 +1,7 @@
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
 from django.db.models import Q, F, Count
-from django.db.models.signals import post_save, post_delete
+from django.db.models.signals import post_save, post_delete, pre_save
 from django.dispatch import receiver
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -156,14 +156,15 @@ class Poll(BaseModel):
             raise ValidationError(f'Poll is not in {" or ".join(phases)}, currently in {current_phase}')
 
     @classmethod
+    def pre_save(cls, instance, *args, **kwargs):
+        topic = message_channel_topic_create(channel_id=instance.created_by.group.chat_id,
+                                             topic_name=f'poll.{instance.id}',
+                                             hidden=True)
+        instance.message_channel_topic = topic
+
+    @classmethod
     def post_save(cls, instance, created, update_fields, **kwargs):
         if created:
-            topic = message_channel_topic_create(channel_id=instance.created_by.group.chat_id,
-                                                 topic_name=f'poll.{instance.id}',
-                                                 hidden=True)
-            instance.message_channel_topic = topic
-            instance.save()
-
             if instance.poll_type == cls.PollType.SCHEDULE:
                 try:
                     schedule = create_schedule(name='group_poll_schedule', origin_name='group_poll',
@@ -184,6 +185,7 @@ class Poll(BaseModel):
             instance.schedule.delete()
 
 
+pre_save.connect(Poll.pre_save, sender=Poll)
 post_save.connect(Poll.post_save, sender=Poll)
 post_delete.connect(Poll.post_delete, sender=Poll)
 
