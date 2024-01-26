@@ -8,7 +8,9 @@ from django.utils.translation import gettext_lazy as _
 from rest_framework.exceptions import ValidationError
 
 from backend.settings import SCORE_VOTE_CEILING, SCORE_VOTE_FLOOR, DEBUG
+from flowback.chat.models import MessageChannelTopic
 from flowback.chat.services import message_channel_topic_create, message_channel_topic_delete
+from flowback.common.services import get_object
 from flowback.files.models import FileCollection
 from flowback.prediction.models import (PredictionBet,
                                         PredictionStatement,
@@ -102,8 +104,8 @@ class Poll(BaseModel):
     def clean(self):
         labels = self.labels
         for x in range(len(labels) - 1):
-            if labels[x][0] > labels[x+1][0]:
-                raise ValidationError(f'{labels[x][1].title()} is greater than {labels[x+1][1]}')
+            if labels[x][0] > labels[x + 1][0]:
+                raise ValidationError(f'{labels[x][1].title()} is greater than {labels[x + 1][1]}')
 
     class Meta:
         constraints = [models.CheckConstraint(check=Q(Q(area_vote_end_date__isnull=True)
@@ -116,7 +118,8 @@ class Poll(BaseModel):
                                                       | Q(prediction_statement_end_date__gte=F('proposal_end_date'))),
                                               name='predictionstatementenddategreaterthanproposalenddate_check'),
                        models.CheckConstraint(check=Q(Q(prediction_bet_end_date__isnull=True)
-                                                      | Q(prediction_bet_end_date__gte=F('prediction_statement_end_date'))),
+                                                      | Q(
+                           prediction_bet_end_date__gte=F('prediction_statement_end_date'))),
                                               name='predictionbetenddategreaterthanpredictionstatementeneddate_check'),
                        models.CheckConstraint(check=Q(Q(delegate_vote_end_date__isnull=True)
                                                       | Q(delegate_vote_end_date__gte=F('prediction_bet_end_date'))),
@@ -134,6 +137,15 @@ class Poll(BaseModel):
     @property
     def schedule_origin(self):
         return 'group_poll'
+
+    @property
+    def message_channel_topic(self):
+        return get_object(MessageChannelTopic,
+                          channel=self.created_by.group.chat,
+                          name=self.message_channel_topic_name)
+
+    @property
+    def message_channel_topic_name(self): return f'poll.{self.id}'
 
     @property
     def current_phase(self) -> str:
@@ -154,12 +166,13 @@ class Poll(BaseModel):
     @classmethod
     def post_save(cls, instance, created, update_fields, **kwargs):
         if created:
-            message_channel_topic_create(channel_id=instance.created_by.chat_id,
-                                         name=f'poll.{instance.id}')
+            message_channel_topic_create(channel_id=instance.created_by.group.chat_id,
+                                         topic_name=instance.message_channel_topic_name)
 
             if instance.poll_type == cls.PollType.SCHEDULE:
                 try:
-                    schedule = create_schedule(name='group_poll_schedule', origin_name='group_poll', origin_id=instance.id)
+                    schedule = create_schedule(name='group_poll_schedule', origin_name='group_poll',
+                                               origin_id=instance.id)
                     schedule_poll = PollTypeSchedule(poll=instance, schedule=schedule)
                     schedule_poll.full_clean()
                     schedule_poll.save()
@@ -170,8 +183,7 @@ class Poll(BaseModel):
 
     @classmethod
     def post_delete(cls, instance, **kwargs):
-        message_channel_topic_delete(channel_id=instance.created_by.chat_id,
-                                     name=f'poll.{instance.id}')
+        instance.message_channel_topic.delete()
 
         if hasattr(instance, 'schedule'):
             instance.schedule.delete()
@@ -340,10 +352,10 @@ class PollPredictionStatement(PredictionStatement):
 
     @receiver(post_delete, sender=PollProposal)
     def clean_prediction_statement(sender, instance: PollProposal, **kwargs):
-        PollPredictionStatement.objects.filter(poll=instance.poll)\
-                                        .annotate(segment_count=Count('pollpredictionstatementsegment'))\
-                                        .filter(segment_count__lt=1)\
-                                        .delete()
+        PollPredictionStatement.objects.filter(poll=instance.poll) \
+            .annotate(segment_count=Count('pollpredictionstatementsegment')) \
+            .filter(segment_count__lt=1) \
+            .delete()
 
 
 class PollPredictionStatementSegment(PredictionStatementSegment):
@@ -372,4 +384,5 @@ class PollPredictionBet(PredictionBet):
 
     @receiver(post_save, sender=PollProposal)
     def reset_prediction_proposal(sender, instance: PollProposal, **kwargs):
-        PollPredictionBet.objects.filter(prediction_statement__pollpredictionstatementsegment__proposal=instance).delete()
+        PollPredictionBet.objects.filter(
+            prediction_statement__pollpredictionstatementsegment__proposal=instance).delete()
