@@ -8,6 +8,7 @@ from django.utils.translation import gettext_lazy as _
 from rest_framework.exceptions import ValidationError
 
 from backend.settings import SCORE_VOTE_CEILING, SCORE_VOTE_FLOOR, DEBUG
+from flowback.chat.services import message_channel_topic_create
 from flowback.files.models import FileCollection
 from flowback.prediction.models import (PredictionBet,
                                         PredictionStatement,
@@ -152,19 +153,26 @@ class Poll(BaseModel):
 
     @classmethod
     def post_save(cls, instance, created, update_fields, **kwargs):
-        if created and instance.poll_type == cls.PollType.SCHEDULE:
-            try:
-                schedule = create_schedule(name='group_poll_schedule', origin_name='group_poll', origin_id=instance.id)
-                schedule_poll = PollTypeSchedule(poll=instance, schedule=schedule)
-                schedule_poll.full_clean()
-                schedule_poll.save()
+        if created:
+            message_channel_topic_create(channel_id=instance.created_by.chat_id,
+                                         name=f'poll.{instance.id}')
 
-            except Exception as e:
-                instance.delete()
-                raise Exception('Internal server error when creating poll' + f':\n{e}' if DEBUG else '')
+            if instance.poll_type == cls.PollType.SCHEDULE:
+                try:
+                    schedule = create_schedule(name='group_poll_schedule', origin_name='group_poll', origin_id=instance.id)
+                    schedule_poll = PollTypeSchedule(poll=instance, schedule=schedule)
+                    schedule_poll.full_clean()
+                    schedule_poll.save()
+
+                except Exception as e:
+                    instance.delete()
+                    raise Exception('Internal server error when creating poll' + f':\n{e}' if DEBUG else '')
 
     @classmethod
     def post_delete(cls, instance, **kwargs):
+        message_channel_topic_delete(channel_id=instance.created_by.chat_id,
+                                     name=f'poll.{instance.id}')
+
         if hasattr(instance, 'schedule'):
             instance.schedule.delete()
 
