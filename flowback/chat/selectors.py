@@ -70,8 +70,7 @@ def message_channel_preview_list(*, user: User, **filters):
         active=Case(When(closed_at__isnull=True, then=True),
                     When(closed_at__gt=OuterRef('created_at'), then=False),
                     default=True)).values('active')
-    qs = Message.objects.filter(channel__messagechannelparticipant__user=user).annotate(
+    qs = Message.objects.filter(channel__messagechannelparticipant__user=user, topic__hidden=False).annotate(
         timestamp=Subquery(timestamp), active=Subquery(active)).filter(active=True).distinct('channel').all()
 
     return BaseMessageChannelPreviewFilter(filters, qs).qs
-

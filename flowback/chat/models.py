@@ -13,6 +13,7 @@ class MessageChannel(BaseModel):
 class MessageChannelTopic(BaseModel):
     channel = models.ForeignKey(MessageChannel, on_delete=models.CASCADE)
     name = models.CharField(max_length=255)
+    hidden = models.BooleanField(default=False)
 
 
 class MessageChannelParticipant(BaseModel):
