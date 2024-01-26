@@ -73,6 +73,7 @@ class Poll(BaseModel):
 
     # Comment section
     comment_section = models.ForeignKey(CommentSection, default=comment_section_create, on_delete=models.DO_NOTHING)
+    message_channel_topic = models.ForeignKey(MessageChannelTopic, on_delete=models.PROTECT)
 
     # Optional dynamic counting support
     participants = models.IntegerField(default=0)
@@ -139,15 +140,6 @@ class Poll(BaseModel):
         return 'group_poll'
 
     @property
-    def message_channel_topic(self):
-        return get_object(MessageChannelTopic,
-                          channel=self.created_by.group.chat,
-                          name=self.message_channel_topic_name)
-
-    @property
-    def message_channel_topic_name(self): return f'poll.{self.id}'
-
-    @property
     def current_phase(self) -> str:
         labels = self.labels
         current_time = timezone.now()
@@ -166,8 +158,10 @@ class Poll(BaseModel):
     @classmethod
     def post_save(cls, instance, created, update_fields, **kwargs):
         if created:
-            message_channel_topic_create(channel_id=instance.created_by.group.chat_id,
-                                         topic_name=instance.message_channel_topic_name)
+            topic = message_channel_topic_create(channel_id=instance.created_by.group.chat_id,
+                                                 topic_name=f'poll.{instance.id}')
+            instance.message_channel_topic = topic
+            instance.save()
 
             if instance.poll_type == cls.PollType.SCHEDULE:
                 try:
