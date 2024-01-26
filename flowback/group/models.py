@@ -1,7 +1,7 @@
 import uuid
 
 from django.core.validators import MinValueValidator, MaxValueValidator
-from django.db.models.signals import post_save, post_delete
+from django.db.models.signals import post_save, post_delete, pre_save
 from django.forms import model_to_dict
 from rest_framework.exceptions import ValidationError
 
@@ -59,13 +59,14 @@ class Group(BaseModel):
     jitsi_room = models.UUIDField(unique=True, default=uuid.uuid4)
 
     @classmethod
+    def pre_save(cls, instance, raw, using, update_fields, *args, **kwargs):
+        instance.chat = message_channel_create(origin_name='group')
+
+    @classmethod
     def post_save(cls, instance, created, update_fields, *args, **kwargs):
         if created:
             instance.schedule = create_schedule(name=instance.name, origin_name='group', origin_id=instance.id)
             instance.kanban = kanban_create(name=instance.name, origin_type='group', origin_id=instance.id)
-            instance.chat = message_channel_create(origin_name='group')
-            instance.save()
-            return
 
         if update_fields:
             if not all(isinstance(field, str) for field in update_fields):
@@ -93,6 +94,7 @@ class Group(BaseModel):
         instance.chat.delete()
 
 
+pre_save.connect(Group.pre_save, sender=Group)
 post_save.connect(Group.post_save, sender=Group)
 post_save.connect(Group.user_post_save, sender=User)
 post_delete.connect(Group.post_delete, sender=Group)
