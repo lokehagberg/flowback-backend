@@ -157,10 +157,9 @@ class Poll(BaseModel):
 
     @classmethod
     def pre_save(cls, instance, *args, **kwargs):
-        topic = message_channel_topic_create(channel_id=instance.created_by.group.chat_id,
-                                             topic_name=f'poll.{instance.id}',
-                                             hidden=True)
-        instance.message_channel_topic = topic
+        instance.message_channel_topic = message_channel_topic_create(channel_id=instance.created_by.group.chat_id,
+                                                                      topic_name=f'poll.{instance.id}',
+                                                                      hidden=True)
 
     @classmethod
     def post_save(cls, instance, created, update_fields, **kwargs):
