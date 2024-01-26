@@ -8,7 +8,7 @@ from django.utils.translation import gettext_lazy as _
 from rest_framework.exceptions import ValidationError
 
 from backend.settings import SCORE_VOTE_CEILING, SCORE_VOTE_FLOOR, DEBUG
-from flowback.chat.services import message_channel_topic_create
+from flowback.chat.services import message_channel_topic_create, message_channel_topic_delete
 from flowback.files.models import FileCollection
 from flowback.prediction.models import (PredictionBet,
                                         PredictionStatement,
