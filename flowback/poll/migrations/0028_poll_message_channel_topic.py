@@ -10,7 +10,8 @@ def create_topic_for_each_poll(apps, schema_editor):
 
     for poll in Poll.objects.all():
         topic = MessageChannelTopic.objects.create(channel=poll.created_by.group.chat,
-                                                   name=f'poll.{poll.id}')
+                                                   name=f'poll.{poll.id}',
+                                                   hidden=True)
         poll.message_channel_topic = topic
         poll.save()
 
