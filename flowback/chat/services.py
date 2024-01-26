@@ -138,6 +138,8 @@ def message_channel_topic_create(*, channel_id: int, topic_name: str, hidden: bo
     topic.full_clean()
     topic.save()
 
+    return topic
+
 
 def message_channel_topic_delete(*, channel_id: int, topic_id: int):
     topic = get_object(MessageChannel, channel_id=channel_id, id=topic_id)
