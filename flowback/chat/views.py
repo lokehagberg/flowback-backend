@@ -2,7 +2,7 @@ from rest_framework import serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .selectors import message_list, message_channel_preview_list
+from .selectors import message_list, message_channel_preview_list, message_channel_topic_list
 from .serializers import MessageSerializer, BasicMessageSerializer
 from .services import message_channel_userdata_update, leave_message_channel, message_files_upload
 from flowback.common.pagination import get_paginated_response, LimitOffsetPagination
@@ -19,6 +19,8 @@ class MessageListAPI(APIView):
         user_id = serializers.IntegerField(required=False)
         message__icontains = serializers.CharField(required=False)
         parent_id = serializers.IntegerField(required=False)
+        topic_id = serializers.IntegerField(required=False)
+        topic_name = serializers.CharField(required=False)
         created_at__gte = serializers.DateTimeField(required=False)
         created_at__lte = serializers.DateTimeField(required=False)
 
@@ -51,6 +53,8 @@ class MessageChannelPreviewAPI(APIView):
         created_at__gte = serializers.DateTimeField(required=False)
         created_at__lte = serializers.DateTimeField(required=False)
         channel_id = serializers.IntegerField(required=False)
+        topic_id = serializers.IntegerField(required=False)
+        topic_name = serializers.CharField(required=False)
 
     class OutputSerializer(BasicMessageSerializer):
         timestamp = serializers.DateTimeField(allow_null=True)
@@ -64,6 +68,34 @@ class MessageChannelPreviewAPI(APIView):
         return get_paginated_response(pagination_class=self.Pagination,
                                       serializer_class=self.OutputSerializer,
                                       queryset=messages,
+                                      request=request,
+                                      view=self)
+
+
+class MessageChannelTopicListAPI(APIView):
+    class Pagination(LimitOffsetPagination):
+        default_limit = 50
+        max_limit = 100
+
+    class FilterSerializer(serializers.Serializer):
+        id = serializers.IntegerField()
+        topic_id = serializers.IntegerField()
+        name = serializers.CharField()
+        name__icontains = serializers.CharField()
+
+    class OutputSerializer(serializers.Serializer):
+        id = serializers.IntegerField()
+        name = serializers.CharField()
+
+    def post(self, request, channel_id: int):
+        serializer = self.FilterSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        topics = message_channel_topic_list(user=request.user, channel_id=channel_id, filters=serializer.validated_data)
+
+        return get_paginated_response(pagination_class=self.Pagination,
+                                      serializer_class=self.OutputSerializer,
+                                      queryset=topics,
                                       request=request,
                                       view=self)
 

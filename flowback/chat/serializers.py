@@ -8,6 +8,8 @@ class _MessageSerializerTemplate(serializers.Serializer):
     id = serializers.IntegerField(read_only=True)
     user = BasicUserSerializer()
     channel_id = serializers.IntegerField()
+    topic_id = serializers.IntegerField(required=False)
+    topic_name = serializers.CharField(required=False, source='topic.name')
     message = serializers.CharField()
     attachments = FileSerializer(many=True, source='attachments.file_collection.filesegment_set', allow_null=True)
 

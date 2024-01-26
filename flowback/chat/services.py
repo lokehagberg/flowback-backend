@@ -2,7 +2,8 @@ from django.shortcuts import get_object_or_404
 from django.utils.datetime_safe import datetime
 from rest_framework.exceptions import ValidationError
 
-from flowback.chat.models import MessageChannel, Message, MessageChannelParticipant, MessageFileCollection
+from flowback.chat.models import MessageChannel, Message, MessageChannelParticipant, MessageFileCollection, \
+    MessageChannelTopic
 from flowback.common.services import get_object, model_update
 from flowback.files.models import FileCollection
 from flowback.files.services import upload_collection
@@ -129,3 +130,9 @@ def leave_message_channel(*, user_id: int, channel_id: int):
     participant = get_object(MessageChannelParticipant, user=user, channel=channel)
 
     participant.delete()
+
+
+def message_channel_topic_create(*, topic_name: str):
+    topic = MessageChannelTopic(name=topic_name)
+    topic.full_clean()
+    topic.save()

@@ -17,15 +17,6 @@ from flowback.group.services import group_user_permissions
 from flowback.user.serializers import BasicUserSerializer
 
 
-# create message
-# update message
-# delete message
-
-# TODO Create websocket that only connects to one channel at a time.
-#  In future create webhook for subscribing to notifications, in meantime use 10s
-#  space between preview list api.
-#  Additionally each module will have their own chat consumer to allow permission check
-
 class ChatConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         self.user = self.scope['user']
@@ -89,22 +80,17 @@ class ChatConsumer(AsyncWebsocketConsumer):
             message = serializers.CharField()
             attachments_id = serializers.IntegerField()
             parent_id = serializers.IntegerField()
+            topic_id = serializers.IntegerField(required=False)
 
         serializer = MessageInputSerializer(data=data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
         channel_id = data.get('channel_id')
-        message = data.get('message')
-        attachments_id = data.get('attachments_id')
-        parent_id = data.get('parent_id')
 
         # Save message to database
         message = await self.create_message(user_id=self.user.id,
-                                            channel_id=channel_id,
-                                            message=message,
-                                            attachments_id=attachments_id,
-                                            parent_id=parent_id)
+                                            **data)
 
         # Send error message to user if string returned
         if isinstance(message, str):
