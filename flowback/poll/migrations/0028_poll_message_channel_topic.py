@@ -31,10 +31,4 @@ class Migration(migrations.Migration):
                                     to='chat.messagechanneltopic')
         ),
         migrations.RunPython(create_topic_for_each_poll),
-        migrations.AlterField(
-            model_name='poll',
-            name='message_channel_topic',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.PROTECT,
-                                    to='chat.messagechanneltopic')
-        ),
     ]
