@@ -155,7 +155,7 @@ class Poll(BaseModel):
 
     @classmethod
     def pre_save(cls, instance, *args, **kwargs):
-        if instance.pk:
+        if not instance.pk:
             instance.message_channel_topic = message_channel_topic_create(channel_id=instance.created_by.group.chat_id,
                                                                           topic_name=f'poll.{instance.id}',
                                                                           hidden=True)

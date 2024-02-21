@@ -1,5 +1,7 @@
 import factory
 from django.utils import timezone
+
+from flowback.chat.tests.factories import MessageChannelTopicFactory
 from flowback.common.tests import fake
 from flowback.group.tests.factories import GroupUserFactory, GroupUserDelegatePoolFactory, GroupTagsFactory
 

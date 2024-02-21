@@ -88,7 +88,7 @@ def poll_create(*, user_id: int,
                 public=public, tag_id=tag, pinned=pinned, dynamic=dynamic, quorum=quorum,
                 attachments=collection)
 
-    poll.full_clean()
+    # poll.full_clean()  TODO make full clean possible for pre_save!
     poll.save()
 
     # Group notification
