@@ -60,7 +60,8 @@ class Group(BaseModel):
 
     @classmethod
     def pre_save(cls, instance, raw, using, update_fields, *args, **kwargs):
-        instance.chat = message_channel_create(origin_name='group')
+        if instance.pk is None:
+            instance.chat = message_channel_create(origin_name='group')
 
     @classmethod
     def post_save(cls, instance, created, update_fields, *args, **kwargs):

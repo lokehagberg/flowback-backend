@@ -4,7 +4,7 @@ from rest_framework.views import APIView
 
 from .selectors import message_list, message_channel_preview_list, message_channel_topic_list
 from .serializers import MessageSerializer, BasicMessageSerializer
-from .services import message_channel_userdata_update, leave_message_channel, message_files_upload
+from .services import message_channel_userdata_update, message_channel_leave, message_files_upload
 from flowback.common.pagination import get_paginated_response, LimitOffsetPagination
 
 
@@ -138,6 +138,6 @@ class MessageChannelLeaveAPI(APIView):
     def post(self, request):
         serializer = self.InputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        leave_message_channel(user_id=request.user.id, **serializer.validated_data)
+        message_channel_leave(user_id=request.user.id, **serializer.validated_data)
 
         return Response(status=status.HTTP_200_OK)

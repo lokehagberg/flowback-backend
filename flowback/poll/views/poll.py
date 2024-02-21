@@ -20,7 +20,8 @@ from flowback.poll.services.comment import poll_comment_create, poll_comment_upd
 from flowback.poll.services.poll import poll_create, poll_update, poll_delete, poll_refresh_cheap, poll_notification, \
     poll_notification_subscribe
 from flowback.poll.services.prediction import poll_prediction_statement_create, poll_prediction_statement_delete, \
-    poll_prediction_bet_create, poll_prediction_bet_update, poll_prediction_bet_delete, poll_prediction_statement_vote_create, \
+    poll_prediction_bet_create, poll_prediction_bet_update, poll_prediction_bet_delete, \
+    poll_prediction_statement_vote_create, \
     poll_prediction_statement_vote_update, poll_prediction_statement_vote_delete
 from flowback.poll.services.proposal import poll_proposal_create, poll_proposal_delete
 from flowback.poll.services.vote import poll_proposal_vote_update, poll_proposal_delegate_vote_update
@@ -35,16 +36,23 @@ class PollListApi(APIView):
 
     class FilterSerializer(serializers.Serializer):
         id = serializers.IntegerField(required=False)
-        id_list = serializers.ListField(child=serializers.IntegerField(), required=False)
-        order_by = serializers.CharField(default='start_date_desc')
+        id__in = serializers.CharField(required=False)
+        order_by = serializers.ChoiceField(choices=['start_date_asc',
+                                                    'start_date_desc',
+                                                    'end_date_asc',
+                                                    'end_date_desc'],
+                                           default='start_date_asc')
         pinned = serializers.BooleanField(required=False, default=None, allow_null=True)
 
         title = serializers.CharField(required=False)
-        title__icontains = serializers.CharField(required=False)
+        title__icontains = serializers.ListField(child=serializers.CharField(), required=False)
+        description = serializers.CharField(required=False)
+        description__icontains = serializers.ListField(child=serializers.CharField(), required=False)
         poll_type = serializers.ChoiceField((0, 1, 2), required=False)
-        tag = serializers.IntegerField(required=False)
+        tag_id = serializers.IntegerField(required=False)
         tag_name = serializers.CharField(required=False)
-        tag_name__icontains = serializers.CharField(required=False)
+        tag_name__icontains = serializers.ListField(child=serializers.CharField(), required=False)
+        has_attachments = serializers.BooleanField(required=False)
         status = serializers.IntegerField(required=False)
 
     class OutputSerializer(serializers.ModelSerializer):
@@ -260,4 +268,3 @@ class PollDelegatesListAPI(APIView):
             request=request,
             view=self
         )
-

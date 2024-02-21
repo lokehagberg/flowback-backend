@@ -11,7 +11,8 @@ from .views.vote import (PollProposalVoteListAPI,
                          PollProposalVoteUpdateAPI,
                          PollProposalDelegateVoteUpdateAPI,
                          DelegatePollVoteListAPI)
-from .views.comment import PollCommentListAPI, PollCommentCreateAPI, PollCommentUpdateAPI, PollCommentDeleteAPI
+from .views.comment import PollCommentListAPI, PollCommentCreateAPI, PollCommentUpdateAPI, PollCommentDeleteAPI, \
+    PollDelegateCommentListAPI, PollDelegateCommentCreateAPI, PollDelegateCommentUpdateAPI, PollDelegateCommentDeleteAPI
 from .views.prediction import (PollPredictionStatementListAPI,
                                PollPredictionBetListAPI,
                                PollPredictionStatementCreateAPI,
@@ -45,10 +46,14 @@ poll_patterns = [
     path('<int:poll>/proposal/vote/delegate/update', PollProposalDelegateVoteUpdateAPI.as_view(),
          name='poll_proposal_delegate_vote_update'),
     path('<int:poll>/delegates', PollDelegatesListAPI.as_view(), name='poll_delegates'),
-    path('<int:poll>/comment/list', PollCommentListAPI.as_view(), name='poll_comments'),
-    path('<int:poll>/comment/create', PollCommentCreateAPI.as_view(), name='poll_comment_create'),
-    path('<int:poll>/comment/<int:comment_id>/update', PollCommentUpdateAPI.as_view(), name='poll_comment_update'),
-    path('<int:poll>/comment/<int:comment_id>/delete', PollCommentDeleteAPI.as_view(), name='poll_comment_delete'),
+    path('<int:poll_id>/comment/list', PollCommentListAPI.as_view(), name='poll_comments'),
+    path('<int:poll_id>/comment/create', PollCommentCreateAPI.as_view(), name='poll_comment_create'),
+    path('<int:poll_id>/comment/<int:comment_id>/update', PollCommentUpdateAPI.as_view(), name='poll_comment_update'),
+    path('<int:poll_id>/comment/<int:comment_id>/delete', PollCommentDeleteAPI.as_view(), name='poll_comment_delete'),
+    path('<int:poll_id>/delegate/<int:delegate_pool_id>/comment/list', PollDelegateCommentListAPI.as_view(), name='poll_delegate_comments'),
+    path('<int:poll_id>/delegate/<int:delegate_pool_id>/comment/create', PollDelegateCommentCreateAPI.as_view(), name='poll_delegate_comment_create'),
+    path('<int:poll_id>/delegate/<int:delegate_pool_id>/comment/<int:comment_id>/update', PollDelegateCommentUpdateAPI.as_view(), name='poll_delegate_comment_update'),
+    path('<int:poll_id>/delegate/<int:delegate_pool_id>/comment/<int:comment_id>/delete', PollDelegateCommentDeleteAPI.as_view(), name='poll_delegate_comment_delete'),
 
     path('<int:poll_id>/prediction/statement/create', PollPredictionStatementCreateAPI.as_view(),
          name='poll_prediction_statement_create'),

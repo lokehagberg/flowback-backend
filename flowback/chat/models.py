@@ -21,6 +21,7 @@ class MessageChannelParticipant(BaseModel):
     channel = models.ForeignKey(MessageChannel, on_delete=models.CASCADE)
     closed_at = models.DateTimeField(null=True, blank=True)
     timestamp = models.DateTimeField(auto_now=True)
+    active = models.BooleanField(default=True)
 
     class Meta:
         unique_together = ('user', 'channel')

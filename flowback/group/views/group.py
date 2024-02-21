@@ -101,9 +101,12 @@ class GroupDetailApi(APIView):
 
 class GroupCreateApi(APIView):
     class InputSerializer(serializers.ModelSerializer):
+        image = serializers.ImageField(required=False)
+        cover_image = serializers.ImageField(required=False)
+
         class Meta:
             model = Group
-            fields = ('name', 'description', 'image', 'cover_image', 'hide_poll_users', 'direct_join', 'public')
+            fields = ('name', 'description', 'hide_poll_users', 'direct_join', 'public', 'image', 'cover_image')
 
     def post(self, request):
         serializer = self.InputSerializer(data=request.data)

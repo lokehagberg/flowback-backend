@@ -13,8 +13,6 @@ from ...poll.views.comment import PollCommentCreateAPI, PollCommentListAPI
 
 
 class CommentAttachmentsTest(APITransactionTestCase):
-    reset_sequences = True
-
     def setUp(self):
         self.collection = FileCollectionFactory()
         (self.file_one,

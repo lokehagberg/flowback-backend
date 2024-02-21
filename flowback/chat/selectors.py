@@ -1,4 +1,4 @@
-from django.db.models import Q, OuterRef, Subquery, Case, When
+from django.db.models import Q, OuterRef, Subquery, Case, When, F
 import django_filters
 
 from .models import MessageChannel, Message, MessageChannelParticipant, MessageChannelTopic
@@ -65,12 +65,13 @@ class BaseMessageChannelPreviewFilter(django_filters.FilterSet):
 def message_channel_preview_list(*, user: User, **filters):
     filters = filters or {}
 
-    timestamp = MessageChannelParticipant.objects.filter(user=user, channel=OuterRef('channel')).values('timestamp')
-    active = MessageChannelParticipant.objects.filter(user=user, channel=OuterRef('channel')).annotate(
-        active=Case(When(closed_at__isnull=True, then=True),
-                    When(closed_at__gt=OuterRef('created_at'), then=False),
-                    default=True)).values('active')
-    qs = Message.objects.filter(channel__messagechannelparticipant__user=user, topic__hidden=False).annotate(
-        timestamp=Subquery(timestamp), active=Subquery(active)).filter(active=True).distinct('channel').all()
+    timestamp = MessageChannelParticipant.objects.filter(user=user, channel=OuterRef('channel_id')).values('timestamp')
+    qs = Message.objects.filter(Q(Q(channel__messagechannelparticipant__closed_at__isnull=True)
+                                | Q(channel__messagechannelparticipant__closed_at__gt=F('created_at'))),
+                                Q(Q(topic__isnull=True)
+                                | Q(topic__hidden=False)),
+                                channel__messagechannelparticipant__user=user,
+                                active=True).annotate(timestamp=Subquery(timestamp)
+                                                      ).distinct('channel').all()
 
     return BaseMessageChannelPreviewFilter(filters, qs).qs

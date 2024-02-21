@@ -1,11 +1,12 @@
 import json
 from pprint import pprint
 
+from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework.test import APIRequestFactory, force_authenticate, APITransactionTestCase
 
 from flowback.group.models import GroupUser, Group, GroupUserInvite
 from flowback.group.tests.factories import GroupFactory, GroupUserFactory
-from flowback.group.views.group import GroupListApi
+from flowback.group.views.group import GroupListApi, GroupCreateApi
 from flowback.group.views.user import GroupInviteApi, GroupJoinApi, GroupInviteAcceptApi, GroupInviteListApi
 from flowback.user.models import User
 from flowback.user.tests.factories import UserFactory
@@ -42,6 +43,20 @@ class GroupTest(APITransactionTestCase):
         view = GroupListApi.as_view()
 
         request = factory.get('', data=dict(limit=10))
+        force_authenticate(request, user=user)
+        response = view(request)
+
+        data = json.loads(response.rendered_content)
+        pprint(data)
+
+    def test_group_create(self):
+        factory = APIRequestFactory()
+        user = self.group_user_creator_two.user
+        view = GroupCreateApi.as_view()
+        data = dict(name="test",
+                    description="test")
+
+        request = factory.post('', data=data)
         force_authenticate(request, user=user)
         response = view(request)
 

@@ -8,6 +8,7 @@ class _MessageSerializerTemplate(serializers.Serializer):
     id = serializers.IntegerField(read_only=True)
     user = BasicUserSerializer()
     channel_id = serializers.IntegerField()
+    channel_origin_name = serializers.CharField(source="channel.origin_name")
     topic_id = serializers.IntegerField(required=False)
     topic_name = serializers.CharField(required=False, source='topic.name')
     message = serializers.CharField()

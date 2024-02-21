@@ -1,6 +1,7 @@
 import django_filters
 
 from flowback.comment.models import Comment
+from flowback.user.models import User
 
 
 class BaseCommentFilter(django_filters.FilterSet):
@@ -20,7 +21,7 @@ class BaseCommentFilter(django_filters.FilterSet):
 
 
 # TODO group parents together
-def comment_list(*, comment_section_id: int, filters=None):
+def comment_list(*, fetched_by: User, comment_section_id: int, filters=None):
     filters = filters or {}
 
     qs = Comment.objects.filter(comment_section_id=comment_section_id).all()

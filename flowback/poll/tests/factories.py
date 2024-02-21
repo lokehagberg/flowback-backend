@@ -1,6 +1,6 @@
 import factory
 from django.utils import timezone
-from flowback.common.tests import faker
+from flowback.common.tests import fake
 from flowback.group.tests.factories import GroupUserFactory, GroupUserDelegatePoolFactory, GroupTagsFactory
 
 from flowback.poll.models import (Poll,
@@ -27,10 +27,10 @@ class PollFactory(factory.django.DjangoModelFactory):
         model = Poll
 
     created_by = factory.SubFactory(GroupUserFactory)
-    title = factory.LazyAttribute(lambda _: faker.unique.first_name().lower())
-    description = factory.LazyAttribute(lambda _: faker.bs())
-    poll_type = factory.LazyAttribute(lambda _: faker.pyint(min_value=1, max_value=4))
-    dynamic = factory.LazyAttribute(lambda o: True if o.poll_type == 3 else faker.pybool())
+    title = factory.LazyAttribute(lambda _: fake.unique.first_name().lower())
+    description = factory.LazyAttribute(lambda _: fake.bs())
+    poll_type = factory.LazyAttribute(lambda _: fake.pyint(min_value=1, max_value=4))
+    dynamic = factory.LazyAttribute(lambda o: True if o.poll_type == 3 else fake.pybool())
 
     start_date = factory.LazyAttribute(lambda _: timezone.now())
     area_vote_end_date = factory.LazyAttribute(lambda _: timezone.now() + timezone.timedelta(hours=1))
@@ -56,8 +56,8 @@ class PollProposalFactory(factory.django.DjangoModelFactory):
     
     created_by = factory.SubFactory(GroupUserFactory)
     poll = factory.SubFactory(PollFactory)
-    title = factory.LazyAttribute(lambda _: faker.unique.first_name())
-    description = factory.LazyAttribute(lambda _: faker.bs())
+    title = factory.LazyAttribute(lambda _: fake.unique.first_name())
+    description = factory.LazyAttribute(lambda _: fake.bs())
 
 
 class PollProposalTypeScheduleFactory(factory.django.DjangoModelFactory):
@@ -99,7 +99,7 @@ class PollVotingTypeCardinalFactory(factory.django.DjangoModelFactory):
         model = PollVotingTypeCardinal
 
     proposal = factory.SubFactory(PollProposalFactory)
-    score = factory.LazyAttribute(lambda _: faker.pyint())
+    score = factory.LazyAttribute(lambda _: fake.pyint())
 
 
 class PollVotingTypeForAgainstFactory(factory.django.DjangoModelFactory):
@@ -115,7 +115,7 @@ class PollPredictionStatementFactory(factory.django.DjangoModelFactory):
 
     created_by = factory.SubFactory(GroupUserFactory)
     poll = factory.SubFactory(PollFactory, **generate_poll_phase_kwargs('proposal'))
-    description = factory.LazyAttribute(lambda _: faker.bs())
+    description = factory.LazyAttribute(lambda _: fake.bs())
     end_date = factory.LazyAttribute(lambda _: timezone.now() + timezone.timedelta(hours=99))
 
 
@@ -125,7 +125,7 @@ class PollPredictionFactory(factory.django.DjangoModelFactory):
 
     prediction_statement = factory.SubFactory(PollPredictionStatementFactory)
     created_by = factory.SubFactory(GroupUserFactory)
-    score = factory.LazyAttribute(lambda _: faker.pyint(min_value=0, max_value=5))
+    score = factory.LazyAttribute(lambda _: fake.pyint(min_value=0, max_value=5))
 
 
 class PollPredictionStatementSegmentFactory(factory.django.DjangoModelFactory):
@@ -134,7 +134,7 @@ class PollPredictionStatementSegmentFactory(factory.django.DjangoModelFactory):
 
     prediction_statement = factory.SubFactory(PollPredictionStatementFactory)
     proposal = factory.SubFactory(PollProposalFactory)
-    is_true = factory.LazyAttribute(lambda _: faker.pybool())
+    is_true = factory.LazyAttribute(lambda _: fake.pybool())
 
 
 class PollPredictionStatementVoteFactory(factory.django.DjangoModelFactory):
@@ -143,7 +143,7 @@ class PollPredictionStatementVoteFactory(factory.django.DjangoModelFactory):
 
     prediction_statement = factory.SubFactory(PollPredictionStatementFactory)
     created_by = factory.SubFactory(GroupUserFactory)
-    vote = factory.LazyAttribute(lambda _: faker.pybool())
+    vote = factory.LazyAttribute(lambda _: fake.pybool())
 
 
 class PollAreaStatementFactory(factory.django.DjangoModelFactory):
@@ -168,4 +168,4 @@ class PollAreaStatementVoteFactory(factory.django.DjangoModelFactory):
 
     created_by = factory.SubFactory(GroupUserFactory)
     poll_area_statement = factory.SubFactory(PollAreaStatementFactory)
-    vote = factory.LazyAttribute(lambda _: faker.pybool())
+    vote = factory.LazyAttribute(lambda _: fake.pybool())

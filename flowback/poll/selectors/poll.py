@@ -13,16 +13,24 @@ from flowback.group.selectors import group_user_permissions
 
 class BasePollFilter(django_filters.FilterSet):
     order_by = django_filters.OrderingFilter(fields=(('start_date', 'start_date_asc'),
-                                                     ('-start_date', 'start_date_desc')))
-    start_date = django_filters.DateFromToRangeFilter()
-    end_date = django_filters.DateFromToRangeFilter()
+                                                     ('-start_date', 'start_date_desc'),
+                                                     ('end_date', 'end_date_asc'),
+                                                     ('-end_date', 'end_date_desc')))
+    start_date = django_filters.DateTimeFilter()
+    end_date = django_filters.DateTimeFilter()
+    description = django_filters.CharFilter(field_name='description', lookup_expr='icontains')
+    has_attachments = django_filters.BooleanFilter(field_name='attachments', method='has_attachments')
     tag_name = django_filters.CharFilter(lookup_expr=['exact', 'icontains'], field_name='tag__name')
+
+    def has_attachments(self, queryset, name, value):
+        return queryset.filter(attachments__isnull=not value)
 
     class Meta:
         model = Poll
-        fields = dict(id=['exact'],
+        fields = dict(id=['exact', 'in'],
                       created_by=['exact'],
                       title=['exact', 'icontains'],
+                      description=['exact', 'icontains'],
                       poll_type=['exact'],
                       public=['exact'],
                       tag=['exact'],
@@ -47,5 +55,4 @@ def poll_list(*, fetched_by: User, group_id: Union[int, None], filters=None):
              ) & Q(start_date__lte=timezone.now())
         ).annotate(group_joined=Exists(joined_groups), total_comments=Count('comment_section__comment',
                                                                             filters=dict(active=True))).all()
-
     return BasePollFilter(filters, qs).qs

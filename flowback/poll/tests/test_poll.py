@@ -13,8 +13,6 @@ from ...user.models import User
 
 
 class PollTest(APITransactionTestCase):
-    reset_sequences = True
-
     def setUp(self):
         self.group = GroupFactory()
         self.group_tag = GroupTagsFactory(group=self.group)
