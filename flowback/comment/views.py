@@ -17,11 +17,20 @@ class CommentListAPI(APIView):
         max_limit = 100
 
     class FilterSerializer(serializers.Serializer):
-        order_by = serializers.CharField(required=False)
+        order_by = serializers.ChoiceField(choices=['created_at_asc',
+                                                    'created_at_desc',
+                                                    'total_replies_asc',
+                                                    'total_replies_desc',
+                                                    'score_asc',
+                                                    'score_desc'], default='created_at_desc')
         id = serializers.IntegerField(required=False)
+        message__icontains = serializers.ListField(child=serializers.CharField(), required=False)
         author_id = serializers.IntegerField(required=False)
+        author_id__in = serializers.CharField(required=False)
         parent_id = serializers.IntegerField(required=False)
+        has_attachments = serializers.BooleanField(required=False, allow_null=True, default=None)
         score__gt = serializers.IntegerField(required=False)
+        score__lt = serializers.IntegerField(required=False)
 
     class OutputSerializer(serializers.Serializer):
         id = serializers.IntegerField()

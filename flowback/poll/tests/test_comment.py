@@ -1,4 +1,5 @@
 import json
+from pprint import pprint
 
 from rest_framework.test import APIRequestFactory, force_authenticate, APITransactionTestCase
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -85,5 +86,6 @@ class PollCommentTest(APITransactionTestCase):
         response = view(request, poll_id=self.poll.id)
 
         self.assertEqual(response.status_code, 200)
+        pprint([i['attachments'] for i in response.data['results'] if i['id'] == target])
         self.assertEqual(len([i['attachments'] for i in response.data['results'] if i['id'] == target][0]), 2)
 

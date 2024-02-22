@@ -19,10 +19,10 @@ class BasePollFilter(django_filters.FilterSet):
     start_date = django_filters.DateTimeFilter()
     end_date = django_filters.DateTimeFilter()
     description = django_filters.CharFilter(field_name='description', lookup_expr='icontains')
-    has_attachments = django_filters.BooleanFilter(field_name='attachments', method='has_attachments')
+    has_attachments = django_filters.BooleanFilter(method='has_attachments_filter')
     tag_name = django_filters.CharFilter(lookup_expr=['exact', 'icontains'], field_name='tag__name')
 
-    def has_attachments(self, queryset, name, value):
+    def has_attachments_filter(self, queryset, name, value):
         return queryset.filter(attachments__isnull=not value)
 
     class Meta:

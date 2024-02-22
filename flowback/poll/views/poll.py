@@ -41,7 +41,7 @@ class PollListApi(APIView):
                                                     'start_date_desc',
                                                     'end_date_asc',
                                                     'end_date_desc'],
-                                           default='start_date_asc')
+                                           default='start_date_desc')
         pinned = serializers.BooleanField(required=False, default=None, allow_null=True)
 
         title = serializers.CharField(required=False)
@@ -52,7 +52,7 @@ class PollListApi(APIView):
         tag_id = serializers.IntegerField(required=False)
         tag_name = serializers.CharField(required=False)
         tag_name__icontains = serializers.ListField(child=serializers.CharField(), required=False)
-        has_attachments = serializers.BooleanField(required=False)
+        has_attachments = serializers.BooleanField(required=False, allow_null=True, default=None)
         status = serializers.IntegerField(required=False)
 
     class OutputSerializer(serializers.ModelSerializer):

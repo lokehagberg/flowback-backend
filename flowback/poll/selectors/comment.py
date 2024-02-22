@@ -11,7 +11,7 @@ def poll_comment_list(*, fetched_by: User, poll_id: int, filters=None):
     poll = get_object(Poll, id=poll_id)
     group_user_permissions(group=poll.created_by.group.id, user=fetched_by)
 
-    return comment_list(comment_section_id=poll.comment_section.id, filters=filters)
+    return comment_list(fetched_by=fetched_by, comment_section_id=poll.comment_section.id, filters=filters)
 
 
 def poll_delegate_comment_list(*, fetched_by: User, poll_id: int, delegate_pool_id: int, filters=None):
@@ -20,4 +20,4 @@ def poll_delegate_comment_list(*, fetched_by: User, poll_id: int, delegate_pool_
 
     group_user_permissions(group=delegate_vote.created_by.group.id, user=fetched_by)
 
-    return comment_list(comment_section_id=delegate_vote.comment_section.id, filters=filters)
+    return comment_list(fetched_by=fetched_by, comment_section_id=delegate_vote.comment_section.id, filters=filters)
