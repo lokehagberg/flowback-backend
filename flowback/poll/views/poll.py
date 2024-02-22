@@ -43,6 +43,8 @@ class PollListApi(APIView):
                                                     'end_date_desc'],
                                            default='start_date_desc')
         pinned = serializers.BooleanField(required=False, default=None, allow_null=True)
+        author_id = serializers.IntegerField(required=False)
+        author_id__in = serializers.CharField(required=False)
 
         title = serializers.CharField(required=False)
         title__icontains = serializers.ListField(child=serializers.CharField(), required=False)
