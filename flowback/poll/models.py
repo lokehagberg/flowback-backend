@@ -271,7 +271,7 @@ class PollVotingTypeCardinal(BaseModel):
     author_delegate = models.ForeignKey(PollDelegateVoting, null=True, blank=True, on_delete=models.CASCADE)
 
     proposal = models.ForeignKey(PollProposal, on_delete=models.CASCADE)
-    raw_score = models.IntegerField()  # Raw vote score
+    raw_score = models.IntegerField(default=0)  # Raw vote score
     score = models.IntegerField(null=True, blank=True)
 
     def clean(self):

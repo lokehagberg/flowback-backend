@@ -1,4 +1,5 @@
 import json
+from pprint import pprint
 
 from rest_framework.test import APITransactionTestCase, APIRequestFactory, force_authenticate
 
@@ -10,8 +11,6 @@ from flowback.poll.views.vote import DelegatePollVoteListAPI
 
 
 class PollDelegateTests(APITransactionTestCase):
-    reset_sequences = True
-
     def setUp(self):
         self.group = GroupFactory()
         self.group_user_creator = GroupUserFactory(group=self.group)
@@ -54,3 +53,5 @@ class PollDelegateTests(APITransactionTestCase):
         request = factory.get('')
         force_authenticate(request, user=user)
         response = view(request, delegate_pool_id=1)
+
+        pprint(response.data)

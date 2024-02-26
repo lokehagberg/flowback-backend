@@ -100,10 +100,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
                         channel_id: int,
                         message: str,
                         attachments_id: int = None,
-                        parent_id: int = None):
+                        parent_id: int = None,
+                        topic_id: int = None):
 
         message = message_create(user_id=user_id, channel_id=channel_id, message=message,
-                                 attachments_id=attachments_id, parent_id=parent_id)
+                                 attachments_id=attachments_id, parent_id=parent_id, topic_id=topic_id)
 
         return MessageSerializer(message).data
 

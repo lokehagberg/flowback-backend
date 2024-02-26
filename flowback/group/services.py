@@ -186,7 +186,7 @@ def group_user_update(*, user: int, group: int, fetched_by: int, data) -> GroupU
 def group_leave(*, user: int, group: int) -> None:
     user = group_user_permissions(group=group, user=user)
 
-    if user.user.id == user.group.created_by:
+    if user.user == user.group.created_by:
         raise ValidationError("Group owner isn't allowed to leave, deleting the group is an option")
 
     user.active = False

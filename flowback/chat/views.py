@@ -87,7 +87,7 @@ class MessageChannelTopicListAPI(APIView):
         id = serializers.IntegerField()
         name = serializers.CharField()
 
-    def post(self, request, channel_id: int):
+    def get(self, request, channel_id: int):
         serializer = self.FilterSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 

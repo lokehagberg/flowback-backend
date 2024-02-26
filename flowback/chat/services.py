@@ -15,17 +15,16 @@ def message_create(*,
                    channel_id: int,
                    message: str,
                    attachments_id: int = None,
-                   parent_id: int = None):
+                   parent_id: int = None,
+                   topic_id: int = None):
     user = get_object(User, id=user_id)
     channel = get_object(MessageChannel, id=channel_id)
-    parent = get_object(Message, id=parent_id, raise_exception=False)
+    parent = get_object(Message, id=parent_id, channel_id=channel_id, topic_id=topic_id,
+                        error_message="Parent does not exist")
 
     # Check whether user is a participant or not
     get_object(MessageChannelParticipant, user=user, channel=channel,
                error_message="User is not participating in this channel")
-
-    if parent and parent.channel.id != channel_id:
-        raise ValidationError('Parent does not exist')
 
     if attachments_id:
         attachments = get_object(MessageFileCollection, id=attachments_id)
@@ -37,7 +36,8 @@ def message_create(*,
                       channel=channel,
                       message=message,
                       attachments_id=attachments_id,
-                      parent=parent)
+                      parent=parent,
+                      topic_id=topic_id)
 
     message.full_clean()
     message.save()
