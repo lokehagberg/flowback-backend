@@ -70,6 +70,7 @@ class PollListApi(APIView):
         tag_name = serializers.CharField(source='tag.name', allow_null=True)
         attachments = FileSerializer(many=True, source="attachments.filesegment_set", allow_null=True)
         hide_poll_users = serializers.BooleanField(source='created_by.group.hide_poll_users')
+        message_channel_topic_id = serializers.IntegerField(source='message_channel_topic.id')
         total_comments = serializers.IntegerField()
 
         proposal_end_date = serializers.DateTimeField(required=False)
