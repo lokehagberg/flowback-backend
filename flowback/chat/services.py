@@ -19,8 +19,10 @@ def message_create(*,
                    topic_id: int = None):
     user = get_object(User, id=user_id)
     channel = get_object(MessageChannel, id=channel_id)
-    parent = get_object(Message, id=parent_id, channel_id=channel_id, topic_id=topic_id,
-                        error_message="Parent does not exist")
+    parent = get_object(Message, id=parent_id, raise_exception=False)
+
+    if parent and (parent.channel_id != channel_id or parent.topic_id != topic_id):
+        return ValidationError("Parent does not exist")
 
     # Check whether user is a participant or not
     get_object(MessageChannelParticipant, user=user, channel=channel,
