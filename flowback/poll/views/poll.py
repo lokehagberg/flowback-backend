@@ -111,6 +111,7 @@ class PollListApi(APIView):
                       'total_comments',
                       'quorum',
                       'status',
+                      'message_channel_topic_id',
                       'attachments')
 
     def get(self, request, group_id: int = None):
