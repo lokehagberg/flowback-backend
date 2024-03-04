@@ -14,13 +14,15 @@ class MessageListAPI(APIView):
         max_limit = 50
 
     class FilterSerializer(serializers.Serializer):
-        order_by = serializers.ChoiceField(required=False, choices=['created_at_asc', 'created_at_desc'])
+        order_by = serializers.ChoiceField(required=False, choices=['created_at_asc', 'created_at_desc',
+                                                                    'total_replies_asc', 'total_replies_desc'])
         id = serializers.IntegerField(required=False)
-        user_id = serializers.IntegerField(required=False)
+        user_ids = serializers.CharField(required=False)
         message__icontains = serializers.CharField(required=False)
         parent_id = serializers.IntegerField(required=False)
         topic_id = serializers.IntegerField(required=False)
         topic_name = serializers.CharField(required=False)
+        has_attachments = serializers.BooleanField(required=False, allow_null=True, default=None)
         created_at__gte = serializers.DateTimeField(required=False)
         created_at__lte = serializers.DateTimeField(required=False)
 

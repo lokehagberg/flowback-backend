@@ -3,6 +3,7 @@ import django_filters
 
 from .models import MessageChannel, Message, MessageChannelParticipant, MessageChannelTopic
 from flowback.user.models import User
+from ..common.filters import NumberInFilter
 from ..common.services import get_object
 
 
@@ -10,11 +11,15 @@ class BaseMessageFilter(django_filters.FilterSet):
     order_by = django_filters.OrderingFilter(fields=(('created_at', 'created_at_asc'),
                                                      ('-created_at', 'created_at_desc')))
     topic_name = django_filters.CharFilter(lookup_expr='exact', field_name='topic__name')
+    user_ids = NumberInFilter()
+    has_attachments = django_filters.BooleanFilter(method='has_attachments_filter')
+
+    def has_attachments_filter(self, queryset, name, value):
+        return queryset.filter(attachments__isnull=not value)
 
     class Meta:
         model = Message
         fields = dict(id=['exact'],
-                      user_id=['exact'],
                       message=['icontains'],
                       topic_id=['exact'],
                       parent_id=['exact'],

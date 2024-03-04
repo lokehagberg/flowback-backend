@@ -198,7 +198,7 @@ def poll_refresh(*, poll_id: int) -> None:
 def poll_refresh_cheap(*, poll_id: int) -> None:
     poll = get_object(Poll, id=poll_id)
 
-    if (poll.dynamic and not poll.status) or (poll.status and timezone.now() >= poll.end_date):
+    if (poll.dynamic and not poll.status) or (not poll.status and timezone.now() >= poll.end_date):
         poll_proposal_vote_count(poll_id=poll_id)
         poll.refresh_from_db()
 
