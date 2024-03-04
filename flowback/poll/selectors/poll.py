@@ -22,8 +22,7 @@ class BasePollFilter(django_filters.FilterSet):
     description = django_filters.CharFilter(field_name='description', lookup_expr='icontains')
     has_attachments = django_filters.BooleanFilter(method='has_attachments_filter')
     tag_name = django_filters.CharFilter(lookup_expr=['exact', 'icontains'], field_name='tag__name')
-    author_id = django_filters.NumberFilter(field_name='created_by__user_id', lookup_expr='exact')
-    author_id__in = NumberInFilter(field_name='created_by__user_id', lookup_expr='in')
+    author_ids = NumberInFilter(field_name='created_by__user_id')
 
     def has_attachments_filter(self, queryset, name, value):
         return queryset.filter(attachments__isnull=not value)
