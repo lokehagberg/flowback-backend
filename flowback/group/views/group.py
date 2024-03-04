@@ -90,6 +90,7 @@ class GroupDetailApi(APIView):
                       'image',
                       'cover_image',
                       'member_count',
+                      'chat_id',
                       'jitsi_room')
 
     def get(self, request, group: int):
