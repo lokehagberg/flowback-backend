@@ -54,6 +54,7 @@ class GroupListApi(APIView):
             view=self
         )
 
+
 class GroupFolderListApi(APIView): #use serializers.Serializers
     class Pagination(LimitOffsetPagination):
         default_limit = 20
@@ -72,6 +73,7 @@ class GroupFolderListApi(APIView): #use serializers.Serializers
             request=request,
             view=self
         ) 
+
 
 class GroupDetailApi(APIView):
     class OutputSerializer(serializers.ModelSerializer):

@@ -6,8 +6,8 @@ from django.forms import model_to_dict
 from rest_framework.exceptions import ValidationError
 
 from backend.settings import FLOWBACK_DEFAULT_GROUP_JOIN
-from flowback.chat.models import MessageChannel
-from flowback.chat.services import message_channel_create
+from flowback.chat.models import MessageChannel, MessageChannelParticipant
+from flowback.chat.services import message_channel_create, message_channel_join
 from flowback.comment.models import CommentSection
 from flowback.comment.services import comment_section_create
 from flowback.common.models import BaseModel
@@ -46,7 +46,7 @@ class Group(BaseModel):
                                               on_delete=models.SET_NULL)
 
     name = models.TextField(unique=True)
-    description = models.TextField()
+    description = models.TextField(null=True, blank=True)
     image = models.ImageField(upload_to='group/image', null=True, blank=True)
     cover_image = models.ImageField(upload_to='group/cover_image', null=True, blank=True)
     hide_poll_users = models.BooleanField(default=False)  # Hides users in polls, TODO remove bool from views
@@ -86,7 +86,7 @@ class Group(BaseModel):
             for group_id in FLOWBACK_DEFAULT_GROUP_JOIN:
                 if get_object(Group, id=group_id, raise_exception=False):
                     group_user = GroupUser(user=instance, group_id=group_id)
-                    group_user.full_clean()
+                    # TODO FIX pre_save check group_user.full_clean()
                     group_user.save()
 
     @classmethod
@@ -143,6 +143,7 @@ class GroupUser(BaseModel):
     group = models.ForeignKey(Group, on_delete=models.CASCADE)
     is_admin = models.BooleanField(default=False)
     permission = models.ForeignKey(GroupPermissions, null=True, blank=True, on_delete=models.SET_NULL)
+    chat_participant = models.ForeignKey(MessageChannelParticipant, on_delete=models.PROTECT)
     active = models.BooleanField(default=True)
 
     def check_permission(self, raise_exception: bool = False, **permissions):
@@ -170,9 +171,13 @@ class GroupUser(BaseModel):
 
         return True
 
+    @classmethod
+    def pre_save(cls, instance, raw, using, update_fields, *args, **kwargs):
+        if instance.pk is None:
+            instance.chat_participant = message_channel_join(user_id=instance.user_id,
+                                                             channel_id=instance.group.chat_id)
 
     @classmethod
-    # Updates Schedule name
     def post_save(cls, instance, created, update_fields, *args, **kwargs):
         if created:
             kanban_subscription_create(kanban_id=instance.user.kanban_id,
@@ -184,11 +189,13 @@ class GroupUser(BaseModel):
     def post_delete(cls, instance, *args, **kwargs):
         kanban_subscription_delete(kanban_id=instance.user.kanban_id,
                                    target_id=instance.group.kanban_id)
+        instance.chat_participant.delete()
 
     class Meta:
         unique_together = ('user', 'group')
 
 
+pre_save.connect(GroupUser.pre_save, sender=GroupUser)
 post_save.connect(GroupUser.post_save, sender=GroupUser)
 post_delete.connect(GroupUser.post_delete, sender=GroupUser)
 

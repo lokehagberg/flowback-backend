@@ -38,7 +38,7 @@ class Poll(BaseModel):
 
     # General information
     title = models.CharField(max_length=255)
-    description = models.TextField()
+    description = models.TextField(null=True, blank=True)
     attachments = models.ForeignKey(FileCollection, on_delete=models.SET_NULL, null=True, blank=True)
     poll_type = models.IntegerField(choices=PollType.choices)
     quorum = models.IntegerField(default=None, null=True, blank=True,

@@ -158,7 +158,7 @@ def group_join(*, user: int, group: int) -> Union[GroupUser, GroupUserInvite]:
             user_status.save()
         except GroupUser.DoesNotExist:
             user_status = GroupUser(user=user, group=group)
-            user_status.full_clean()
+            # user_status.full_clean() TODO fix
             user_status.save()
 
     group_notification.create(sender_id=group.id, action=group_notification.Action.create,
@@ -225,7 +225,7 @@ def group_invite_accept(*, fetched_by: int, group: int, to: int = None) -> None:
                             external=False)
         group_user = GroupUser(user_id=fetched_by, group_id=group)
 
-    group_user.full_clean()
+    # TODO fix group_user.full_clean()
     group_user.save()
     invite.delete()
 
