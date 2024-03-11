@@ -14,7 +14,9 @@ class BasePollProposalFilter(django_filters.FilterSet):
     order_by = django_filters.OrderingFilter(fields=(('created_at', 'created_at_asc'),
                                                      ('-created_at', 'created_at_desc'),
                                                      ('score', 'score_asc'),
-                                                     ('-score', 'score_desc')))
+                                                     ('-score', 'score_desc'),
+                                                     ('approval', 'approval_asc'),
+                                                     ('-approval', 'approval_desc')))
     has_attachments = ExistsFilter(field_name='attachments')
 
     class Meta:
@@ -73,6 +75,7 @@ def poll_proposal_list(*, fetched_by: User, poll_id: int, filters=None):
         qs = (PollProposal.objects.filter(created_by__group_id=poll.created_by.group.id, poll=poll)
               .annotate(approval_positive=Subquery(positive_subquery),
                         approval_negative=Subquery(negative_subquery))
+              .annotate(approval=F('approval_positive') - F('approval_negative'))
               .order_by(F('score').desc(nulls_last=True)).all())
 
         if poll.poll_type == Poll.PollType.SCHEDULE:
