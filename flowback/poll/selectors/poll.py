@@ -5,6 +5,7 @@ from django.db.models import Q, Exists, OuterRef, Count
 from django.utils import timezone
 
 from flowback.comment.models import Comment
+from flowback.common.filters import ExistsFilter
 from flowback.common.filters import NumberInFilter
 from flowback.group.models import Group
 from flowback.poll.models import Poll
@@ -20,12 +21,9 @@ class BasePollFilter(django_filters.FilterSet):
     start_date = django_filters.DateTimeFilter()
     end_date = django_filters.DateTimeFilter()
     description = django_filters.CharFilter(field_name='description', lookup_expr='icontains')
-    has_attachments = django_filters.BooleanFilter(method='has_attachments_filter')
+    has_attachments = ExistsFilter(field_name='attachments')
     tag_name = django_filters.CharFilter(lookup_expr=['exact', 'icontains'], field_name='tag__name')
     author_ids = NumberInFilter(field_name='created_by__user_id')
-
-    def has_attachments_filter(self, queryset, name, value):
-        return queryset.filter(attachments__isnull=not value)
 
     class Meta:
         model = Poll
