@@ -29,7 +29,7 @@ class MessageListAPI(APIView):
     OutputSerializer = MessageSerializer
 
     def get(self, request, channel_id: int):
-        serializer = self.FilterSerializer(data=request.data)
+        serializer = self.FilterSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
 
         messages = message_list(user=request.user, channel_id=channel_id, filters=serializer.validated_data)
@@ -62,7 +62,7 @@ class MessageChannelPreviewAPI(APIView):
         timestamp = serializers.DateTimeField(allow_null=True)
 
     def get(self, request):
-        serializer = self.FilterSerializer(data=request.data)
+        serializer = self.FilterSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
 
         messages = message_channel_preview_list(user=request.user, filters=serializer.validated_data)
@@ -90,7 +90,7 @@ class MessageChannelTopicListAPI(APIView):
         name = serializers.CharField()
 
     def get(self, request, channel_id: int):
-        serializer = self.FilterSerializer(data=request.data)
+        serializer = self.FilterSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
 
         topics = message_channel_topic_list(user=request.user, channel_id=channel_id, filters=serializer.validated_data)
