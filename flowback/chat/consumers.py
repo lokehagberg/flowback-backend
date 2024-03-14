@@ -1,4 +1,5 @@
 import json
+from json import JSONDecodeError
 from typing import Union
 
 from asgiref.sync import sync_to_async
@@ -46,34 +47,45 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     # Receive message from WebSocket
     async def receive(self, text_data):
-        data = json.loads(text_data or '{}')
+        try:
+            data = json.loads(text_data or '{}')
+
+        except JSONDecodeError as e:
+            return await self.send_error_message(method="JSONDecodeError",
+                                                 detail="Wrong Format")
 
         # Message endpoint
-        if data.get('type') == 'message_create':
+        if data.get('method') == 'message_create':
             await self.message_create(data=data)
 
-        if data.get('type') == 'message_update':
+        if data.get('method') == 'message_update':
             await self.message_update(data=data)
 
-        if data.get('type') == 'message_delete':
+        if data.get('method') == 'message_delete':
             await self.message_delete(data=data)
 
-        if data.get('type') == 'message_notify':
+        if data.get('method') == 'message_notify':
             await self.message_notify(data=data)
 
-        elif data.get('type') == 'connect_channel':
+        elif data.get('method') == 'connect_channel':
             await self.connect_channel(data=data)
 
-        elif data.get('type') == 'disconnect_channel':
+        elif data.get('method') == 'disconnect_channel':
             await self.connect_channel(data=data, disconnect=True)
+
+        elif data.get('method'):
+            return await self.send_error_message(method="UnknownMethod",
+                                                 detail="Unknown 'method' key in request")
+
+        elif data.get('method') is None:
+            return await self.send_error_message(method="MissingMethod",
+                                                 detail="Missing 'method' key in request")
 
         return True
 
     # Send message to WebSocket
     # TODO Check if redundant
     async def message(self, content: dict):
-        if content.get('type_override'):
-            content['type'] = content.pop('type_override')
         await self.send(text_data=json.dumps(content))
 
     @database_sync_to_async
@@ -81,11 +93,35 @@ class ChatConsumer(AsyncWebsocketConsumer):
         return list(MessageChannelParticipant.objects.filter(user=self.user).values_list('channel_id', flat=True))
 
     @staticmethod
-    def generate_status_message(message: str, type: str = None, **kwargs):
+    def generate_status_message(message: str, method: str = None, **kwargs):
         return dict(type="message",
-                    type_override=type,
+                    method=method,
                     message=message,
                     **kwargs)
+
+    async def validate_serializer(self, *, serializer, method: str, data: dict) -> Union[dict, bool]:
+        try:
+            serializer = serializer(data=data)
+            serializer.is_valid(raise_exception=True)
+            return serializer.validated_data
+
+        except ValidationError as e:
+            message = self.generate_status_message(message_id=data.get('message_id'),
+                                                   message=json.dumps(e.detail),
+                                                   method=method,
+                                                   status="error")
+
+            await self.send_message(channel_id=self.user_channel, message=message)
+            return False
+
+    async def send_error_message(self, *, detail: Union[dict, str], method: str, **extra) -> None:
+        message = self.generate_status_message(message=json.dumps(detail) if isinstance(detail, dict) else detail,
+                                               message_is_json=True if isinstance(detail, dict) else False,
+                                               method=method,
+                                               status="error",
+                                               **extra)
+
+        await self.send_message(channel_id=self.user_channel, message=message)
 
     async def send_message(self, channel_id, message: Union[dict, str]):
         if isinstance(message, dict):
@@ -112,32 +148,25 @@ class ChatConsumer(AsyncWebsocketConsumer):
         return MessageSerializer(message).data
 
     async def message_create(self, data: dict):
-        class MessageInputSerializer(serializers.Serializer):
+        class InputSerializer(serializers.Serializer):
             channel_id = serializers.IntegerField()
             message = serializers.CharField()
             attachments_id = serializers.IntegerField(required=False)
             parent_id = serializers.IntegerField(required=False)
             topic_id = serializers.IntegerField(required=False)
 
-        serializer = MessageInputSerializer(data=data)
-        serializer.is_valid(raise_exception=True)
-        data = serializer.validated_data
+        serializer = InputSerializer(data=data)
 
-        # Save message to database
         try:
-            message = await self._create_message(user_id=self.user.id,
-                                                 **data)
+            serializer.is_valid(raise_exception=True)
+            message = await self._create_message(user_id=self.user.id, **serializer.validated_data)
 
         except ValidationError as e:
-            message = self.generate_status_message(channel_id=data.get('channel_id'),
-                                                   message=f"{', '.join([x for x in e.detail])}",
-                                                   type="error")
-
-            await self.channel_layer.group_send(self.user_channel, message)
-            return False
+            return await self.send_error_message(detail=e.detail,
+                                                 method="message_create",
+                                                 channel_id=data.get('channel_id'))
 
         await self.send_message(channel_id=data.get('channel_id'), message=message)
-        return True
 
     @database_sync_to_async
     def _update_message(self, *,
@@ -147,7 +176,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
         update = message_update(user_id=user_id, message_id=message_id, **data)
 
-        return dict(**MessageSerializer(update[0]).data, type_override="message_update")
+        return dict(**MessageSerializer(update[0]).data, method="message_update")
 
     async def message_update(self, data: dict):
         class InputSerializer(serializers.Serializer):
@@ -155,60 +184,40 @@ class ChatConsumer(AsyncWebsocketConsumer):
             message = serializers.CharField()
 
         serializer = InputSerializer(data=data)
-        serializer.is_valid(raise_exception=True)
-        data = serializer.validated_data
-
-        # Update message
         try:
-            message = await self._update_message(user_id=self.user.id, **data)
+            serializer.is_valid(raise_exception=True)
+            message = await self._update_message(user_id=self.user.id, **serializer.validated_data)
 
         except ValidationError as e:
-            message = self.generate_status_message(message=f"{', '.join([x for x in e.detail])}",
-                                                   type="message_update",
-                                                   status="error")
-
-            await self.send_message(channel_id=self.user_channel, message=message)
-            return False
+            return await self.send_error_message(detail=e.detail,
+                                                 method="message_update",
+                                                 channel_id=data.get('channel_id'))
 
         await self.send_message(channel_id=message['channel_id'], message=message)
-        return True
 
     @database_sync_to_async
     def _delete_message(self, *,
                         user_id: int,
                         message_id: int):
         message = message_delete(user_id=user_id, message_id=message_id)
-        return dict(**MessageSerializer(message).data, type_override="message_delete")
+        return dict(**MessageSerializer(message).data, method="message_delete")
 
     async def message_delete(self, data: dict):
         class InputSerializer(serializers.Serializer):
             message_id = serializers.IntegerField()
 
         serializer = InputSerializer(data=data)
-        serializer.is_valid(raise_exception=True)
-        data = serializer.validated_data
 
-        # Update message
         try:
-            message = await self._delete_message(user_id=self.user.id, **data)
+            serializer.is_valid(raise_exception=True)
+            message = await self._delete_message(user_id=self.user.id, **serializer.validated_data)
 
         except ValidationError as e:
-            message = self.generate_status_message(message_id=data.get('message_id'),
-                                                   message=f"{', '.join([x for x in e.detail])}",
-                                                   type="message_delete",
-                                                   status="error")
-
-            await self.send_message(channel_id=self.user_channel, message=message)
-            return False
+            return await self.send_error_message(detail=e.detail,
+                                                 method="message_delete",
+                                                 channel_id=data.get('channel_id'))
 
         await self.send_message(channel_id=message['channel_id'], message=message)
-        return True
-
-    @database_sync_to_async
-    def _message_notify_check(self, user_id: int, channel_id: int):
-        user = get_object(User)
-        channel = get_object(MessageChannel)
-        return user_message_channel_permission(user=user, channel=channel)
 
     async def message_notify(self, data: dict):
         class InputSerializer(serializers.Serializer):
@@ -216,24 +225,27 @@ class ChatConsumer(AsyncWebsocketConsumer):
             action = serializers.ChoiceField(choices=['is_typing'])
 
         serializer = InputSerializer(data=data)
-        serializer.is_valid(raise_exception=True)
-
-        data = serializer.validated_data
 
         try:
+            serializer.is_valid(raise_exception=True)
             await MessageChannelParticipant.objects.aget(user=self.user,
                                                          channel_id=data['channel_id'])
 
-        except MessageChannelParticipant.DoesNotExist:
-            return await self.channel_layer.group_send(self.user_channel,
-                                                       dict(channel_id=str(data['channel_id']),
-                                                            type="error",
-                                                            message="User is not participating in this channel"))
+        except ValidationError as e:
+            return await self.send_error_message(detail=e.detail,
+                                                 method="message_notify",
+                                                 channel_id=data.get('channel_id'))
 
+        except MessageChannelParticipant.DoesNotExist:
+            return await self.send_error_message(detail="User is not participating in this channel",
+                                                 method="message_notify",
+                                                 channel_id=data.get('channel_id'))
+
+        data = serializer.validated_data
         message = self.generate_status_message(channel_id=data['channel_id'],
                                                user_id=self.user.id,
                                                message=data['action'],
-                                               type='action')
+                                               method='message_notify')
 
         await self.send_message(channel_id=str(data['channel_id']), message=message)
 

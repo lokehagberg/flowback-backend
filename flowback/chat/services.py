@@ -53,7 +53,7 @@ def message_create(*,
 
 def message_update(*, user_id: int, message_id: int, **data):
     user = get_object(User, id=user_id)
-    message = get_object(Message, id=message_id)
+    message = get_object(Message, id=message_id, active=True)
 
     if not user == message.user:
         raise ValidationError('User is not author of message')
