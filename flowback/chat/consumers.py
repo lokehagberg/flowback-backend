@@ -8,9 +8,9 @@ from django.shortcuts import get_object_or_404
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
-from flowback.chat.models import MessageChannelParticipant
+from flowback.chat.models import MessageChannelParticipant, MessageChannel
 from flowback.chat.serializers import BasicMessageSerializer, MessageSerializer
-from flowback.chat.services import message_create, message_update, message_delete
+from flowback.chat.services import message_create, message_update, message_delete, user_message_channel_permission
 from flowback.common.services import get_object
 from flowback.user.models import User
 from flowback.group.models import Group
@@ -58,6 +58,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
         if data.get('type') == 'message_delete':
             await self.message_delete(data=data)
 
+        if data.get('type') == 'message_notify':
+            await self.message_notify(data=data)
+
         elif data.get('type') == 'connect_channel':
             await self.connect_channel(data=data)
 
@@ -78,7 +81,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         return list(MessageChannelParticipant.objects.filter(user=self.user).values_list('channel_id', flat=True))
 
     @staticmethod
-    def generate_status_message(message: str, type: str, **kwargs):
+    def generate_status_message(message: str, type: str = None, **kwargs):
         return dict(type="message",
                     type_override=type,
                     message=message,
@@ -200,6 +203,39 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
         await self.send_message(channel_id=message['channel_id'], message=message)
         return True
+
+    @database_sync_to_async
+    def _message_notify_check(self, user_id: int, channel_id: int):
+        user = get_object(User)
+        channel = get_object(MessageChannel)
+        return user_message_channel_permission(user=user, channel=channel)
+
+    async def message_notify(self, data: dict):
+        class InputSerializer(serializers.Serializer):
+            channel_id = serializers.IntegerField()
+            action = serializers.ChoiceField(choices=['is_typing'])
+
+        serializer = InputSerializer(data=data)
+        serializer.is_valid(raise_exception=True)
+
+        data = serializer.validated_data
+
+        try:
+            await MessageChannelParticipant.objects.aget(user=self.user,
+                                                         channel_id=data['channel_id'])
+
+        except MessageChannelParticipant.DoesNotExist:
+            return await self.channel_layer.group_send(self.user_channel,
+                                                       dict(channel_id=str(data['channel_id']),
+                                                            type="error",
+                                                            message="User is not participating in this channel"))
+
+        message = self.generate_status_message(channel_id=data['channel_id'],
+                                               user_id=self.user.id,
+                                               message=data['action'],
+                                               type='action')
+
+        await self.send_message(channel_id=str(data['channel_id']), message=message)
 
     async def connect_channel(self, data, disconnect=False):
         class ConnectChannelInputSerializer(serializers.Serializer):

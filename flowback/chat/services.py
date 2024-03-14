@@ -10,6 +10,11 @@ from flowback.files.services import upload_collection
 from flowback.user.models import User
 
 
+def user_message_channel_permission(*, user: User, channel: MessageChannel):
+    return get_object(MessageChannelParticipant, user=user, channel=channel,
+                      error_message="User is not participating in this channel")
+
+
 def message_create(*,
                    user_id: int,
                    channel_id: int,
@@ -25,8 +30,7 @@ def message_create(*,
         return ValidationError("Parent does not exist")
 
     # Check whether user is a participant or not
-    get_object(MessageChannelParticipant, user=user, channel=channel,
-               error_message="User is not participating in this channel")
+    user_message_channel_permission(user=user, channel=channel)
 
     if attachments_id:
         attachments = get_object(MessageFileCollection, id=attachments_id)
