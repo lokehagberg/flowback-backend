@@ -11,7 +11,7 @@ from flowback.poll.models import Poll, PollVotingTypeRanking, PollVotingTypeForA
 
 from ..selectors.vote import poll_vote_list, delegate_poll_vote_list
 from ..services.poll import poll_refresh_cheap
-from ..services.vote import poll_proposal_vote_update, poll_proposal_delegate_vote_update
+from ..services.vote import poll_proposal_vote_update, poll_proposal_delegate_vote_update, poll_vote
 
 
 @extend_schema(tags=['poll'])
@@ -231,4 +231,16 @@ class PollProposalDelegateVoteUpdateAPI(APIView):
         serializer.is_valid(raise_exception=True)
         poll_refresh_cheap(poll_id=poll.id)  # TODO get celery
         poll_proposal_delegate_vote_update(user_id=request.user.id, poll_id=poll.id, data=serializer.validated_data)
+        return Response(status=status.HTTP_200_OK)
+
+
+class PollVoteUpdateAPI(APIView):
+    class InputSerializer(serializers.Serializer):
+        score = serializers.IntegerField(min_value=-1, max_value=1)
+
+    def post(self, request, poll_id: int):
+        serializer = self.InputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        poll_vote(user_id=request.user.id, poll_id=poll_id, **serializer.validated_data)
         return Response(status=status.HTTP_200_OK)

@@ -40,7 +40,9 @@ class PollListApi(APIView):
         order_by = serializers.ChoiceField(choices=['start_date_asc',
                                                     'start_date_desc',
                                                     'end_date_asc',
-                                                    'end_date_desc'],
+                                                    'end_date_desc',
+                                                    'poll_score_asc',
+                                                    'poll_score_desc'],
                                            default='start_date_desc')
         pinned = serializers.BooleanField(required=False, default=None, allow_null=True)
         author_id = serializers.IntegerField(required=False)
@@ -55,6 +57,8 @@ class PollListApi(APIView):
         tag_name = serializers.CharField(required=False)
         tag_name__icontains = serializers.ListField(child=serializers.CharField(), required=False)
         has_attachments = serializers.BooleanField(required=False, allow_null=True, default=None)
+        user_vote__gte = serializers.IntegerField(required=False)
+        user_vote__lte = serializers.IntegerField(required=False)
         status = serializers.IntegerField(required=False)
 
     class OutputSerializer(serializers.ModelSerializer):
@@ -72,6 +76,8 @@ class PollListApi(APIView):
         hide_poll_users = serializers.BooleanField(source='created_by.group.hide_poll_users')
         message_channel_topic_id = serializers.IntegerField(source='message_channel_topic.id')
         total_comments = serializers.IntegerField()
+        poll_score = serializers.IntegerField(required=True)
+        user_poll_vote = serializers.IntegerField(required=True)
 
         proposal_end_date = serializers.DateTimeField(required=False)
         prediction_statement_end_date = serializers.DateTimeField(required=False)
@@ -109,6 +115,8 @@ class PollListApi(APIView):
                       'pinned',
                       'dynamic',
                       'total_comments',
+                      'poll_score',
+                      'user_poll_vote',
                       'quorum',
                       'status',
                       'message_channel_topic_id',

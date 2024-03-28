@@ -24,6 +24,7 @@ import pgtrigger
 
 from flowback.schedule.models import Schedule, ScheduleEvent
 from flowback.schedule.services import create_schedule
+from flowback.user.models import User
 
 
 # Create your models here.
@@ -381,3 +382,12 @@ class PollPredictionBet(PredictionBet):
     @receiver(post_save, sender=PollProposal)
     def reset_prediction_proposal(sender, instance: PollProposal, **kwargs):
         PollPredictionBet.objects.filter(prediction_statement__pollpredictionstatementsegment__proposal=instance).delete()
+
+
+class PollVote(BaseModel):
+    group_user = models.ForeignKey(GroupUser, on_delete=models.CASCADE)
+    poll = models.ForeignKey(Poll, on_delete=models.CASCADE)
+    score = models.IntegerField(validators=(MinValueValidator(-1), MaxValueValidator(1)))
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['group_user', 'poll'], name='unique_vote')]

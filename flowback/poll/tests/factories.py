@@ -1,3 +1,5 @@
+import random
+
 import factory
 from django.utils import timezone
 
@@ -19,9 +21,10 @@ from flowback.poll.models import (Poll,
                                   PollPredictionStatementVote,
                                   PollAreaStatement,
                                   PollAreaStatementSegment,
-                                  PollAreaStatementVote)
+                                  PollAreaStatementVote, PollVote)
 from flowback.poll.tests.utils import generate_poll_phase_kwargs
 from flowback.schedule.tests.factories import ScheduleEventFactory
+from flowback.user.tests.factories import UserFactory
 
 
 class PollFactory(factory.django.DjangoModelFactory):
@@ -171,3 +174,12 @@ class PollAreaStatementVoteFactory(factory.django.DjangoModelFactory):
     created_by = factory.SubFactory(GroupUserFactory)
     poll_area_statement = factory.SubFactory(PollAreaStatementFactory)
     vote = factory.LazyAttribute(lambda _: fake.pybool())
+
+
+class PollVoteFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = PollVote
+
+    poll = factory.SubFactory(PollFactory)
+    group_user = factory.SubFactory(GroupUserFactory)
+    score = factory.LazyAttribute(lambda _: random.choice([-1, 1]))
