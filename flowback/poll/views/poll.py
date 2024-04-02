@@ -57,8 +57,8 @@ class PollListApi(APIView):
         tag_name = serializers.CharField(required=False)
         tag_name__icontains = serializers.ListField(child=serializers.CharField(), required=False)
         has_attachments = serializers.BooleanField(required=False, allow_null=True, default=None)
-        user_vote__gte = serializers.IntegerField(required=False)
-        user_vote__lte = serializers.IntegerField(required=False)
+        user_priority__gte = serializers.IntegerField(required=False, source='user_vote__gte')
+        user_priority__lte = serializers.IntegerField(required=False, source='user_vote__lte')
         status = serializers.IntegerField(required=False)
 
     class OutputSerializer(serializers.ModelSerializer):
@@ -77,7 +77,7 @@ class PollListApi(APIView):
         message_channel_topic_id = serializers.IntegerField(source='message_channel_topic.id')
         total_comments = serializers.IntegerField()
         poll_score = serializers.IntegerField(required=True)
-        user_poll_vote = serializers.IntegerField(required=True)
+        user_poll_priority = serializers.IntegerField(required=True, source='user_poll_vote')
 
         proposal_end_date = serializers.DateTimeField(required=False)
         prediction_statement_end_date = serializers.DateTimeField(required=False)
@@ -116,7 +116,7 @@ class PollListApi(APIView):
                       'dynamic',
                       'total_comments',
                       'poll_score',
-                      'user_poll_vote',
+                      'user_poll_priority',
                       'quorum',
                       'status',
                       'message_channel_topic_id',
