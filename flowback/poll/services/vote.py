@@ -330,7 +330,7 @@ def poll_proposal_vote_count(*, poll_id: int) -> None:
         poll.save()
 
 
-def poll_vote(user_id: int, poll_id: int, score: int) -> None:
+def poll_priority_update(user_id: int, poll_id: int, score: int) -> None:
     poll = Poll.objects.get(id=poll_id)
     group_user = group_user_permissions(user=user_id, group=poll.created_by.group)
 

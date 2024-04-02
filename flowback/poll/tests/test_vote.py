@@ -12,7 +12,7 @@ from ..views.poll import PollListApi
 from ..views.vote import (PollProposalDelegateVoteUpdateAPI,
                           PollProposalVoteUpdateAPI,
                           PollProposalVoteListAPI,
-                          DelegatePollVoteListAPI, PollVoteUpdateAPI)
+                          DelegatePollVoteListAPI, PollPriorityUpdateAPI)
 from ...files.tests.factories import FileSegmentFactory
 from ...group.tests.factories import GroupFactory, GroupUserFactory, GroupUserDelegateFactory, GroupTagsFactory
 from ...user.models import User
@@ -216,10 +216,10 @@ class PollVoteTest(APITransactionTestCase):
         self.assertEqual(polls.get(id=self.poll_cardinal.id).user_poll_vote, 1)
         self.assertEqual(polls.get(id=self.poll_schedule.id).user_poll_vote, None)
 
-    def test_poll_vote(self):
+    def test_poll_priority(self):
         def vote(score: int):
             factory = APIRequestFactory()
-            view = PollVoteUpdateAPI.as_view()
+            view = PollPriorityUpdateAPI.as_view()
             data = dict(score=score)
             request = factory.post('', data=data)
             force_authenticate(request, user=self.group_user_one.user)
@@ -237,6 +237,12 @@ class PollVoteTest(APITransactionTestCase):
         vote(-1)
         vote(0)
 
+
+# Reasons poll: Similiar to comments we already have, no winner, people can be in favor/against
+#   Prioritization system (1 to -1, support for 5 to -5)
+
+# Link/files can be "recommended" by other users
+#   Prioritization system (1 to -1, support for 5 to -5)
 
 class PollDelegateVoteTest(APITransactionTestCase):
     reset_sequences = True

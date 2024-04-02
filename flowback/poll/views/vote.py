@@ -11,7 +11,7 @@ from flowback.poll.models import Poll, PollVotingTypeRanking, PollVotingTypeForA
 
 from ..selectors.vote import poll_vote_list, delegate_poll_vote_list
 from ..services.poll import poll_refresh_cheap
-from ..services.vote import poll_proposal_vote_update, poll_proposal_delegate_vote_update, poll_vote
+from ..services.vote import poll_proposal_vote_update, poll_proposal_delegate_vote_update, poll_priority_update
 
 
 @extend_schema(tags=['poll'])
@@ -234,7 +234,7 @@ class PollProposalDelegateVoteUpdateAPI(APIView):
         return Response(status=status.HTTP_200_OK)
 
 
-class PollVoteUpdateAPI(APIView):
+class PollPriorityUpdateAPI(APIView):
     class InputSerializer(serializers.Serializer):
         score = serializers.IntegerField(min_value=-1, max_value=1)
 
@@ -242,5 +242,5 @@ class PollVoteUpdateAPI(APIView):
         serializer = self.InputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        poll_vote(user_id=request.user.id, poll_id=poll_id, **serializer.validated_data)
+        poll_priority_update(user_id=request.user.id, poll_id=poll_id, **serializer.validated_data)
         return Response(status=status.HTTP_200_OK)
