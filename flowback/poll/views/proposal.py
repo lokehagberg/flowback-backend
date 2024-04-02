@@ -49,6 +49,8 @@ class PollProposalListAPI(APIView):
         description = serializers.CharField()
         attachments = FileSerializer(many=True, source="attachments.filesegment_set", allow_null=True)
         score = serializers.IntegerField()
+        priority = serializers.IntegerField()
+        user_priority = serializers.IntegerField()
 
     class OutputSerializerTypeCardinal(OutputSerializer):
         approval_positive = serializers.IntegerField()
