@@ -4,7 +4,7 @@ from rest_framework.exceptions import ValidationError
 from flowback.common.services import get_object
 from flowback.files.services import upload_collection
 from flowback.group.selectors import group_user_permissions
-from flowback.poll.models import PollProposal, Poll, PollProposalTypeSchedule
+from flowback.poll.models import PollProposal, Poll, PollProposalTypeSchedule, PollProposalPriority
 
 # TODO proposal can be created without schedule, dangerous
 from flowback.poll.services.poll import poll_refresh_cheap
@@ -71,3 +71,16 @@ def poll_proposal_delete(*, user_id: int, proposal_id: int) -> None:
                               "group admin or force_delete_proposal permission")
 
     proposal.delete()
+
+
+def poll_proposal_priority_update(user_id: int, proposal_id: int, score: int) -> None:
+    proposal = PollProposal.objects.get(id=proposal_id)
+    group_user = group_user_permissions(user=user_id, group=proposal.poll.created_by.group)
+
+    if score != 0:
+        PollProposalPriority.objects.update_or_create(group_user=group_user,
+                                                      proposal=proposal,
+                                                      defaults=dict(score=score))
+
+    else:
+        PollProposalPriority.objects.get(group_user=group_user, proposal=proposal).delete()

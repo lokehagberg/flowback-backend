@@ -5,7 +5,7 @@ from flowback.common.services import get_object, model_update
 from flowback.files.services import upload_collection
 from flowback.group.services import group_notification, group_schedule
 from flowback.notification.services import NotificationManager
-from flowback.poll.models import Poll, PollProposal
+from flowback.poll.models import Poll, PollProposal, PollPriority
 from flowback.group.selectors import group_user_permissions
 from django.utils import timezone
 from datetime import datetime
@@ -216,3 +216,14 @@ def poll_refresh_cheap(*, poll_id: int) -> None:
                                             description=poll.description)
 
         poll.save()
+
+
+def poll_priority_update(user_id: int, poll_id: int, score: int) -> None:
+    poll = Poll.objects.get(id=poll_id)
+    group_user = group_user_permissions(user=user_id, group=poll.created_by.group)
+
+    if score != 0:
+        PollPriority.objects.update_or_create(group_user=group_user, poll=poll, defaults=dict(score=score))
+
+    else:
+        PollPriority.objects.get(group_user=group_user, poll=poll).delete()

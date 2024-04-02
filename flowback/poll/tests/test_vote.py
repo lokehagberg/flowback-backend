@@ -2,17 +2,17 @@ from pprint import pprint
 
 from django.db.models import Sum
 from rest_framework.test import APIRequestFactory, force_authenticate, APITransactionTestCase
-from .factories import PollFactory, PollProposalFactory, PollVoteFactory
+from .factories import PollFactory, PollProposalFactory, PollPriorityFactory
 from .utils import generate_poll_phase_kwargs
 from ..models import PollDelegateVoting, PollVotingTypeCardinal, Poll, PollProposal, PollVoting, \
-    PollVotingTypeForAgainst, PollVote
+    PollVotingTypeForAgainst, PollPriority
 from ..selectors.poll import poll_list
 from ..services.vote import poll_proposal_vote_count
-from ..views.poll import PollListApi
+from ..views.poll import PollListApi, PollPriorityUpdateAPI
 from ..views.vote import (PollProposalDelegateVoteUpdateAPI,
                           PollProposalVoteUpdateAPI,
                           PollProposalVoteListAPI,
-                          DelegatePollVoteListAPI, PollPriorityUpdateAPI)
+                          DelegatePollVoteListAPI)
 from ...files.tests.factories import FileSegmentFactory
 from ...group.tests.factories import GroupFactory, GroupUserFactory, GroupUserDelegateFactory, GroupTagsFactory
 from ...user.models import User
@@ -203,40 +203,6 @@ class PollVoteTest(APITransactionTestCase):
 
         self.assertEqual(event.start_date, self.poll_schedule_proposal_three.pollproposaltypeschedule.event.start_date)
         self.assertEqual(event.end_date, self.poll_schedule_proposal_three.pollproposaltypeschedule.event.end_date)
-
-    def test_poll_list_score(self):
-        vote_one = PollVoteFactory(poll=self.poll_cardinal, group_user=self.group_user_one, score=1)
-        vote_two = PollVoteFactory(poll=self.poll_cardinal, group_user=self.group_user_two, score=1)
-        vote_three = PollVoteFactory(poll=self.poll_cardinal, group_user=self.group_user_three, score=-1)
-
-        polls = poll_list(fetched_by=self.group_user_one.user, group_id=self.poll_cardinal.created_by.group.id)
-
-        self.assertEqual(polls.get(id=self.poll_cardinal.id).poll_score, 1)
-        self.assertEqual(polls.get(id=self.poll_schedule.id).poll_score, 0)
-        self.assertEqual(polls.get(id=self.poll_cardinal.id).user_poll_vote, 1)
-        self.assertEqual(polls.get(id=self.poll_schedule.id).user_poll_vote, None)
-
-    def test_poll_priority(self):
-        def vote(score: int):
-            factory = APIRequestFactory()
-            view = PollPriorityUpdateAPI.as_view()
-            data = dict(score=score)
-            request = factory.post('', data=data)
-            force_authenticate(request, user=self.group_user_one.user)
-            view(request, poll_id=self.poll_cardinal.id)
-
-            if score != 0:
-                self.assertEqual(PollVote.objects.get(poll_id=self.poll_cardinal.id,
-                                                      group_user=self.group_user_one).score, score)
-
-            else:
-                self.assertFalse(PollVote.objects.filter(poll_id=self.poll_cardinal.id,
-                                                         group_user=self.group_user_one).exists())
-
-        vote(1)
-        vote(-1)
-        vote(0)
-
 
 # Reasons poll: Similiar to comments we already have, no winner, people can be in favor/against
 #   Prioritization system (1 to -1, support for 5 to -5)

@@ -2,11 +2,12 @@ import json
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework.test import APIRequestFactory, force_authenticate, APITransactionTestCase
-from .factories import PollFactory
+from .factories import PollFactory, PollPriorityFactory
 
 from .utils import generate_poll_phase_kwargs
-from ..models import Poll
-from ..views.poll import PollListApi, PollCreateAPI, PollUpdateAPI, PollDeleteAPI
+from ..models import Poll, PollPriority
+from ..selectors.poll import poll_list
+from ..views.poll import PollListApi, PollCreateAPI, PollUpdateAPI, PollDeleteAPI, PollPriorityUpdateAPI
 from ...files.tests.factories import FileSegmentFactory
 from ...group.tests.factories import GroupFactory, GroupUserFactory, GroupTagsFactory
 from ...user.models import User
@@ -144,3 +145,36 @@ class PollTest(APITransactionTestCase):
 
         self.assertTrue(response.status_code == 200)
         self.assertTrue(not Poll.objects.filter(id=poll.id).exists())
+
+    def test_poll_priority_list(self):
+        vote_one = PollPriorityFactory(poll=self.poll_one, group_user=self.group_user_one, score=1)
+        vote_two = PollPriorityFactory(poll=self.poll_one, group_user=self.group_user_two, score=1)
+        vote_three = PollPriorityFactory(poll=self.poll_one, group_user=self.group_user_three, score=-1)
+
+        polls = poll_list(fetched_by=self.group_user_one.user, group_id=self.poll_one.created_by.group.id)
+
+        self.assertEqual(polls.get(id=self.poll_one.id).priority, 1)
+        self.assertEqual(polls.get(id=self.poll_two.id).priority, 0)
+        self.assertEqual(polls.get(id=self.poll_one.id).user_priority, 1)
+        self.assertEqual(polls.get(id=self.poll_two.id).user_priority, None)
+
+    def test_poll_priority_update(self):
+        def vote(score: int):
+            factory = APIRequestFactory()
+            view = PollPriorityUpdateAPI.as_view()
+            data = dict(score=score)
+            request = factory.post('', data=data)
+            force_authenticate(request, user=self.group_user_one.user)
+            view(request, poll_id=self.poll_one.id)
+
+            if score != 0:
+                self.assertEqual(PollPriority.objects.get(poll_id=self.poll_one.id,
+                                                          group_user=self.group_user_one).score, score)
+
+            else:
+                self.assertFalse(PollPriority.objects.filter(poll_id=self.poll_one.id,
+                                                             group_user=self.group_user_one).exists())
+
+        vote(1)
+        vote(-1)
+        vote(0)

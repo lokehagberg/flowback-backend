@@ -1,10 +1,12 @@
 from django.utils import timezone
 from rest_framework.test import APIRequestFactory, force_authenticate, APITransactionTestCase
-from .factories import PollFactory, PollProposalFactory
+from .factories import PollFactory, PollProposalFactory, PollProposalPriorityFactory
 
 from .utils import generate_poll_phase_kwargs
-from ..models import PollProposal, Poll
-from ..views.proposal import PollProposalListAPI, PollProposalCreateAPI, PollProposalDeleteAPI
+from ..models import PollProposal, Poll, PollProposalPriority
+from ..selectors.proposal import poll_proposal_list
+from ..views.proposal import PollProposalListAPI, PollProposalCreateAPI, PollProposalDeleteAPI, \
+    PollProposalPriorityUpdateAPI
 from ...group.tests.factories import GroupFactory, GroupUserFactory, GroupTagsFactory, GroupPermissionsFactory
 from ...schedule.models import ScheduleEvent
 from ...user.models import User
@@ -21,7 +23,7 @@ class ProposalTest(APITransactionTestCase):
         self.poll_schedule = PollFactory(created_by=self.group_user_one, poll_type=Poll.PollType.SCHEDULE,
                                          **generate_poll_phase_kwargs('proposal'))
         self.poll_cardinal = PollFactory(created_by=self.group_user_one, poll_type=Poll.PollType.CARDINAL,
-                                        **generate_poll_phase_kwargs('proposal'))
+                                         **generate_poll_phase_kwargs('proposal'))
         group_users = [self.group_user_one, self.group_user_two, self.group_user_three]
         (self.poll_schedule_proposal_one,
          self.poll_schedule_proposal_two,
@@ -167,3 +169,39 @@ class ProposalTest(APITransactionTestCase):
         response = self.proposal_delete(proposal, user)
         self.assertEqual(response.status_code, 200, response.data)
         self.assertFalse(ScheduleEvent.objects.filter(id=event_id).exists())
+
+    def test_poll_proposal_priority_list(self):
+        vote_one = PollProposalPriorityFactory(proposal=self.poll_cardinal_proposal_one,
+                                               group_user=self.group_user_one, score=1)
+        vote_two = PollProposalPriorityFactory(proposal=self.poll_cardinal_proposal_one,
+                                               group_user=self.group_user_two, score=1)
+        vote_three = PollProposalPriorityFactory(proposal=self.poll_cardinal_proposal_one,
+                                                 group_user=self.group_user_three, score=-1)
+
+        proposals = poll_proposal_list(fetched_by=self.group_user_one.user, poll_id=self.poll_cardinal.id)
+
+        self.assertEqual(proposals.get(id=self.poll_cardinal_proposal_one.id).priority, 1)
+        self.assertEqual(proposals.get(id=self.poll_cardinal_proposal_two.id).priority, 0)
+        self.assertEqual(proposals.get(id=self.poll_cardinal_proposal_one.id).user_priority, 1)
+        self.assertEqual(proposals.get(id=self.poll_cardinal_proposal_two.id).user_priority, None)
+
+    def test_poll_proposal_priority_update(self):
+        def vote(score: int):
+            factory = APIRequestFactory()
+            view = PollProposalPriorityUpdateAPI.as_view()
+            data = dict(score=score)
+            request = factory.post('', data=data)
+            force_authenticate(request, user=self.group_user_one.user)
+            view(request, proposal_id=self.poll_cardinal_proposal_one.id)
+
+            if score != 0:
+                self.assertEqual(PollProposalPriority.objects.get(proposal_id=self.poll_cardinal_proposal_one.id,
+                                                                  group_user=self.group_user_one).score, score)
+
+            else:
+                self.assertFalse(PollProposalPriority.objects.filter(proposal_id=self.poll_cardinal_proposal_one.id,
+                                                                     group_user=self.group_user_one).exists())
+
+        vote(1)
+        vote(-1)
+        vote(0)

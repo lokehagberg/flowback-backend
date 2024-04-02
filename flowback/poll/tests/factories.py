@@ -21,7 +21,7 @@ from flowback.poll.models import (Poll,
                                   PollPredictionStatementVote,
                                   PollAreaStatement,
                                   PollAreaStatementSegment,
-                                  PollAreaStatementVote, PollVote)
+                                  PollAreaStatementVote, PollPriority, PollProposalPriority)
 from flowback.poll.tests.utils import generate_poll_phase_kwargs
 from flowback.schedule.tests.factories import ScheduleEventFactory
 from flowback.user.tests.factories import UserFactory
@@ -176,10 +176,19 @@ class PollAreaStatementVoteFactory(factory.django.DjangoModelFactory):
     vote = factory.LazyAttribute(lambda _: fake.pybool())
 
 
-class PollVoteFactory(factory.django.DjangoModelFactory):
+class PollPriorityFactory(factory.django.DjangoModelFactory):
     class Meta:
-        model = PollVote
+        model = PollPriority
 
     poll = factory.SubFactory(PollFactory)
-    group_user = factory.SubFactory(GroupUserFactory)
+    group_user = factory.SubFactory(GroupUserFactory, group=factory.SelfAttribute('..poll.created_by.group'))
+    score = factory.LazyAttribute(lambda _: random.choice([-1, 1]))
+
+
+class PollProposalPriorityFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = PollProposalPriority
+
+    proposal = factory.SubFactory(PollProposalFactory)
+    group_user = factory.SubFactory(GroupUserFactory, group=factory.SelfAttribute('..proposal.poll.created_by.group'))
     score = factory.LazyAttribute(lambda _: random.choice([-1, 1]))

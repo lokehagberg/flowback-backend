@@ -384,10 +384,27 @@ class PollPredictionBet(PredictionBet):
         PollPredictionBet.objects.filter(prediction_statement__pollpredictionstatementsegment__proposal=instance).delete()
 
 
-class PollVote(BaseModel):
+class PollPriority(BaseModel):
     group_user = models.ForeignKey(GroupUser, on_delete=models.CASCADE)
     poll = models.ForeignKey(Poll, on_delete=models.CASCADE)
     score = models.IntegerField(validators=(MinValueValidator(-1), MaxValueValidator(1)))
 
+    def clean(self):
+        if self.poll.created_by.group != self.group_user.group:
+            raise ValidationError('PollPriority group user is not in the same group as poll')
+
     class Meta:
-        constraints = [models.UniqueConstraint(fields=['group_user', 'poll'], name='unique_vote')]
+        constraints = [models.UniqueConstraint(fields=['group_user', 'poll'], name='unique_poll_priority')]
+
+
+class PollProposalPriority(BaseModel):
+    group_user = models.ForeignKey(GroupUser, on_delete=models.CASCADE)
+    proposal = models.ForeignKey(PollProposal, on_delete=models.CASCADE)
+    score = models.IntegerField(validators=(MinValueValidator(-1), MaxValueValidator(1)))
+
+    def clean(self):
+        if self.proposal.poll.created_by.group != self.group_user.group:
+            raise ValidationError('PollProposalPriority group user is not in the same group as poll')
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['group_user', 'proposal'], name='unique_poll_proposal_priority')]

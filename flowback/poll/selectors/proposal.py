@@ -1,9 +1,10 @@
 import django_filters
+from django.db import models
 
 from flowback.common.filters import NumberInFilter, ExistsFilter
-from django.db.models import F, Subquery, Count, Func
+from django.db.models import F, Subquery, Count, Func, Sum, OuterRef
 from flowback.common.services import get_object
-from flowback.poll.models import Poll, PollProposal, PollVotingTypeCardinal
+from flowback.poll.models import Poll, PollProposal, PollVotingTypeCardinal, PollProposalPriority
 from flowback.user.models import User
 from flowback.group.selectors import group_user_permissions
 
@@ -32,7 +33,9 @@ class BasePollProposalScheduleFilter(django_filters.FilterSet):
             ('start_date', 'start_date_asc'),
             ('-start_date', 'start_date_desc'),
             ('end_date', 'end_date_asc'),
-            ('-end_date', 'end_date_desc')
+            ('-end_date', 'end_date_desc'),
+            ('priority', 'priority_asc'),
+            ('-priority', 'priority_desc')
         )
     )
 
@@ -46,6 +49,9 @@ class BasePollProposalScheduleFilter(django_filters.FilterSet):
                                                  lookup_expr='lt')
     end_date__gte = django_filters.DateTimeFilter(field_name='pollproposaltypeschedule.event.end_date',
                                                  lookup_expr='gte')
+
+    user_priority__gte = django_filters.NumberFilter(field_name='user_priority', lookup_expr='gte')
+    user_priority__lte = django_filters.NumberFilter(field_name='user_priority', lookup_expr='lte')
 
     poll_title = django_filters.CharFilter(field_name='poll.title', lookup_expr='exact')
     poll_title__icontains = django_filters.CharFilter(field_name='poll.title', lookup_expr='icontains')
@@ -65,17 +71,27 @@ def poll_proposal_list(*, fetched_by: User, poll_id: int, filters=None):
             group_user_permissions(group=poll.created_by.group.id, user=fetched_by)
 
         positive_subquery = PollVotingTypeCardinal.objects.filter(author__poll=poll, score__gt=0
-                                                                  ).annotate(count=Func(F('id'), function='Count')
+                                                                  ).annotate(count=Func(F('id'),
+                                                                                        function='Count')
                                                                              ).values('count')
         negative_subquery = PollVotingTypeCardinal.objects.filter(author__poll=poll, score__lt=0
-                                                                  ).annotate(count=Func(F('id'), function='Count')
+                                                                  ).annotate(count=Func(F('id'),
+                                                                                        function='Count')
                                                                              ).values('count')
 
         filters = filters or {}
         qs = (PollProposal.objects.filter(created_by__group_id=poll.created_by.group.id, poll=poll)
               .annotate(approval_positive=Subquery(positive_subquery),
                         approval_negative=Subquery(negative_subquery))
-              .annotate(approval=F('approval_positive') - F('approval_negative'))
+              .annotate(approval=F('approval_positive') - F('approval_negative'),
+                        priority=Sum('pollproposalpriority__score',
+                                     output_field=models.IntegerField(),
+                                     default=0),
+                        user_priority=Subquery(
+                            PollProposalPriority.objects.filter(proposal=OuterRef('id'),
+                                                                group_user__user=fetched_by).values('score'),
+                            output_field=models.IntegerField())
+                        )
               .order_by(F('score').desc(nulls_last=True)).all())
 
         if poll.poll_type == Poll.PollType.SCHEDULE:

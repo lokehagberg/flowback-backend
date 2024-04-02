@@ -18,7 +18,7 @@ from flowback.poll.selectors.comment import poll_comment_list
 
 from flowback.poll.services.comment import poll_comment_create, poll_comment_update, poll_comment_delete
 from flowback.poll.services.poll import poll_create, poll_update, poll_delete, poll_refresh_cheap, poll_notification, \
-    poll_notification_subscribe
+    poll_notification_subscribe, poll_priority_update
 from flowback.poll.services.prediction import poll_prediction_statement_create, poll_prediction_statement_delete, \
     poll_prediction_bet_create, poll_prediction_bet_update, poll_prediction_bet_delete, \
     poll_prediction_statement_vote_create, \
@@ -41,8 +41,8 @@ class PollListApi(APIView):
                                                     'start_date_desc',
                                                     'end_date_asc',
                                                     'end_date_desc',
-                                                    'poll_score_asc',
-                                                    'poll_score_desc'],
+                                                    'priority_asc',
+                                                    'priority_desc'],
                                            default='start_date_desc')
         pinned = serializers.BooleanField(required=False, default=None, allow_null=True)
         author_id = serializers.IntegerField(required=False)
@@ -57,8 +57,8 @@ class PollListApi(APIView):
         tag_name = serializers.CharField(required=False)
         tag_name__icontains = serializers.ListField(child=serializers.CharField(), required=False)
         has_attachments = serializers.BooleanField(required=False, allow_null=True, default=None)
-        user_priority__gte = serializers.IntegerField(required=False, source='user_vote__gte')
-        user_priority__lte = serializers.IntegerField(required=False, source='user_vote__lte')
+        user_priority__gte = serializers.IntegerField(required=False)
+        user_priority__lte = serializers.IntegerField(required=False)
         status = serializers.IntegerField(required=False)
 
     class OutputSerializer(serializers.ModelSerializer):
@@ -76,8 +76,8 @@ class PollListApi(APIView):
         hide_poll_users = serializers.BooleanField(source='created_by.group.hide_poll_users')
         message_channel_topic_id = serializers.IntegerField(source='message_channel_topic.id')
         total_comments = serializers.IntegerField()
-        poll_score = serializers.IntegerField(required=True)
-        user_poll_priority = serializers.IntegerField(required=True, source='user_poll_vote')
+        priority = serializers.IntegerField()
+        user_priority = serializers.IntegerField()
 
         proposal_end_date = serializers.DateTimeField(required=False)
         prediction_statement_end_date = serializers.DateTimeField(required=False)
@@ -115,8 +115,8 @@ class PollListApi(APIView):
                       'pinned',
                       'dynamic',
                       'total_comments',
-                      'poll_score',
-                      'user_poll_priority',
+                      'priority',
+                      'user_priority',
                       'quorum',
                       'status',
                       'message_channel_topic_id',
@@ -280,3 +280,15 @@ class PollDelegatesListAPI(APIView):
             request=request,
             view=self
         )
+
+
+class PollPriorityUpdateAPI(APIView):
+    class InputSerializer(serializers.Serializer):
+        score = serializers.IntegerField(min_value=-1, max_value=1)
+
+    def post(self, request, poll_id: int):
+        serializer = self.InputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        poll_priority_update(user_id=request.user.id, poll_id=poll_id, **serializer.validated_data)
+        return Response(status=status.HTTP_200_OK)

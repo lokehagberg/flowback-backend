@@ -5,12 +5,14 @@ from .views.poll import (PollListApi,
                          PollCreateAPI,
                          PollUpdateAPI,
                          PollDeleteAPI,
-                         PollDelegatesListAPI)
-from .views.proposal import PollProposalListAPI, PollProposalDeleteAPI, PollProposalCreateAPI
+                         PollDelegatesListAPI,
+                         PollPriorityUpdateAPI)
+from .views.proposal import PollProposalListAPI, PollProposalDeleteAPI, PollProposalCreateAPI, \
+    PollProposalPriorityUpdateAPI
 from .views.vote import (PollProposalVoteListAPI,
                          PollProposalVoteUpdateAPI,
                          PollProposalDelegateVoteUpdateAPI,
-                         DelegatePollVoteListAPI, PollPriorityUpdateAPI)
+                         DelegatePollVoteListAPI)
 from .views.comment import PollCommentListAPI, PollCommentCreateAPI, PollCommentUpdateAPI, PollCommentDeleteAPI, \
     PollDelegateCommentListAPI, PollDelegateCommentCreateAPI, PollDelegateCommentUpdateAPI, PollDelegateCommentDeleteAPI
 from .views.prediction import (PollPredictionStatementListAPI,
@@ -38,10 +40,12 @@ poll_patterns = [
     path('<int:poll>/subscribe', PollNotificationSubscribeApi.as_view(), name='poll_subscribe'),
     path('<int:poll>/update', PollUpdateAPI.as_view(), name='poll_update'),
     path('<int:poll>/delete', PollDeleteAPI.as_view(), name='poll_delete'),
-    path('<int:poll_id>/priority/update', PollPriorityUpdateAPI.as_view(), name='poll_vote_update'),
+    path('<int:poll_id>/priority/update', PollPriorityUpdateAPI.as_view(), name='poll_priority_update'),
     path('<int:poll>/proposals', PollProposalListAPI.as_view(), name='poll_proposals'),
     path('<int:poll>/proposal/create', PollProposalCreateAPI.as_view(), name='poll_proposal_create'),
     path('proposal/<int:proposal>/delete', PollProposalDeleteAPI.as_view(), name='poll_proposal_delete'),
+    path('proposal/<int:proposal_id>/priority/update', PollProposalPriorityUpdateAPI.as_view(),
+         name='poll_proposal_priority_update'),
     path('<int:poll>/proposal/votes', PollProposalVoteListAPI.as_view(), name='poll_proposal_votes'),
     path('<int:poll>/proposal/vote/update', PollProposalVoteUpdateAPI.as_view(), name='poll_proposal_vote_update'),
     path('<int:poll>/proposal/vote/delegate/update', PollProposalDelegateVoteUpdateAPI.as_view(),

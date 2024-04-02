@@ -10,7 +10,7 @@ from flowback.poll.models import Poll, PollProposal
 
 from ..selectors.proposal import poll_proposal_list
 from ..services.poll import poll_refresh_cheap
-from ..services.proposal import poll_proposal_create, poll_proposal_delete
+from ..services.proposal import poll_proposal_create, poll_proposal_delete, poll_proposal_priority_update
 from ...files.serializers import FileSerializer
 from ...group.serializers import GroupUserSerializer
 
@@ -26,13 +26,16 @@ class PollProposalListAPI(APIView):
                                            default='created_at_desc',
                                            choices=['created_at_asc', 'created_at_desc',
                                                     'score_asc', 'score_desc',
-                                                    'approval_asc', 'approval_desc'])
+                                                    'approval_asc', 'approval_desc',
+                                                    'priority_asc', 'priority_desc'])
+
+        user_priority__gte = serializers.IntegerField(required=False)
+        user_priority__lte = serializers.IntegerField(required=False)
         id = serializers.IntegerField(required=False)
         created_by_user_id_list = serializers.CharField(required=False)
         title = serializers.CharField(required=False)
         title__icontains = serializers.CharField(required=False)
         has_attachments = serializers.BooleanField(required=False, allow_null=True, default=None)
-
 
     class FilterSerializerTypeSchedule(FilterSerializer):
         start_date = serializers.DateTimeField(required=False)
@@ -126,3 +129,14 @@ class PollProposalDeleteAPI(APIView):
         poll_proposal_delete(user_id=request.user.id, proposal_id=proposal)
         return Response(status=status.HTTP_200_OK)
 
+
+class PollProposalPriorityUpdateAPI(APIView):
+    class InputSerializer(serializers.Serializer):
+        score = serializers.IntegerField(min_value=-1, max_value=1)
+
+    def post(self, request, proposal_id: int):
+        serializer = self.InputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        poll_proposal_priority_update(user_id=request.user.id, proposal_id=proposal_id, **serializer.validated_data)
+        return Response(status=status.HTTP_200_OK)

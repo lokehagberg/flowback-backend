@@ -6,7 +6,7 @@ from backend.settings import SCORE_VOTE_CEILING, SCORE_VOTE_FLOOR
 from flowback.common.services import get_object
 from flowback.group.models import GroupUserDelegatePool, GroupUser
 from flowback.poll.models import Poll, PollProposal, PollVoting, PollVotingTypeRanking, PollDelegateVoting, \
-    PollVotingTypeForAgainst, PollVotingTypeCardinal, PollVote
+    PollVotingTypeForAgainst, PollVotingTypeCardinal, PollPriority
 from flowback.group.selectors import group_user_permissions
 from flowback.group.services import group_schedule
 from django.utils import timezone
@@ -328,14 +328,3 @@ def poll_proposal_vote_count(*, poll_id: int) -> None:
         poll.status = 1 if poll.participants > total_group_users * quorum else -1
         poll.result = True
         poll.save()
-
-
-def poll_priority_update(user_id: int, poll_id: int, score: int) -> None:
-    poll = Poll.objects.get(id=poll_id)
-    group_user = group_user_permissions(user=user_id, group=poll.created_by.group)
-
-    if score != 0:
-        PollVote.objects.update_or_create(group_user=group_user, poll=poll, defaults=dict(score=score))
-
-    else:
-        PollVote.objects.get(group_user=group_user, poll=poll).delete()
