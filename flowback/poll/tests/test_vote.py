@@ -204,12 +204,6 @@ class PollVoteTest(APITransactionTestCase):
         self.assertEqual(event.start_date, self.poll_schedule_proposal_three.pollproposaltypeschedule.event.start_date)
         self.assertEqual(event.end_date, self.poll_schedule_proposal_three.pollproposaltypeschedule.event.end_date)
 
-# Reasons poll: Similiar to comments we already have, no winner, people can be in favor/against
-#   Prioritization system (1 to -1, support for 5 to -5)
-
-# Link/files can be "recommended" by other users
-#   Prioritization system (1 to -1, support for 5 to -5)
-
 class PollDelegateVoteTest(APITransactionTestCase):
     reset_sequences = True
 
