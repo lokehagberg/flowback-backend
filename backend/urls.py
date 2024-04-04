@@ -14,6 +14,7 @@ from flowback.chat.urls import chat_patterns
 from flowback.notification.urls import notification_patterns
 from django.conf.urls.static import static
 
+
 api_urlpatterns = [
     path('', include((user_patterns, 'user'))),
     path('group/', include((group_patterns, 'group'))),
