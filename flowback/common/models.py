@@ -12,7 +12,7 @@ class BaseModel(models.Model):
 
 
 # Generates a query where only one of the fields is allowed to be set, while all other fields must be null
-def generate_exclusive_q(fields: list[str]) -> Q:
+def generate_exclusive_q(*fields: str) -> Q:
     queryset_merge = None
 
     for i in range(len(fields)):
