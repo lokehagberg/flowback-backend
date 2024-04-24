@@ -68,3 +68,5 @@ class CustomAutoSchema(AutoSchema):
 
     def get_summary(self):
         return self.view.__class__.__name__.replace('API', '').replace('Api', '')
+
+    # Neko waffle

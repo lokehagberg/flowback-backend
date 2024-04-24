@@ -40,6 +40,10 @@ from .views.thread import (GroupThreadListAPI,
                            GroupThreadCommentCreateAPI,
                            GroupThreadCommentUpdateAPI,
                            GroupThreadCommentDeleteAPI)
+from .views.comment import (GroupDelegatePoolCommentListAPI,
+                            GroupDelegatePoolCommentCreateAPI,
+                            GroupDelegatePoolCommentUpdateAPI,
+                            GroupDelegatePoolCommentDeleteAPI)
 
 group_patterns = [
     path('folders', GroupFolderListApi.as_view(), name='group_folder_list'),
@@ -81,6 +85,19 @@ group_patterns = [
          name='group_user_delegate_pool_create'),
     path('<int:group>/delegate/pool/delete',
          GroupUserDelegatePoolDeleteApi.as_view(),
+         name='group_user_delegate_pool_delete'),
+
+    path('delegate/pool/<int:delegate_pool_id>/comment/list',
+         GroupDelegatePoolCommentListAPI.as_view(),
+         name='group_user_delegate_pool_list'),
+    path('delegate/pool/<int:delegate_pool_id>/comment/create',
+         GroupDelegatePoolCommentCreateAPI.as_view(),
+         name='group_user_delegate_pool_create'),
+    path('delegate/pool/<int:delegate_pool_id>/comment/update',
+         GroupDelegatePoolCommentUpdateAPI.as_view(),
+         name='group_user_delegate_pool_update'),
+    path('delegate/pool/<int:delegate_pool_id>/comment/delete',
+         GroupDelegatePoolCommentDeleteAPI.as_view(),
          name='group_user_delegate_pool_delete'),
 
     path('<int:group_id>/schedule', GroupScheduleEventListAPI.as_view(), name='group_schedule'),

@@ -1,4 +1,5 @@
 from django.utils import timezone
+from django.core.exceptions import ObjectDoesNotExist
 from rest_framework.test import APIRequestFactory, force_authenticate, APITransactionTestCase
 from .factories import PollFactory, PollProposalFactory, PollProposalPriorityFactory
 
@@ -99,6 +100,12 @@ class ProposalTest(APITransactionTestCase):
         self.assertEqual(proposal.description, 'Test')
         self.assertEqual(proposal.pollproposaltypeschedule.event.start_date, start_date)
         self.assertEqual(proposal.pollproposaltypeschedule.event.end_date, end_date)
+
+        response = self.proposal_create(user=self.group_user_one.user, poll=self.poll_schedule,
+                                        title='Test Proposal', description='Test',
+                                        event__start_date=start_date, event__end_date=end_date)
+
+        self.assertRaises(ObjectDoesNotExist, PollProposal.objects.get, id=proposal.id+1)
 
     def test_proposal_create_no_schedule_data(self):
         response = self.proposal_create(user=self.group_user_one.user, poll=self.poll_schedule,

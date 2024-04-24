@@ -110,7 +110,7 @@ class KanbanManager:
                             created_by_id: int,
                             assignee_id: int = None,
                             title: str,
-                            description: str,
+                            description: str = None,
                             priority: int,
                             tag: int,
                             end_date: timezone.datetime = None) -> KanbanEntry:
@@ -129,8 +129,8 @@ class KanbanManager:
                             origin_id: int,
                             entry_id: int,
                             data) -> KanbanEntry:
-            self.get_entry(origin_id=origin_id, entry_id=entry_id)
-            return kanban_entry_update(kanban_entry_id=entry_id, data=data)
+        self.get_entry(origin_id=origin_id, entry_id=entry_id)
+        return kanban_entry_update(kanban_entry_id=entry_id, data=data)
 
     def kanban_entry_delete(self,
                             *,

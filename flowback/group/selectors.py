@@ -39,10 +39,10 @@ def group_user_permissions(*,
                            group_user: [GroupUser, int] = None,
                            permissions: Union[list[str], str] = None,
                            raise_exception: bool = True) -> Union[GroupUser, bool]:
-    if type(user) == int:
+    if isinstance(user, int):
         user = get_object(User, id=user)
 
-    if type(group) == int:
+    if isinstance(group, int):
         group = get_object(Group, id=group)
 
     permissions = permissions or []
@@ -54,8 +54,11 @@ def group_user_permissions(*,
         group_user = get_object(GroupUser, 'User is not in group', group=group, user=user, active=True)
 
     elif group_user:
-        if type(group_user) == int:
-            group_user = get_object(GroupUser, id=group_user)
+        if isinstance(group_user, int):
+            group_user = get_object(GroupUser, id=group_user, active=True)
+
+        elif isinstance(group_user, GroupUser):
+            group_user = get_object(GroupUser, id=group_user.id, active=True)
 
     else:
         raise Exception('group_user_permissions is missing appropiate parameters')
@@ -267,3 +270,12 @@ def group_thread_comment_list(*, fetched_by: User, thread_id: int, filters=None)
     group_user_permissions(user=fetched_by, group=thread.created_by.group)
 
     return comment_list(comment_section_id=thread.comment_section_id, filters=filters)
+
+
+def group_delegate_pool_comment_list(*, fetched_by: User, delegate_pool_id: int, filters=None):
+    filters = filters or {}
+    delegate_pool = get_object(GroupUserDelegatePool, id=delegate_pool_id)
+    group_user_permissions(group=delegate_pool.group, user=fetched_by)
+
+    return comment_list(fetched_by=fetched_by, comment_section_id=delegate_pool.comment_section.id, filters=filters)
+

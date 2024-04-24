@@ -18,7 +18,7 @@ from flowback.poll.selectors.comment import poll_comment_list
 
 from flowback.poll.services.comment import poll_comment_create, poll_comment_update, poll_comment_delete
 from flowback.poll.services.poll import poll_create, poll_update, poll_delete, poll_refresh_cheap, poll_notification, \
-    poll_notification_subscribe, poll_priority_update
+    poll_notification_subscribe, poll_priority_update, poll_fast_forward
 from flowback.poll.services.prediction import poll_prediction_statement_create, poll_prediction_statement_delete, \
     poll_prediction_bet_create, poll_prediction_bet_update, poll_prediction_bet_delete, \
     poll_prediction_statement_vote_create, \
@@ -49,7 +49,7 @@ class PollListApi(APIView):
         author_id__in = serializers.CharField(required=False)
 
         title = serializers.CharField(required=False)
-        title__icontains = serializers.ListField(child=serializers.CharField(), required=False)
+        title__icontains = serializers.CharField(required=False)
         description = serializers.CharField(required=False)
         description__icontains = serializers.ListField(child=serializers.CharField(), required=False)
         poll_type = serializers.ChoiceField((0, 1, 2), required=False)
@@ -99,6 +99,7 @@ class PollListApi(APIView):
                       'title',
                       'description',
                       'poll_type',
+                      'allow_fast_forward',
                       'public',
                       'tag',
                       'tag_name',
@@ -167,9 +168,24 @@ class PollCreateAPI(APIView):
 
         class Meta:
             model = Poll
-            fields = ('title', 'description', 'start_date', 'proposal_end_date', 'prediction_statement_end_date',
-                      'area_vote_end_date', 'prediction_bet_end_date', 'delegate_vote_end_date', 'vote_end_date',
-                      'end_date', 'poll_type', 'public', 'tag', 'pinned', 'dynamic', 'quorum', 'attachments')
+            fields = ('title',
+                      'description',
+                      'start_date',
+                      'proposal_end_date',
+                      'prediction_statement_end_date',
+                      'area_vote_end_date',
+                      'prediction_bet_end_date',
+                      'delegate_vote_end_date',
+                      'vote_end_date',
+                      'end_date',
+                      'poll_type',
+                      'public',
+                      'allow_fast_forward',
+                      'tag',
+                      'pinned',
+                      'dynamic',
+                      'quorum',
+                      'attachments')
 
     def post(self, request, group_id: int):
         serializer = self.InputSerializer(data=request.data)
@@ -190,6 +206,18 @@ class PollUpdateAPI(APIView):
         serializer.is_valid(raise_exception=True)
         poll_refresh_cheap(poll_id=poll)  # TODO get celery
         poll_update(user_id=request.user.id, poll_id=poll, data=serializer.validated_data)
+        return Response(status=status.HTTP_200_OK)
+
+
+@extend_schema(tags=['poll'])
+class PollFastForwardAPI(APIView):
+    class InputSerializer(serializers.Serializer):
+        phase = serializers.CharField()
+
+    def post(self, request, poll_id: int):
+        serializer = self.InputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        poll_fast_forward(user_id=request.user.id, poll_id=poll_id, **serializer.validated_data)
         return Response(status=status.HTTP_200_OK)
 
 

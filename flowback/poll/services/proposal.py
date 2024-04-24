@@ -52,7 +52,13 @@ def poll_proposal_create(*, user_id: int, poll_id: int,
         schedule_proposal = PollProposalTypeSchedule(proposal=proposal,
                                                      event=event)
 
-        schedule_proposal.full_clean()
+        try:
+            schedule_proposal.full_clean()
+
+        except ValidationError as e:
+            proposal.delete()
+            raise e
+
         schedule_proposal.save()
 
     return proposal

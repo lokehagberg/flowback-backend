@@ -8,6 +8,8 @@ from .utils import generate_poll_phase_kwargs
 from ..models import Poll, PollPriority
 from ..selectors.poll import poll_list
 from ..views.poll import PollListApi, PollCreateAPI, PollUpdateAPI, PollDeleteAPI, PollPriorityUpdateAPI
+from ..models import Poll
+from ..services.poll import poll_fast_forward
 from ...files.tests.factories import FileSegmentFactory
 from ...group.tests.factories import GroupFactory, GroupUserFactory, GroupTagsFactory
 from ...user.models import User
@@ -116,6 +118,17 @@ class PollTest(APITransactionTestCase):
         self.assertTrue(self.poll_two.title == 'new_title')
         self.assertTrue(self.poll_two.description == 'new_description')
         self.assertTrue(self.poll_two.pinned)
+
+    def test_poll_phase_fast_forward(self):
+        poll = PollFactory(created_by__is_admin=True,
+                           allow_fast_forward=True,
+                           poll_type=4,
+                           dynamic=False,
+                           **generate_poll_phase_kwargs())
+        poll_fast_forward(user_id=poll.created_by.user.id, poll_id=poll.id, phase='vote')
+
+        poll.refresh_from_db()
+        self.assertEqual('vote', poll.current_phase)
 
     def delete_poll(self, poll: Poll, user: User):
         factory = APIRequestFactory()

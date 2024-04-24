@@ -12,7 +12,7 @@ boto3==1.28.69
 factory-boy==3.3.0
 Faker==19.2.0
 channels==4.0.0
-channels_redis==4.0.0
+channels-redis==4.0.0
 daphne==4.0.0
 celery==5.3.6
 django-celery-beat==2.5.0
@@ -21,3 +21,4 @@ pyyaml==6.0.1
 uritemplate==4.1.1
 twisted>=23.10.0rc1 # not directly required, pinned by Snyk to avoid a vulnerability
 pytest-django==4.8.0
+numpy==1.26.4

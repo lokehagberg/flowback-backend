@@ -47,8 +47,8 @@ env = environ.Env(DEBUG=(bool, False),
                   EMAIL_USE_TLS=(bool, None),
                   EMAIL_USE_SSL=(bool, None),
                   INTEGRATIONS=(list, []),
-                  SCORE_VOTE_CEILING=(int, None),
-                  SCORE_VOTE_FLOOR=(int, None)
+                  SCORE_VOTE_CEILING=(int, 100),
+                  SCORE_VOTE_FLOOR=(int, 0)
                   )
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.

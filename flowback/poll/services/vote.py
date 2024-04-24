@@ -42,10 +42,10 @@ def poll_proposal_vote_update(*, user_id: int, poll_id: int, data: dict) -> None
 
     elif poll.poll_type == Poll.PollType.CARDINAL:
 
-        if SCORE_VOTE_CEILING is not None and any([score >= SCORE_VOTE_CEILING for score in data['score']]):
+        if SCORE_VOTE_CEILING is not None and any([score >= SCORE_VOTE_CEILING for score in data['scores']]):
             raise ValidationError(f'Voting scores exceeds ceiling bounds (currently set at {SCORE_VOTE_CEILING})')
 
-        if SCORE_VOTE_FLOOR is not None and any([score <= SCORE_VOTE_FLOOR for score in data['score']]):
+        if SCORE_VOTE_FLOOR is not None and any([score <= SCORE_VOTE_FLOOR for score in data['scores']]):
             raise ValidationError(f'Voting scores exceeds floor bounds (currently set at {SCORE_VOTE_FLOOR})')
 
         # Delete votes if no polls are registered
@@ -314,7 +314,8 @@ def poll_proposal_vote_count(*, poll_id: int) -> None:
 
     if poll.finished and not poll.result:
         if poll.poll_type == Poll.PollType.SCHEDULE:
-            winning_proposal = PollProposal.objects.filter(poll_id=poll_id).order_by('-score').first()
+            winning_proposal = PollProposal.objects.filter(
+                poll_id=poll_id).order_by('-score', '-pollproposaltypeschedule__event__start_date').first()
             if winning_proposal:
                 event = winning_proposal.pollproposaltypeschedule.event
                 create_event(schedule_id=group.schedule_id,

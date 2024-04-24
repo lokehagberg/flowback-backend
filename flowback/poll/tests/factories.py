@@ -124,7 +124,7 @@ class PollPredictionStatementFactory(factory.django.DjangoModelFactory):
     end_date = factory.LazyAttribute(lambda _: timezone.now() + timezone.timedelta(hours=99))
 
 
-class PollPredictionFactory(factory.django.DjangoModelFactory):
+class PollPredictionBetFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = PollPredictionBet
 

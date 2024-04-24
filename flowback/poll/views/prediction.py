@@ -46,6 +46,7 @@ class PollPredictionStatementListAPI(APIView):
         end_date = serializers.DateTimeField()
         user_prediction_bet = serializers.IntegerField(required=False)
         user_prediction_statement_vote = serializers.BooleanField(required=False)
+        combined_bet = serializers.FloatField()
 
         segments = StatementSegment(source='pollpredictionstatementsegment_set', many=True)
 
@@ -54,8 +55,8 @@ class PollPredictionStatementListAPI(APIView):
         filter_serializer.is_valid(raise_exception=True)
 
         prediction_statement = poll_prediction_statement_list(fetched_by=request.user,
-                                               group_id=group_id,
-                                               filters=filter_serializer.validated_data)
+                                                              group_id=group_id,
+                                                              filters=filter_serializer.validated_data)
 
         return get_paginated_response(
             pagination_class=self.Pagination,

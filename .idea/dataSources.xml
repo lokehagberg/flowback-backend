@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="DataSourceManagerImpl" format="xml" multifile-model="true">
-    <data-source source="LOCAL" name="Main" uuid="77498464-45d6-4e12-8fd1-24148694d5cc">
+    <data-source source="LOCAL" name="flowback@localhost" uuid="4193112a-662c-43d8-8f99-ee1a4c4a4b5f">
       <driver-ref>postgresql</driver-ref>
       <synchronize>true</synchronize>
       <jdbc-driver>org.postgresql.Driver</jdbc-driver>
