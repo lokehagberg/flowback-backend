@@ -29,7 +29,7 @@ from ...user.tests.factories import UserFactory
 # Create your tests here.
 
 
-class ChatTest(TransactionTestCase):
+class ChatTestHTTP(TransactionTestCase):
     reset_sequences = True
 
     def setUp(self):

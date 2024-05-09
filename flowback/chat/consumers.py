@@ -58,13 +58,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
         if data.get('method') == 'message_create':
             await self.message_create(data=data)
 
-        if data.get('method') == 'message_update':
+        elif data.get('method') == 'message_update':
             await self.message_update(data=data)
 
-        if data.get('method') == 'message_delete':
+        elif data.get('method') == 'message_delete':
             await self.message_delete(data=data)
 
-        if data.get('method') == 'message_notify':
+        elif data.get('method') == 'message_notify':
             await self.message_notify(data=data)
 
         elif data.get('method') == 'connect_channel':
@@ -73,9 +73,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
         elif data.get('method') == 'disconnect_channel':
             await self.connect_channel(data=data, disconnect=True)
 
-        elif data.get('method'):
+        elif method := data.get('method'):
             return await self.send_error_message(method="UnknownMethod",
-                                                 detail="Unknown 'method' key in request")
+                                                 detail=f"Unknown 'method' key in request (got '{method}')")
 
         elif data.get('method') is None:
             return await self.send_error_message(method="MissingMethod",

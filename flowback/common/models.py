@@ -27,7 +27,7 @@ def generate_exclusive_q(*fields: str) -> Q:
     return Q(queryset_merge)
 
 
-def generate_exclusive_constraint_eq(*, base: str, target: str, fields: tuple[tuple[str, str]]) -> Case:
+def generate_exclusive_constraint_eq(*, base: str, target: str, fields: tuple) -> Case:
     """
     Generates Case of exclusive constraint query for given fields, allows for checking if e.g. user is in the
     same group as other fields
