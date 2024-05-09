@@ -36,6 +36,7 @@ class Poll(BaseModel):
         FOR_AGAINST = 2, _('for_against')
         SCHEDULE = 3, _('schedule')
         CARDINAL = 4, _('cardinal')
+        VOTE = 1001, _('vote')
 
     created_by = models.ForeignKey(GroupUser, on_delete=models.CASCADE)
 
@@ -44,6 +45,7 @@ class Poll(BaseModel):
     description = models.TextField(null=True, blank=True)
     attachments = models.ForeignKey(FileCollection, on_delete=models.SET_NULL, null=True, blank=True)
     poll_type = models.IntegerField(choices=PollType.choices)
+    parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='children')
     quorum = models.IntegerField(default=None, null=True, blank=True,
                                  validators=[MinValueValidator(0), MaxValueValidator(100)])
     tag = models.ForeignKey(GroupTags, on_delete=models.CASCADE, null=True, blank=True)
@@ -137,6 +139,12 @@ class Poll(BaseModel):
         for x in range(len(labels) - 1):
             if labels[x][0] > labels[x + 1][0]:
                 raise ValidationError(f'{labels[x][1].title()} is greater than {labels[x + 1][1]}')
+
+        if self.parent and self.parent.poll_type != self.PollType.VOTE:
+            raise ValidationError("Unable to assign parent for poll, unless it's parents poll type is vote")
+
+        if self.parent and self.parent.children.count() > 0:
+            raise ValidationError("Parent poll is only able to have one linked poll")
 
     class Meta:
         constraints = [models.CheckConstraint(check=Q(Q(area_vote_end_date__isnull=True)

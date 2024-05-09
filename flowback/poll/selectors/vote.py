@@ -71,7 +71,7 @@ def poll_vote_list(*, fetched_by: User, poll_id: int, delegates: bool = False, f
 
         return BasePollVoteRankingFilter(filters, qs).qs
 
-    if poll.poll_type == Poll.PollType.CARDINAL:
+    if poll.poll_type in [Poll.PollType.CARDINAL, Poll.PollType.VOTE]:
         if delegates:
             qs = PollVotingTypeCardinal.objects.filter(proposal__poll=poll,
                                                        author_delegate__isnull=False).order_by('-score').all()
