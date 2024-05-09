@@ -15,6 +15,7 @@ from flowback.poll.selectors.prediction import poll_prediction_statement_list, p
 from flowback.poll.selectors.proposal import poll_proposal_list, poll_user_schedule_list
 from flowback.poll.selectors.vote import poll_vote_list, poll_delegates_list, delegate_poll_vote_list
 from flowback.poll.selectors.comment import poll_comment_list
+from flowback.poll.serializers import PollSerializer
 
 from flowback.poll.services.comment import poll_comment_create, poll_comment_update, poll_comment_delete
 from flowback.poll.services.poll import poll_create, poll_update, poll_delete, poll_refresh_cheap, poll_notification, \
@@ -87,6 +88,8 @@ class PollListApi(APIView):
         vote_end_date = serializers.DateTimeField(required=False)
         end_date = serializers.DateTimeField(required=False)
 
+        parent = PollSerializer(allow_null=True)
+
         class Meta:
             model = Poll
             fields = ('id',
@@ -121,7 +124,8 @@ class PollListApi(APIView):
                       'quorum',
                       'status',
                       'message_channel_topic_id',
-                      'attachments')
+                      'attachments',
+                      'parent')
 
     def get(self, request, group_id: int = None):
         filter_serializer = self.FilterSerializer(data=request.query_params)
@@ -157,6 +161,7 @@ class PollCreateAPI(APIView):
         quorum = serializers.IntegerField(required=False)
         public = serializers.BooleanField(default=False)
         attachments = serializers.ListField(child=serializers.FileField(), required=False, max_length=10)
+        parent_id = serializers.IntegerField(required=False)
 
         proposal_end_date = serializers.DateTimeField(required=False)
         prediction_statement_end_date = serializers.DateTimeField(required=False)
@@ -185,7 +190,8 @@ class PollCreateAPI(APIView):
                       'pinned',
                       'dynamic',
                       'quorum',
-                      'attachments')
+                      'attachments',
+                      'parent_id')
 
     def post(self, request, group_id: int):
         serializer = self.InputSerializer(data=request.data)

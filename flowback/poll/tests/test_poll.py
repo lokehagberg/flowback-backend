@@ -1,6 +1,7 @@
 import json
 
 from django.core.files.uploadedfile import SimpleUploadedFile
+from rest_framework import status
 from rest_framework.test import APIRequestFactory, force_authenticate, APITransactionTestCase
 from .factories import PollFactory, PollPriorityFactory
 
@@ -47,12 +48,22 @@ class PollTest(APITransactionTestCase):
         user = self.group_user_creator.user
         view = PollCreateAPI.as_view()
 
-        data = dict(title='test title', description='test description', poll_type=4, public=True, tag=self.group_tag.id,
+        data = dict(title='test title', description='test description', poll_type=1001, public=True, tag=self.group_tag.id,
                     pinned=False, dynamic=False, attachments=[SimpleUploadedFile('test.jpg', b'test')],
                     **generate_poll_phase_kwargs('base'))
         request = factory.post('', data=data)
         force_authenticate(request, user)
         response = view(request, group_id=self.group.id)  # Success
+
+        data = dict(title='test title', description='test description', poll_type=4,
+                    parent_id=response.data, public=True, tag=self.group_tag.id,
+                    pinned=False, dynamic=False, attachments=[SimpleUploadedFile('test.jpg', b'test')],
+                    **generate_poll_phase_kwargs('base'))
+
+        request = factory.post('', data=data)
+        force_authenticate(request, user)
+        response = view(request, group_id=self.group.id)  # Success
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_create_failing_poll(self):
         factory = APIRequestFactory()

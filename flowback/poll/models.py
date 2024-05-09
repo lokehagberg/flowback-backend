@@ -146,6 +146,9 @@ class Poll(BaseModel):
         if self.parent and self.parent.children.count() > 0:
             raise ValidationError("Parent poll is only able to have one linked poll")
 
+        if self.parent and self.parent.created_by.group != self.created_by.group:
+            raise ValidationError("Parent poll must be in the same group as the linked poll")
+
     class Meta:
         constraints = [models.CheckConstraint(check=Q(Q(area_vote_end_date__isnull=True)
                                                       | Q(area_vote_end_date__gte=F('start_date'))),

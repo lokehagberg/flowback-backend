@@ -46,7 +46,8 @@ def poll_create(*, user_id: int,
                 pinned: bool,
                 dynamic: bool,
                 attachments: list = None,
-                quorum: int = None
+                quorum: int = None,
+                parent_id: int = None
                 ) -> Poll:
     group_user = group_user_permissions(user=user_id, group=group_id, permissions=['create_poll', 'admin'])
 
@@ -102,9 +103,10 @@ def poll_create(*, user_id: int,
                 pinned=pinned,
                 dynamic=dynamic,
                 quorum=quorum,
-                attachments=collection)
+                attachments=collection,
+                parent_id=parent_id)
 
-    # poll.full_clean()  TODO make full clean possible for pre_save!
+    poll.clean()  # TODO make full clean possible for pre_save!
     poll.save()
 
     # Group notification
