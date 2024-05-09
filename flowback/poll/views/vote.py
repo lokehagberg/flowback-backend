@@ -66,7 +66,7 @@ class PollProposalVoteListAPI(APIView):
             output_serializer = self.OutputSerializerTypeForAgainst
         elif poll.poll_type == Poll.PollType.RANKING:
             output_serializer = self.OutputSerializerTypeRanking
-        elif poll.poll_type == Poll.PollType.CARDINAL:
+        elif poll.poll_type in [Poll.PollType.CARDINAL, Poll.PollType.VOTE]:
             output_serializer = self.OutputSerializerTypeCardinal
         else:
             raise ValidationError('Unknown poll type')
@@ -146,7 +146,7 @@ class DelegatePollVoteListAPI(APIView):
 
                 return serializer.data
 
-            elif poll_type == Poll.PollType.CARDINAL:
+            elif poll_type in [Poll.PollType.CARDINAL, Poll.PollType.VOTE]:
                 serializer = self.VoteCardinalOutputSerializer(obj.pollvotingtypecardinal_set,
                                                                many=True,
                                                                allow_null=True,
@@ -189,7 +189,7 @@ class PollProposalVoteUpdateAPI(APIView):
 
         if poll.poll_type in (Poll.PollType.SCHEDULE, Poll.PollType.RANKING):
             input_serializer = self.InputSerializerDefault
-        elif poll.poll_type == Poll.PollType.CARDINAL:
+        elif poll.poll_type in [Poll.PollType.CARDINAL, Poll.PollType.VOTE]:
             input_serializer = self.InputSerializerCardinal
         else:
             raise ValidationError('Unknown poll type')
@@ -222,7 +222,7 @@ class PollProposalDelegateVoteUpdateAPI(APIView):
             input_serializer = self.InputSerializerDefault
         elif poll.poll_type == Poll.PollType.RANKING:
             input_serializer = self.InputSerializerRanking
-        elif poll.poll_type == Poll.PollType.CARDINAL:
+        elif poll.poll_type in [Poll.PollType.CARDINAL, Poll.PollType.VOTE]:
             input_serializer = self.InputSerializerCardinal
         else:
             raise ValidationError('Unknown poll type')
