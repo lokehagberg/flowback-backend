@@ -20,14 +20,24 @@ def generate_exclusive_q(*fields: str) -> Q:
         queryset_slice = None
 
         for j, field in enumerate(fields):
-            queryset_slice &= Q(**{field: i == j})
+            queryset_slice_add = Q(**{field: i == j})
 
-        queryset_merge |= queryset_slice
+            if queryset_slice is None:
+                queryset_slice = queryset_slice_add
+
+            else:
+                queryset_slice &= queryset_slice_add
+
+        if queryset_merge is None:
+            queryset_merge = queryset_slice
+
+        else:
+            queryset_merge |= queryset_slice
 
     return Q(queryset_merge)
 
 
-def generate_exclusive_constraint_eq(*, base: str, target: str, fields: tuple) -> Case:
+def generate_exclusive_constraint_eq(*, base: str, target: str, fields: tuple) -> Q:
     """
     Generates Case of exclusive constraint query for given fields, allows for checking if e.g. user is in the
     same group as other fields
@@ -36,9 +46,13 @@ def generate_exclusive_constraint_eq(*, base: str, target: str, fields: tuple) -
     :type fields: tuple[tuple[str, str]], list of fields for each exclusive constraint, appended with the base field.
                   First value is to check if it's null, second is to check if it's equal to the target
     """
-    constraints = []
+    constraints = None
     for exist_field, compare_field in fields:
-        constraints.append(When(Q(**{f"{base}__{exist_field}": False}),
-                                then=Q(**{f"{base}__{compare_field}": compare_field})))
+        add_constraint = Q(Q({f"{base}__{exist_field}__isnull": False})
+                           & Q(**{f"{base}__{exist_field}__{compare_field}": f"{base}__{target}"}))
+        if constraints is None:
+            constraints = add_constraint
+        else:
+            constraints |= add_constraint
 
-    return Case(*constraints, default=False)
+    return constraints
