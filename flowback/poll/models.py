@@ -143,9 +143,6 @@ class Poll(BaseModel):
         if self.parent and self.parent.poll_type != self.PollType.VOTE:
             raise ValidationError("Unable to assign parent for poll, unless it's parents poll type is vote")
 
-        if self.parent and self.parent.children.count() > 0:
-            raise ValidationError("Parent poll is only able to have one linked poll")
-
         if self.parent and self.parent.created_by.group != self.created_by.group:
             raise ValidationError("Parent poll must be in the same group as the linked poll")
 
