@@ -1,6 +1,7 @@
 import uuid
 
 from django.core.validators import MinValueValidator, MaxValueValidator
+from django.db.models import Q
 from django.db.models.signals import post_save, post_delete, pre_save
 from django.forms import model_to_dict
 from rest_framework.exceptions import ValidationError
@@ -57,6 +58,10 @@ class Group(BaseModel):
     group_folder = models.ForeignKey(GroupFolder, null=True, blank=True, on_delete=models.SET_NULL)
 
     jitsi_room = models.UUIDField(unique=True, default=uuid.uuid4)
+
+    class Meta:
+        constraints = [models.CheckConstraint(check=Q(public=True) | Q(direct_join=True),
+                                              name='group_not_private_and_direct_join_check')]
 
     @classmethod
     def pre_save(cls, instance, raw, using, update_fields, *args, **kwargs):

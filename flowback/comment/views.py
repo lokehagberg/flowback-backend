@@ -41,7 +41,7 @@ class CommentListAPI(APIView):
         created_at = serializers.DateTimeField()
         edited = serializers.BooleanField()
         active = serializers.BooleanField()
-        message = serializers.CharField()
+        message = serializers.CharField(allow_null=True)
         attachments = FileSerializer(source="attachments.filesegment_set", many=True, allow_null=True)
         score = serializers.IntegerField()
 
@@ -66,7 +66,7 @@ class CommentCreateAPI(APIView):
 
     class InputSerializer(serializers.Serializer):
         parent_id = serializers.IntegerField(required=False)
-        message = serializers.CharField()
+        message = serializers.CharField(required=False)
         attachments = serializers.ListField(child=serializers.FileField(), required=False, max_length=10)
 
     def post(self, request, *args, **kwargs):

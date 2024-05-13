@@ -84,6 +84,7 @@ if env('SECURE_PROXY_SSL_HEADERS'):
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 URL_SUBPATH = env('URL_SUBPATH')
+INTEGRATIONS = env('INTEGRATIONS')
 
 # Application definition
 

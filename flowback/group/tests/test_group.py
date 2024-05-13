@@ -54,7 +54,8 @@ class GroupTest(APITransactionTestCase):
         user = self.group_user_creator_two.user
         view = GroupCreateApi.as_view()
         data = dict(name="test",
-                    description="test")
+                    description="test",
+                    direct_join=True)
 
         request = factory.post('', data=data)
         force_authenticate(request, user=user)
