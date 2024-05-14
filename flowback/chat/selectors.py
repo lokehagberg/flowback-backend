@@ -74,6 +74,6 @@ def message_channel_preview_list(*, user: User, **filters):
                                 | Q(topic__hidden=False)),
                                 channel__messagechannelparticipant__user=user,
                                 active=True).annotate(timestamp=Subquery(timestamp)
-                                                      ).distinct('channel').all()
+                                                      ).order_by('channel').distinct('channel').all()
 
     return BaseMessageChannelPreviewFilter(filters, qs).qs

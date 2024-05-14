@@ -6,7 +6,9 @@ from .views import (MessageListAPI,
                     MessageChannelPreviewAPI,
                     MessageFileCollectionUploadAPI,
                     MessageChannelUserDataUpdateAPI,
-                    MessageChannelTopicListAPI)
+                    MessageChannelTopicListAPI,
+                    GetAllParentsOfCommentAPI,
+                    GetAllChildsOfCommentAPI)
 
 subpath = f'{URL_SUBPATH}/' if URL_SUBPATH else ''
 
@@ -18,7 +20,11 @@ chat_patterns = [
     path('message/channel/userdata/update', MessageChannelUserDataUpdateAPI.as_view(),
          name='message_channel_userdata_update'),
     path('message/channel/<int:channel_id>/topic/list', MessageChannelTopicListAPI.as_view(),
-         name='message_channel_topic_list')
+         name='message_channel_topic_list'),
+     path('message/channel/all/parent/', GetAllParentsOfCommentAPI.as_view(),
+         name='message_channel_parents_of_comment'),
+     path('message/channel/all/child/', GetAllChildsOfCommentAPI.as_view(),
+         name='message_channel_childs_of_comment')
 ]
 
 chat_ws_patterns = [

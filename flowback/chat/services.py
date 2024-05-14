@@ -152,3 +152,13 @@ def message_channel_topic_create(*, channel_id: int, topic_name: str, hidden: bo
 def message_channel_topic_delete(*, channel_id: int, topic_id: int):
     topic = get_object(MessageChannel, channel_id=channel_id, id=topic_id)
     topic.delete()
+
+
+def get_ancestor(*,channel_id: int, comment_id: int, self_include: bool=False, **kwargs):
+    parent = get_object(Message,id=comment_id)
+    return parent.get_ancestors(include_self=self_include).filter(channel_id=channel_id)
+
+def get_descendants(*,channel_id: int, comment_id: int, self_include: bool=False,**kwargs):
+    parent = get_object(Message,id=comment_id)
+    return parent.get_descendants(include_self=self_include).filter(channel_id=channel_id)
+

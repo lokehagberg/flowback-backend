@@ -3,6 +3,7 @@ from django.db import models
 from flowback.common.models import BaseModel
 from flowback.files.models import FileCollection
 from flowback.user.models import User
+from mptt.models import MPTTModel, TreeForeignKey
 
 
 class MessageChannel(BaseModel):
@@ -37,11 +38,14 @@ class MessageFileCollection(BaseModel):
         return 'message'
 
 
-class Message(BaseModel):
+class Message(BaseModel, MPTTModel):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     channel = models.ForeignKey(MessageChannel, on_delete=models.CASCADE)
     topic = models.ForeignKey(MessageChannelTopic, on_delete=models.CASCADE, null=True, blank=True)
     message = models.TextField(max_length=2000)
     attachments = models.ForeignKey(MessageFileCollection, on_delete=models.SET_NULL, null=True, blank=True)
-    parent = models.ForeignKey('self', null=True, blank=True, on_delete=models.SET_NULL, related_name='message_parent')
+    parent = TreeForeignKey('self', null=True, blank=True, on_delete=models.CASCADE, related_name='message_parent')
     active = models.BooleanField(default=True)
+
+    class MPTTMeta:
+        order_insertion_by = ['created_at']
