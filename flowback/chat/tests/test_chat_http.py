@@ -1,3 +1,4 @@
+import random
 from pprint import pprint
 
 from django.test import TransactionTestCase
@@ -22,7 +23,7 @@ from .factories import (MessageChannelFactory,
                         MessageChannelParticipantFactory,
                         MessageChannelTopicFactory,
                         MessageFileCollectionFactory)
-from ..views import MessageListAPI, MessageChannelPreviewAPI
+from ..views import MessageListAPI, MessageChannelPreviewAPI,GetAllParentsOfCommentAPI,GetAllChildsOfCommentAPI
 from ...user.tests.factories import UserFactory
 
 
@@ -134,3 +135,106 @@ class ChatTestHTTP(TransactionTestCase):
         response = view(request)
 
         self.assertEqual(response.data.get('count'), 2)
+
+    def test_parent_comment_fetch(self):
+        channel = self.message_channel
+        channel_participant_one = self.message_channel_participant_one
+
+        root = MessageFactory(user=channel_participant_one.user, channel=channel)
+        first_level = [MessageFactory(user=channel_participant_one.user, channel=channel, parent_id=root.id).id for x in range(3)]
+        second_level = [MessageFactory(user=channel_participant_one.user, channel=channel, parent_id=first_level[0]) for x in range(10)]
+
+        child_node = second_level[0]
+        query_params = {
+            "channel_id":channel.id,
+            "comment_id":child_node.id
+        }   
+        factory = APIRequestFactory()
+        request = factory.get('', data=query_params)
+        view = GetAllParentsOfCommentAPI.as_view()
+        force_authenticate(request, user=channel_participant_one.user)
+        response = view(request)
+        comment_ids = [each.get('id') for each in response.data.get('results')]
+
+
+        self.assertEqual(response.status_code,200)
+        self.assertEqual(comment_ids,[root.id,first_level[0],child_node.id])
+        
+    def test_child_comment_fetch(self):
+        channel = self.message_channel
+        channel_participant_one = self.message_channel_participant_one
+        
+        root = MessageFactory(user=channel_participant_one.user, channel=channel)
+        first_level = [MessageFactory(user=channel_participant_one.user, channel=channel, parent_id=root.id) for x in range(3)]
+        second_level = [MessageFactory(user=channel_participant_one.user, channel=channel, parent_id=first_level[0].id).id for x in range(5)]
+
+        
+        query_params = {
+            "channel_id":channel.id,
+            "comment_id":first_level[0].id
+        }
+
+        factory = APIRequestFactory()
+        request = factory.get('', data=query_params)
+        view = GetAllChildsOfCommentAPI.as_view()
+        force_authenticate(request, user=channel_participant_one.user)
+        response = view(request)
+        comment_ids = [each.get('id') for each in response.data.get('results')]
+
+
+        self.assertEqual(response.status_code,200)
+        self.assertEqual(comment_ids,[first_level[0].id,*second_level])
+
+    def test_child_of_leaf_node(self):
+        channel = self.message_channel
+        channel_participant_one = self.message_channel_participant_one
+
+        root = MessageFactory(user=channel_participant_one.user, channel=channel)
+        first_level = [MessageFactory(user=channel_participant_one.user, channel=channel, parent_id=root.id) for x in range(3)]
+
+        query_params = {
+            "channel_id":channel.id,
+            "comment_id":first_level[0].id
+        }
+
+        factory = APIRequestFactory()
+        request = factory.get('', data=query_params)
+        view = GetAllChildsOfCommentAPI.as_view()
+        force_authenticate(request, user=channel_participant_one.user)
+        response = view(request)
+
+
+        self.assertEqual(response.status_code,200)
+        self.assertEqual(response.data.get('count'),1)
+
+    def test_parent_of_root_node(self):
+        channel = self.message_channel
+        channel_participant_one = self.message_channel_participant_one
+
+        root = MessageFactory(user=channel_participant_one.user, channel=channel)
+        first_level = [MessageFactory(user=channel_participant_one.user, channel=channel, parent_id=root.id) for x in range(3)]
+
+        query_params = {
+            "channel_id":channel.id,
+            "comment_id":root.id
+        }
+
+        factory = APIRequestFactory()
+        request = factory.get('', data=query_params)
+        view = GetAllParentsOfCommentAPI.as_view()
+        force_authenticate(request, user=channel_participant_one.user)
+        response = view(request)
+
+
+        self.assertEqual(response.status_code,200)
+        self.assertEqual(response.data.get('count'),1)
+
+'''
+Above mentioned test cases will check the following the Scenario's:
+  - For a given comment ID, fetching all parents in their respective chronological order.
+  - For a given comment ID, fetching all children in their respective chronological order.
+  - For a given comment ID, getting only its children, not siblings.
+  - For a given comment ID of root node, not getting any parent data.
+  - For a given comment ID of leaf node, not getting and child data
+
+'''
