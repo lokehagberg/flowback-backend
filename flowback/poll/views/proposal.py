@@ -10,7 +10,7 @@ from flowback.poll.models import Poll, PollProposal
 
 from ..selectors.proposal import poll_proposal_list
 from ..services.poll import poll_refresh_cheap
-from ..services.proposal import poll_proposal_create, poll_proposal_delete
+from ..services.proposal import poll_proposal_create, poll_proposal_delete, poll_proposal_priority_update
 from ...files.serializers import FileSerializer
 from ...group.serializers import GroupUserSerializer
 
@@ -22,10 +22,20 @@ class PollProposalListAPI(APIView):
         default_limit = 10
 
     class FilterSerializer(serializers.Serializer):
+        order_by = serializers.ChoiceField(required=False,
+                                           default='created_at_desc',
+                                           choices=['created_at_asc', 'created_at_desc',
+                                                    'score_asc', 'score_desc',
+                                                    'approval_asc', 'approval_desc',
+                                                    'priority_asc', 'priority_desc'])
+
+        user_priority__gte = serializers.IntegerField(required=False)
+        user_priority__lte = serializers.IntegerField(required=False)
         id = serializers.IntegerField(required=False)
-        created_by = serializers.IntegerField(required=False)
+        created_by_user_id_list = serializers.CharField(required=False)
         title = serializers.CharField(required=False)
         title__icontains = serializers.CharField(required=False)
+        has_attachments = serializers.BooleanField(required=False, allow_null=True, default=None)
 
     class FilterSerializerTypeSchedule(FilterSerializer):
         start_date = serializers.DateTimeField(required=False)
@@ -39,6 +49,12 @@ class PollProposalListAPI(APIView):
         description = serializers.CharField()
         attachments = FileSerializer(many=True, source="attachments.filesegment_set", allow_null=True)
         score = serializers.IntegerField()
+        priority = serializers.IntegerField()
+        user_priority = serializers.IntegerField()
+
+    class OutputSerializerTypeCardinal(OutputSerializer):
+        approval_positive = serializers.IntegerField()
+        approval_negative = serializers.IntegerField()
 
     class OutputSerializerTypeSchedule(OutputSerializer):
         start_date = serializers.DateTimeField(source='pollproposaltypeschedule.event.start_date')
@@ -46,13 +62,16 @@ class PollProposalListAPI(APIView):
 
     def get(self, request, poll: int = None):
         poll = get_object(Poll, id=poll)
-        if poll.poll_type != Poll.PollType.SCHEDULE:
+        if poll.poll_type in [Poll.PollType.CARDINAL, Poll.PollType.VOTE]:
             filter_serializer = self.FilterSerializer(data=request.query_params)
-            output_serializer = self.OutputSerializer
+            output_serializer = self.OutputSerializerTypeCardinal
 
-        else:
+        elif poll.poll_type == Poll.PollType.SCHEDULE:
             filter_serializer = self.FilterSerializerTypeSchedule(data=request.query_params)
             output_serializer = self.OutputSerializerTypeSchedule
+
+        else:
+            raise ValidationError('Unsupported poll type')
 
         filter_serializer.is_valid(raise_exception=True)
         poll_refresh_cheap(poll_id=poll.id)  # TODO get celery
@@ -112,3 +131,14 @@ class PollProposalDeleteAPI(APIView):
         poll_proposal_delete(user_id=request.user.id, proposal_id=proposal)
         return Response(status=status.HTTP_200_OK)
 
+
+class PollProposalPriorityUpdateAPI(APIView):
+    class InputSerializer(serializers.Serializer):
+        score = serializers.IntegerField(min_value=-1, max_value=1)
+
+    def post(self, request, proposal_id: int):
+        serializer = self.InputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        poll_proposal_priority_update(user_id=request.user.id, proposal_id=proposal_id, **serializer.validated_data)
+        return Response(status=status.HTTP_200_OK)

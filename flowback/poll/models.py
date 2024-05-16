@@ -1,13 +1,18 @@
+from typing import Union
+
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
 from django.db.models import Q, F, Count
-from django.db.models.signals import post_save, post_delete
+from django.db.models.signals import post_save, post_delete, pre_save
 from django.dispatch import receiver
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from rest_framework.exceptions import ValidationError
 
 from backend.settings import SCORE_VOTE_CEILING, SCORE_VOTE_FLOOR, DEBUG
+from flowback.chat.models import MessageChannelTopic
+from flowback.chat.services import message_channel_topic_create, message_channel_topic_delete
+from flowback.common.services import get_object
 from flowback.files.models import FileCollection
 from flowback.prediction.models import (PredictionBet,
                                         PredictionStatement,
@@ -21,6 +26,7 @@ import pgtrigger
 
 from flowback.schedule.models import Schedule, ScheduleEvent
 from flowback.schedule.services import create_schedule
+from flowback.user.models import User
 
 
 # Create your models here.
@@ -30,14 +36,16 @@ class Poll(BaseModel):
         FOR_AGAINST = 2, _('for_against')
         SCHEDULE = 3, _('schedule')
         CARDINAL = 4, _('cardinal')
+        VOTE = 1001, _('vote')
 
     created_by = models.ForeignKey(GroupUser, on_delete=models.CASCADE)
 
     # General information
     title = models.CharField(max_length=255)
-    description = models.TextField()
+    description = models.TextField(null=True, blank=True)
     attachments = models.ForeignKey(FileCollection, on_delete=models.SET_NULL, null=True, blank=True)
     poll_type = models.IntegerField(choices=PollType.choices)
+    parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='children')
     quorum = models.IntegerField(default=None, null=True, blank=True,
                                  validators=[MinValueValidator(0), MaxValueValidator(100)])
     tag = models.ForeignKey(GroupTags, on_delete=models.CASCADE, null=True, blank=True)
@@ -48,6 +56,7 @@ class Poll(BaseModel):
 
     # Determines if poll is visible outside of group
     public = models.BooleanField(default=False)
+    allow_fast_forward = models.BooleanField(default=False)
 
     # Poll Phases
     start_date = models.DateTimeField()  # Poll Start
@@ -69,8 +78,10 @@ class Poll(BaseModel):
     result = models.BooleanField(default=False)
 
     # Comment section
-    comment_section = models.ForeignKey(CommentSection, default=comment_section_create_model_default, on_delete=models.DO_NOTHING)
-
+    comment_section = models.ForeignKey(CommentSection,
+                                        default=comment_section_create_model_default,
+                                        on_delete=models.DO_NOTHING)
+    message_channel_topic = models.ForeignKey(MessageChannelTopic, on_delete=models.PROTECT)
     # Optional dynamic counting support
     participants = models.IntegerField(default=0)
     dynamic = models.BooleanField()
@@ -82,27 +93,58 @@ class Poll(BaseModel):
     @property
     def labels(self) -> tuple:
         if self.dynamic:
-            return ((self.start_date, 'start date', 'dynamic'),
-                    (self.end_date, 'end date', 'result'))
+            if self.poll_type == self.PollType.SCHEDULE:
+                return ((self.start_date, 'start_date', 'schedule'),
+                        (self.end_date, 'end_date', 'result'))
 
-        if self.poll_type == self.PollType.SCHEDULE:
-            return ((self.start_date, 'start date', 'schedule'),
-                    (self.end_date, 'end date', 'result'))
+            else:
+                return ((self.start_date, 'start_date', 'dynamic'),
+                        (self.end_date, 'end_date', 'result'))
 
-        return ((self.start_date, 'start date', 'area_vote'),
-                (self.area_vote_end_date, 'area vote end date', 'proposal'),
-                (self.proposal_end_date, 'proposal end date', 'prediction_statement'),
-                (self.prediction_statement_end_date, 'prediction statement end date', 'prediction_bet'),
-                (self.prediction_bet_end_date, 'prediction bet end date', 'delegate_vote'),
-                (self.delegate_vote_end_date, 'delegate vote end date', 'vote'),
-                (self.vote_end_date, 'vote end date', 'result'),
-                (self.end_date, 'end date', 'prediction_vote'))
+        return ((self.start_date, 'start_date', 'area_vote'),
+                (self.area_vote_end_date, 'area_vote_end_date', 'proposal'),
+                (self.proposal_end_date, 'proposal_end_date', 'prediction_statement'),
+                (self.prediction_statement_end_date, 'prediction_statement_end_date', 'prediction_bet'),
+                (self.prediction_bet_end_date, 'prediction_bet_end_date', 'delegate_vote'),
+                (self.delegate_vote_end_date, 'delegate_vote_end_date', 'vote'),
+                (self.vote_end_date, 'vote_end_date', 'result'),
+                (self.end_date, 'end_date', 'prediction_vote'))
+
+    @property
+    def time_table(self) -> list:
+        labels = [[self.start_date, 'start_date', 'area_vote'],
+                  [self.area_vote_end_date, 'area_vote_end_date', 'proposal'],
+                  [self.proposal_end_date, 'proposal_end_date', 'prediction_statement'],
+                  [self.prediction_statement_end_date, 'prediction_statement_end_date', 'prediction_bet'],
+                  [self.prediction_bet_end_date, 'prediction_bet_end_date', 'delegate_vote'],
+                  [self.delegate_vote_end_date, 'delegate_vote_end_date', 'vote'],
+                  [self.vote_end_date, 'vote_end_date', 'result'],
+                  [self.end_date, 'end_date', 'prediction_vote']]
+
+        if self.dynamic:
+            if self.poll_type == self.PollType.SCHEDULE:
+                labels[0][2] = 'schedule'
+                labels[6][2] = 'result_default'
+                labels[7][2] = 'result'
+
+            else:
+                labels[0][2] = 'dynamic'
+                labels[6][2] = 'result_default'
+                labels[7][2] = 'result'
+
+        return labels
 
     def clean(self):
         labels = self.labels
         for x in range(len(labels) - 1):
-            if labels[x][0] > labels[x+1][0]:
-                raise ValidationError(f'{labels[x][1].title()} is greater than {labels[x+1][1]}')
+            if labels[x][0] > labels[x + 1][0]:
+                raise ValidationError(f'{labels[x][1].title()} is greater than {labels[x + 1][1]}')
+
+        if self.parent and self.parent.poll_type != self.PollType.VOTE:
+            raise ValidationError("Unable to assign parent for poll, unless it's parents poll type is vote")
+
+        if self.parent and self.parent.created_by.group != self.created_by.group:
+            raise ValidationError("Parent poll must be in the same group as the linked poll")
 
     class Meta:
         constraints = [models.CheckConstraint(check=Q(Q(area_vote_end_date__isnull=True)
@@ -115,7 +157,8 @@ class Poll(BaseModel):
                                                       | Q(prediction_statement_end_date__gte=F('proposal_end_date'))),
                                               name='predictionstatementenddategreaterthanproposalenddate_check'),
                        models.CheckConstraint(check=Q(Q(prediction_bet_end_date__isnull=True)
-                                                      | Q(prediction_bet_end_date__gte=F('prediction_statement_end_date'))),
+                                                      | Q(
+                           prediction_bet_end_date__gte=F('prediction_statement_end_date'))),
                                               name='predictionbetenddategreaterthanpredictionstatementeneddate_check'),
                        models.CheckConstraint(check=Q(Q(delegate_vote_end_date__isnull=True)
                                                       | Q(delegate_vote_end_date__gte=F('prediction_bet_end_date'))),
@@ -145,10 +188,44 @@ class Poll(BaseModel):
 
         return 'waiting'
 
+    def get_phase_start_date(self, phase: str, field_name=False) -> str:
+        time_table = self.time_table
+
+        for x in reversed(range(len(time_table))):
+            if phase == time_table[x][2]:
+                if field_name:
+                    return time_table[x][1]
+
+                else:
+                    return time_table[x][0]
+
+        raise Exception('Phase not found')
+
+    def phase_exist(self, phase: str, raise_exception=True):
+        phases = [label[2] for label in self.labels]
+
+        if phase in phases:
+            return True
+
+        if raise_exception:
+            raise ValidationError(f'Poll phase "{phase}" does not exist')
+
+        return False
+
     def check_phase(self, *phases: str):
+        if not any(self.phase_exist(phase, raise_exception=False) for phase in phases):
+            raise ValidationError(f'Action is unavailable during this poll phase')
+
         current_phase = self.current_phase
         if current_phase not in phases:
             raise ValidationError(f'Poll is not in {" or ".join(phases)}, currently in {current_phase}')
+
+    @classmethod
+    def pre_save(cls, instance, *args, **kwargs):
+        if not instance.pk:
+            instance.message_channel_topic = message_channel_topic_create(channel_id=instance.created_by.group.chat_id,
+                                                                          topic_name=f'poll.{instance.id}',
+                                                                          hidden=True)
 
     @classmethod
     def post_save(cls, instance, created, update_fields, **kwargs):
@@ -165,10 +242,13 @@ class Poll(BaseModel):
 
     @classmethod
     def post_delete(cls, instance, **kwargs):
+        instance.message_channel_topic.delete()
+
         if hasattr(instance, 'schedule'):
             instance.schedule.delete()
 
 
+pre_save.connect(Poll.pre_save, sender=Poll)
 post_save.connect(Poll.post_save, sender=Poll)
 post_delete.connect(Poll.post_delete, sender=Poll)
 
@@ -185,6 +265,11 @@ class PollProposal(BaseModel):
     title = models.CharField(max_length=255, null=True, blank=True)
     description = models.TextField(null=True, blank=True)
     attachments = models.ForeignKey(FileCollection, on_delete=models.CASCADE, null=True, blank=True)
+
+    participants = models.IntegerField(null=True, blank=True)
+    blank_votes = models.IntegerField(null=True, blank=True)
+    positive_votes = models.IntegerField(null=True, blank=True)
+
     score = models.IntegerField(null=True, blank=True)
 
     @property
@@ -195,6 +280,14 @@ class PollProposal(BaseModel):
 class PollProposalTypeSchedule(BaseModel):
     proposal = models.OneToOneField(PollProposal, on_delete=models.CASCADE)
     event = models.OneToOneField(ScheduleEvent, on_delete=models.CASCADE)
+
+    def clean(self):
+        if PollProposalTypeSchedule.objects.filter(event__start_date=self.event.start_date,
+                                                   event__end_date=self.event.end_date).exists():
+            raise ValidationError('Proposal event with same start_date and end_date already exists')
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['proposal', 'event'], name='unique_proposaltypeschedule')]
 
     @classmethod
     def post_delete(cls, instance, **kwargs):
@@ -216,9 +309,6 @@ class PollDelegateVoting(BaseModel):
     created_by = models.ForeignKey(GroupUserDelegatePool, on_delete=models.CASCADE)
     poll = models.ForeignKey(Poll, on_delete=models.CASCADE)
     mandate = models.IntegerField(default=0)
-    comment_section = models.ForeignKey(CommentSection,
-                                        default=comment_section_create_model_default,
-                                        on_delete=models.CASCADE)
 
     class Meta:
         unique_together = ('created_by', 'poll')
@@ -326,14 +416,14 @@ class PollPredictionStatement(PredictionStatement):
 
     def clean(self):
         if self.poll.end_date > self.end_date:
-            raise ValidationError('Poll ends earlier than prediction statement end date')
+            raise ValidationError('Poll ends later than prediction statement deadline')
 
     @receiver(post_delete, sender=PollProposal)
     def clean_prediction_statement(sender, instance: PollProposal, **kwargs):
-        PollPredictionStatement.objects.filter(poll=instance.poll)\
-                                        .annotate(segment_count=Count('pollpredictionstatementsegment'))\
-                                        .filter(segment_count__lt=1)\
-                                        .delete()
+        PollPredictionStatement.objects.filter(poll=instance.poll) \
+            .annotate(segment_count=Count('pollpredictionstatementsegment')) \
+            .filter(segment_count__lt=1) \
+            .delete()
 
 
 class PollPredictionStatementSegment(PredictionStatementSegment):
@@ -362,4 +452,31 @@ class PollPredictionBet(PredictionBet):
 
     @receiver(post_save, sender=PollProposal)
     def reset_prediction_proposal(sender, instance: PollProposal, **kwargs):
-        PollPredictionBet.objects.filter(prediction_statement__pollpredictionstatementsegment__proposal=instance).delete()
+        PollPredictionBet.objects.filter(
+            prediction_statement__pollpredictionstatementsegment__proposal=instance).delete()
+
+
+class PollPriority(BaseModel):
+    group_user = models.ForeignKey(GroupUser, on_delete=models.CASCADE)
+    poll = models.ForeignKey(Poll, on_delete=models.CASCADE)
+    score = models.IntegerField(validators=(MinValueValidator(-1), MaxValueValidator(1)))
+
+    def clean(self):
+        if self.poll.created_by.group != self.group_user.group:
+            raise ValidationError('PollPriority group user is not in the same group as poll')
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['group_user', 'poll'], name='unique_poll_priority')]
+
+
+class PollProposalPriority(BaseModel):
+    group_user = models.ForeignKey(GroupUser, on_delete=models.CASCADE)
+    proposal = models.ForeignKey(PollProposal, on_delete=models.CASCADE)
+    score = models.IntegerField(validators=(MinValueValidator(-1), MaxValueValidator(1)))
+
+    def clean(self):
+        if self.proposal.poll.created_by.group != self.group_user.group:
+            raise ValidationError('PollProposalPriority group user is not in the same group as poll')
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['group_user', 'proposal'], name='unique_poll_proposal_priority')]

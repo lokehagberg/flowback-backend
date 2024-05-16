@@ -1,5 +1,9 @@
+import random
+
 import factory
 from django.utils import timezone
+
+from flowback.chat.tests.factories import MessageChannelTopicFactory
 from flowback.common.tests import fake
 from flowback.group.tests.factories import GroupUserFactory, GroupUserDelegatePoolFactory, GroupTagsFactory
 
@@ -17,9 +21,10 @@ from flowback.poll.models import (Poll,
                                   PollPredictionStatementVote,
                                   PollAreaStatement,
                                   PollAreaStatementSegment,
-                                  PollAreaStatementVote)
+                                  PollAreaStatementVote, PollPriority, PollProposalPriority)
 from flowback.poll.tests.utils import generate_poll_phase_kwargs
 from flowback.schedule.tests.factories import ScheduleEventFactory
+from flowback.user.tests.factories import UserFactory
 
 
 class PollFactory(factory.django.DjangoModelFactory):
@@ -119,7 +124,7 @@ class PollPredictionStatementFactory(factory.django.DjangoModelFactory):
     end_date = factory.LazyAttribute(lambda _: timezone.now() + timezone.timedelta(hours=99))
 
 
-class PollPredictionFactory(factory.django.DjangoModelFactory):
+class PollPredictionBetFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = PollPredictionBet
 
@@ -169,3 +174,21 @@ class PollAreaStatementVoteFactory(factory.django.DjangoModelFactory):
     created_by = factory.SubFactory(GroupUserFactory)
     poll_area_statement = factory.SubFactory(PollAreaStatementFactory)
     vote = factory.LazyAttribute(lambda _: fake.pybool())
+
+
+class PollPriorityFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = PollPriority
+
+    poll = factory.SubFactory(PollFactory)
+    group_user = factory.SubFactory(GroupUserFactory, group=factory.SelfAttribute('..poll.created_by.group'))
+    score = factory.LazyAttribute(lambda _: random.choice([-1, 1]))
+
+
+class PollProposalPriorityFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = PollProposalPriority
+
+    proposal = factory.SubFactory(PollProposalFactory)
+    group_user = factory.SubFactory(GroupUserFactory, group=factory.SelfAttribute('..proposal.poll.created_by.group'))
+    score = factory.LazyAttribute(lambda _: random.choice([-1, 1]))

@@ -8,7 +8,8 @@ from flowback.group.models import GroupUser
 from flowback.group.tests.factories import GroupFactory, GroupUserFactory
 from flowback.poll.models import Poll, PollPredictionStatement, PollPredictionStatementSegment, PollPredictionBet, \
     PollPredictionStatementVote
-from flowback.poll.tests.factories import PollFactory, PollPredictionFactory, PollProposalFactory, \
+from flowback.poll.tasks import poll_prediction_bet_count
+from flowback.poll.tests.factories import PollFactory, PollPredictionBetFactory, PollProposalFactory, \
     PollPredictionStatementFactory, PollPredictionStatementSegmentFactory, PollPredictionStatementVoteFactory
 from flowback.poll.tests.utils import generate_poll_phase_kwargs
 
@@ -25,8 +26,6 @@ from flowback.poll.views.prediction import (PollPredictionStatementCreateAPI,
 
 
 class PollPredictionStatementTest(APITransactionTestCase):
-    reset_sequences = True
-
     def setUp(self):
         # Group Preparation
         self.group = GroupFactory.create()
@@ -127,11 +126,11 @@ class PollPredictionStatementTest(APITransactionTestCase):
 
         (self.prediction_one,
          self.prediction_two,
-         self.prediction_three) = [PollPredictionFactory(prediction_statement=self.prediction_statement,
-                                                         created_by=group_user
-                                                         ) for group_user in [self.user_prediction_caster_one,
-                                                                              self.user_prediction_caster_two,
-                                                                              self.user_prediction_caster_three]]
+         self.prediction_three) = [PollPredictionBetFactory(prediction_statement=self.prediction_statement,
+                                                            created_by=group_user
+                                                            ) for group_user in [self.user_prediction_caster_one,
+                                                                                 self.user_prediction_caster_two,
+                                                                                 self.user_prediction_caster_three]]
 
         new_score = self.prediction_one.score
         new_score = random.choice([x for x in range(6) if x != new_score])
@@ -153,11 +152,11 @@ class PollPredictionStatementTest(APITransactionTestCase):
 
         (self.prediction_one,
          self.prediction_two,
-         self.prediction_three) = [PollPredictionFactory(prediction_statement=self.prediction_statement,
-                                                         created_by=group_user
-                                                         ) for group_user in [self.user_prediction_caster_one,
-                                                                              self.user_prediction_caster_two,
-                                                                              self.user_prediction_caster_three]]
+         self.prediction_three) = [PollPredictionBetFactory(prediction_statement=self.prediction_statement,
+                                                            created_by=group_user
+                                                            ) for group_user in [self.user_prediction_caster_one,
+                                                                                 self.user_prediction_caster_two,
+                                                                                 self.user_prediction_caster_three]]
 
         request = factory.post('')
         force_authenticate(request, user=self.user_prediction_caster_one.user)
@@ -230,14 +229,13 @@ class PollPredictionStatementTest(APITransactionTestCase):
         factory = APIRequestFactory()
         view = PollPredictionBetListAPI.as_view()
 
-
         (self.prediction_one,
          self.prediction_two,
-         self.prediction_three) = [PollPredictionFactory(prediction_statement=self.prediction_statement,
-                                                         created_by=group_user
-                                                         ) for group_user in [self.user_prediction_caster_one,
-                                                                              self.user_prediction_caster_two,
-                                                                              self.user_prediction_caster_three]]
+         self.prediction_three) = [PollPredictionBetFactory(prediction_statement=self.prediction_statement,
+                                                            created_by=group_user
+                                                            ) for group_user in [self.user_prediction_caster_one,
+                                                                                 self.user_prediction_caster_two,
+                                                                                 self.user_prediction_caster_three]]
 
         request = factory.get('')
         force_authenticate(request, user=self.user_prediction_caster_one.user)
@@ -245,3 +243,64 @@ class PollPredictionStatementTest(APITransactionTestCase):
 
         self.assertEqual(len(json.loads(response.rendered_content)['results']), 1,
                          'Incorrect amount of predictions returned')
+
+    class BetUser:
+        def __init__(self, group_user: GroupUser, score: int, vote: bool):
+            self.group_user = group_user
+            self.score = score
+            self.vote = vote
+
+        group_user: GroupUser
+        score: int  # between 0 and 5
+        vote: bool
+
+    @staticmethod
+    def generate_previous_bet(poll: Poll, bet_users: list[BetUser]):
+        statement = PollPredictionStatementFactory(poll=poll)
+
+        for bet_user in bet_users:
+            PollPredictionBetFactory(prediction_statement=statement,
+                                     created_by=bet_user.group_user,
+                                     score=bet_user.score)
+            PollPredictionStatementVoteFactory(prediction_statement=statement,
+                                               created_by=bet_user.group_user,
+                                               vote=bet_user.vote)
+
+    def test_poll_prediction_combined_bet(self):
+        # Make random previous bets
+        poll_one_bets = [self.BetUser(group_user=self.user_prediction_caster_one,
+                                      score=4,
+                                      vote=True),
+                         self.BetUser(group_user=self.user_prediction_caster_two,
+                                      score=3,
+                                      vote=False),
+                         self.BetUser(group_user=self.user_prediction_caster_three,
+                                      score=0,
+                                      vote=False)]
+
+        poll = PollFactory(created_by=self.user_group_creator, **generate_poll_phase_kwargs('prediction_vote'))
+        self.generate_previous_bet(poll=poll, bet_users=poll_one_bets)
+
+        poll_two_bets = [self.BetUser(group_user=self.user_prediction_caster_one,
+                                      score=2,
+                                      vote=True),
+                         self.BetUser(group_user=self.user_prediction_caster_two,
+                                      score=2,
+                                      vote=False),
+                         self.BetUser(group_user=self.user_prediction_caster_three,
+                                      score=5,
+                                      vote=True)]
+
+        poll = PollFactory(created_by=self.user_group_creator, **generate_poll_phase_kwargs('prediction_vote'))
+        self.generate_previous_bet(poll=poll, bet_users=poll_two_bets)
+
+        # Calculate combined_bet
+        (self.prediction_one,
+         self.prediction_two,
+         self.prediction_three) = [PollPredictionBetFactory(prediction_statement=self.prediction_statement,
+                                                            created_by=group_user,
+                                                            ) for group_user in [self.user_prediction_caster_one,
+                                                                                 self.user_prediction_caster_two,
+                                                                                 self.user_prediction_caster_three]]
+
+        poll_prediction_bet_count(poll_id=self.poll.id)

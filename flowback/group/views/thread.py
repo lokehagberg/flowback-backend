@@ -76,50 +76,16 @@ class GroupThreadDeleteAPI(APIView):
 
 
 class GroupThreadCommentListAPI(CommentListAPI):
-    def get(self, request, thread_id: int):
-        serializer = self.FilterSerializer(data=request.query_params)
-        serializer.is_valid(raise_exception=True)
-
-        comments = group_thread_comment_list(fetched_by=request.user,
-                                             thread_id=thread_id,
-                                             filters=serializer.validated_data)
-
-        return get_paginated_response(pagination_class=self.Pagination,
-                                      serializer_class=self.OutputSerializer,
-                                      queryset=comments,
-                                      request=request,
-                                      view=self)
+    lazy_action = group_thread_comment_list
 
 
 class GroupThreadCommentCreateAPI(CommentCreateAPI):
-    def post(self, request, thread_id: int):
-        serializer = self.InputSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-
-        comment = group_thread_comment_create(user_id=request.user.id,
-                                              thread_id=thread_id,
-                                              **serializer.validated_data)
-
-        return Response(status=status.HTTP_201_CREATED, data=comment.id)
+    lazy_action = group_thread_comment_create
 
 
 class GroupThreadCommentUpdateAPI(CommentUpdateAPI):
-    def post(self, request, thread_id: int, comment_id: int):
-        serializer = self.InputSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-
-        group_thread_comment_update(user_id=request.user.id,
-                                    thread_id=thread_id,
-                                    comment_id=comment_id,
-                                    data=serializer.validated_data)
-
-        return Response(status=status.HTTP_200_OK)
+    lazy_action = group_thread_comment_update
 
 
 class GroupThreadCommentDeleteAPI(CommentDeleteAPI):
-    def post(self, request, thread_id: int, comment_id: int):
-        group_thread_comment_delete(user_id=request.user.id,
-                                    thread_id=thread_id,
-                                    comment_id=comment_id)
-
-        return Response(status=status.HTTP_200_OK)
+    lazy_action = group_thread_comment_delete

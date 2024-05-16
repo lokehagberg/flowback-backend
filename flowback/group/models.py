@@ -1,15 +1,16 @@
 import uuid
 
 from django.core.validators import MinValueValidator, MaxValueValidator
+from django.db.models import Q
 from django.db.models.signals import post_save, post_delete, pre_save
 from django.forms import model_to_dict
 from rest_framework.exceptions import ValidationError
 
 from backend.settings import FLOWBACK_DEFAULT_GROUP_JOIN
-from flowback.chat.models import MessageChannel
-from flowback.chat.services import message_channel_create
+from flowback.chat.models import MessageChannel, MessageChannelParticipant
+from flowback.chat.services import message_channel_create, message_channel_join
 from flowback.comment.models import CommentSection
-from flowback.comment.services import comment_section_create
+from flowback.comment.services import comment_section_create, comment_section_create_model_default
 from flowback.common.models import BaseModel
 from flowback.common.services import get_object
 from flowback.kanban.models import Kanban
@@ -46,7 +47,7 @@ class Group(BaseModel):
                                               on_delete=models.SET_NULL)
 
     name = models.TextField(unique=True)
-    description = models.TextField()
+    description = models.TextField(null=True, blank=True)
     image = models.ImageField(upload_to='group/image', null=True, blank=True)
     cover_image = models.ImageField(upload_to='group/cover_image', null=True, blank=True)
     hide_poll_users = models.BooleanField(default=False)  # Hides users in polls, TODO remove bool from views
@@ -57,6 +58,10 @@ class Group(BaseModel):
     group_folder = models.ForeignKey(GroupFolder, null=True, blank=True, on_delete=models.SET_NULL)
 
     jitsi_room = models.UUIDField(unique=True, default=uuid.uuid4)
+
+    class Meta:
+        constraints = [models.CheckConstraint(check=Q(public=True) | Q(direct_join=True),
+                                              name='group_not_private_and_direct_join_check')]
 
     @classmethod
     def pre_save(cls, instance, raw, using, update_fields, *args, **kwargs):
@@ -86,7 +91,7 @@ class Group(BaseModel):
             for group_id in FLOWBACK_DEFAULT_GROUP_JOIN:
                 if get_object(Group, id=group_id, raise_exception=False):
                     group_user = GroupUser(user=instance, group_id=group_id)
-                    group_user.full_clean()
+                    # TODO FIX pre_save check group_user.full_clean()
                     group_user.save()
 
     @classmethod
@@ -108,6 +113,7 @@ class GroupPermissions(BaseModel):
     author = models.ForeignKey('Group', on_delete=models.CASCADE)
     invite_user = models.BooleanField(default=False)
     create_poll = models.BooleanField(default=True)
+    poll_fast_forward = models.BooleanField(default=False)
     poll_quorum = models.BooleanField(default=False)
     allow_vote = models.BooleanField(default=True)
     kick_members = models.BooleanField(default=False)
@@ -143,6 +149,7 @@ class GroupUser(BaseModel):
     group = models.ForeignKey(Group, on_delete=models.CASCADE)
     is_admin = models.BooleanField(default=False)
     permission = models.ForeignKey(GroupPermissions, null=True, blank=True, on_delete=models.SET_NULL)
+    chat_participant = models.ForeignKey(MessageChannelParticipant, on_delete=models.PROTECT)
     active = models.BooleanField(default=True)
 
     def check_permission(self, raise_exception: bool = False, **permissions):
@@ -170,9 +177,13 @@ class GroupUser(BaseModel):
 
         return True
 
+    @classmethod
+    def pre_save(cls, instance, raw, using, update_fields, *args, **kwargs):
+        if instance.pk is None:
+            instance.chat_participant = message_channel_join(user_id=instance.user_id,
+                                                             channel_id=instance.group.chat_id)
 
     @classmethod
-    # Updates Schedule name
     def post_save(cls, instance, created, update_fields, *args, **kwargs):
         if created:
             kanban_subscription_create(kanban_id=instance.user.kanban_id,
@@ -184,11 +195,13 @@ class GroupUser(BaseModel):
     def post_delete(cls, instance, *args, **kwargs):
         kanban_subscription_delete(kanban_id=instance.user.kanban_id,
                                    target_id=instance.group.kanban_id)
+        instance.chat_participant.delete()
 
     class Meta:
         unique_together = ('user', 'group')
 
 
+pre_save.connect(GroupUser.pre_save, sender=GroupUser)
 post_save.connect(GroupUser.post_save, sender=GroupUser)
 post_delete.connect(GroupUser.post_delete, sender=GroupUser)
 
@@ -213,6 +226,9 @@ class GroupUserInvite(BaseModel):
 
 class GroupUserDelegatePool(BaseModel):
     group = models.ForeignKey(Group, on_delete=models.CASCADE)
+    comment_section = models.ForeignKey(CommentSection,
+                                        default=comment_section_create_model_default,
+                                        on_delete=models.CASCADE)
 
 
 class GroupUserDelegate(BaseModel):

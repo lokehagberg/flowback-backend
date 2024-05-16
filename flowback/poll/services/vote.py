@@ -1,11 +1,12 @@
-from django.db.models import Sum, Q, Count, F, OuterRef, Subquery
+from django.db import models
+from django.db.models import Sum, Q, Count, F, OuterRef, Subquery, When, Case
 from rest_framework.exceptions import ValidationError
 
 from backend.settings import SCORE_VOTE_CEILING, SCORE_VOTE_FLOOR
 from flowback.common.services import get_object
 from flowback.group.models import GroupUserDelegatePool, GroupUser
 from flowback.poll.models import Poll, PollProposal, PollVoting, PollVotingTypeRanking, PollDelegateVoting, \
-    PollVotingTypeForAgainst, PollVotingTypeCardinal
+    PollVotingTypeForAgainst, PollVotingTypeCardinal, PollPriority
 from flowback.group.selectors import group_user_permissions
 from flowback.group.services import group_schedule
 from django.utils import timezone
@@ -39,12 +40,12 @@ def poll_proposal_vote_update(*, user_id: int, poll_id: int, data: dict) -> None
         PollVotingTypeRanking.objects.filter(author=poll_vote).delete()
         PollVotingTypeRanking.objects.bulk_create(poll_vote_ranking)
 
-    elif poll.poll_type == Poll.PollType.CARDINAL:
+    elif poll.poll_type in [Poll.PollType.CARDINAL, Poll.PollType.VOTE]:
 
-        if SCORE_VOTE_CEILING is not None and any([score >= SCORE_VOTE_CEILING for score in data['score']]):
+        if SCORE_VOTE_CEILING is not None and any([score >= SCORE_VOTE_CEILING for score in data['scores']]):
             raise ValidationError(f'Voting scores exceeds ceiling bounds (currently set at {SCORE_VOTE_CEILING})')
 
-        if SCORE_VOTE_FLOOR is not None and any([score <= SCORE_VOTE_FLOOR for score in data['score']]):
+        if SCORE_VOTE_FLOOR is not None and any([score <= SCORE_VOTE_FLOOR for score in data['scores']]):
             raise ValidationError(f'Voting scores exceeds floor bounds (currently set at {SCORE_VOTE_FLOOR})')
 
         # Delete votes if no polls are registered
@@ -119,7 +120,7 @@ def poll_proposal_delegate_vote_update(*, user_id: int, poll_id: int, data) -> N
         PollVotingTypeRanking.objects.filter(author_delegate=poll_vote).delete()
         PollVotingTypeRanking.objects.bulk_create(poll_vote_ranking)
 
-    elif poll.poll_type == Poll.PollType.CARDINAL:
+    elif poll.poll_type in [Poll.PollType.CARDINAL, Poll.PollType.VOTE]:
 
         # Delete votes if no polls are registered
         if not data['proposals']:
@@ -168,6 +169,30 @@ def poll_proposal_vote_count(*, poll_id: int) -> None:
     poll = get_object(Poll, id=poll_id)
     group = poll.created_by.group
     total_proposals = poll.pollproposal_set.count()
+
+    def save_participants_count(voting_type_class):
+        blank_votes = voting_type_class.objects.filter(author__poll=poll, score=0).count()
+        blank_votes += voting_type_class.objects.filter(
+            author_delegate__poll=poll, score=0
+        ).annotate(total_blank_votes=Subquery(mandate_subquery)).aggregate(blank_votes=Sum('total_blank_votes')
+                                                                           ).get('total_blank_votes') or 0
+
+        participants = voting_type_class.objects.filter(author__poll=poll).count()
+        participants += voting_type_class.objects.filter(author_delegate__poll=poll
+                                                         ).annotate(participants=Subquery(mandate_subquery)
+                                                                    ).aggregate(total_participants=Sum(participants)
+                                                                                ).get('total_participants') or 0
+
+        positive_votes = voting_type_class.objects.filter(author__poll=poll, score__gt=0
+                                                          ).count()
+        positive_votes += voting_type_class.objects.filter(author_delegate__poll=poll, score__gt=0
+                                                           ).annotate(
+            positive_votes=Subquery(mandate_subquery)).aggregate(total_positive_votes=Sum('positive_votes')
+                                                                 ).get('total_positive_votes') or 0
+
+        PollProposal.objects.filter(poll=poll).update(blank_votes=blank_votes,
+                                                      participants=participants,
+                                                      positive_votes=positive_votes)
 
     # Count mandate for each delegate, multiply it by score
     # TODO Redundant
@@ -222,13 +247,15 @@ def poll_proposal_vote_count(*, poll_id: int) -> None:
             for i in proposals:
                 PollProposal.objects.filter(id=i['pk']).update(score=i['score'])
 
+            save_participants_count(PollVotingTypeRanking)
+
             # TODO make this work aswell, replace above
             # PollProposal.objects.bulk_update(proposals, fields=('score',))
 
             poll.participants = mandate + PollVoting.objects.filter(poll=poll).all().count()
             poll.save()
 
-    if poll.poll_type == Poll.PollType.CARDINAL:
+    if poll.poll_type in [Poll.PollType.CARDINAL, Poll.PollType.VOTE]:
         if poll.tag:
             # Calculate user scores
             # user_weight = PollVoting.objects.filter(id=OuterRef('author'), poll=poll
@@ -247,6 +274,8 @@ def poll_proposal_vote_count(*, poll_id: int) -> None:
 
             proposal_scores = PollProposal.objects.filter(id=OuterRef('id')).annotate(final_score=Sum('pollvotingtypecardinal__score')).values('final_score')
             PollProposal.objects.update(score=Subquery(proposal_scores))
+
+            save_participants_count(PollVotingTypeCardinal)
 
     if poll.poll_type == Poll.PollType.SCHEDULE:
         if poll.tag:
@@ -285,7 +314,8 @@ def poll_proposal_vote_count(*, poll_id: int) -> None:
 
     if poll.finished and not poll.result:
         if poll.poll_type == Poll.PollType.SCHEDULE:
-            winning_proposal = PollProposal.objects.filter(poll_id=poll_id).order_by('-score').first()
+            winning_proposal = PollProposal.objects.filter(
+                poll_id=poll_id).order_by('-score', '-pollproposaltypeschedule__event__start_date').first()
             if winning_proposal:
                 event = winning_proposal.pollproposaltypeschedule.event
                 create_event(schedule_id=group.schedule_id,

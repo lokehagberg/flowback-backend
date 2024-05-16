@@ -9,6 +9,7 @@ class PredictionStatement(BaseModel):
     end_date = models.DateTimeField()
     # created_by: represents ownership
     # fk: represents relationship
+    combined_bet = models.DecimalField(max_digits=8, decimal_places=7, null=True, blank=True)
 
     class Meta:
         abstract = True

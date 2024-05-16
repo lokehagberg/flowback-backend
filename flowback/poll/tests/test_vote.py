@@ -1,9 +1,14 @@
+from pprint import pprint
+
+from django.db.models import Sum
 from rest_framework.test import APIRequestFactory, force_authenticate, APITransactionTestCase
-from .factories import PollFactory, PollProposalFactory
+from .factories import PollFactory, PollProposalFactory, PollPriorityFactory
 from .utils import generate_poll_phase_kwargs
 from ..models import PollDelegateVoting, PollVotingTypeCardinal, Poll, PollProposal, PollVoting, \
-    PollVotingTypeForAgainst
+    PollVotingTypeForAgainst, PollPriority
+from ..selectors.poll import poll_list
 from ..services.vote import poll_proposal_vote_count
+from ..views.poll import PollListApi, PollPriorityUpdateAPI
 from ..views.vote import (PollProposalDelegateVoteUpdateAPI,
                           PollProposalVoteUpdateAPI,
                           PollProposalVoteListAPI,
@@ -14,8 +19,6 @@ from ...user.models import User
 
 
 class PollVoteTest(APITransactionTestCase):
-    reset_sequences = True
-
     def setUp(self):
         self.group = GroupFactory()
         self.group_tag = GroupTagsFactory(group=self.group)
@@ -200,7 +203,6 @@ class PollVoteTest(APITransactionTestCase):
 
         self.assertEqual(event.start_date, self.poll_schedule_proposal_three.pollproposaltypeschedule.event.start_date)
         self.assertEqual(event.end_date, self.poll_schedule_proposal_three.pollproposaltypeschedule.event.end_date)
-
 
 class PollDelegateVoteTest(APITransactionTestCase):
     reset_sequences = True

@@ -20,10 +20,21 @@ class GroupPermissionListApi(APIView):
     class OutputSerializer(serializers.ModelSerializer):
         class Meta:
             model = GroupPermissions
-            fields = ('id', 'role_name', 'invite_user', 'create_poll', 'poll_quorum',
-                      'allow_vote', 'kick_members', 'ban_members', 'create_proposal',
-                      'update_proposal', 'delete_proposal', 'force_delete_poll',
-                      'force_delete_proposal', 'force_delete_comment')
+            fields = ('id',
+                      'role_name',
+                      'invite_user',
+                      'create_poll',
+                      'poll_fast_forward',
+                      'poll_quorum',
+                      'allow_vote',
+                      'kick_members',
+                      'ban_members',
+                      'create_proposal',
+                      'update_proposal',
+                      'delete_proposal',
+                      'force_delete_poll',
+                      'force_delete_proposal',
+                      'force_delete_comment')
 
     def get(self, request, group: int):
         filter_serializer = self.FilterSerializer(data=request.query_params)
@@ -46,10 +57,20 @@ class GroupPermissionCreateApi(APIView):
     class InputSerializer(serializers.ModelSerializer):
         class Meta:
             model = GroupPermissions
-            fields = ('role_name', 'invite_user', 'create_poll', 'poll_quorum',
-                      'allow_vote', 'kick_members', 'ban_members', 'create_proposal',
-                      'update_proposal', 'delete_proposal', 'force_delete_poll',
-                      'force_delete_proposal', 'force_delete_comment')
+            fields = ('role_name',
+                      'invite_user',
+                      'create_poll',
+                      'poll_fast_forward',
+                      'poll_quorum',
+                      'allow_vote',
+                      'kick_members',
+                      'ban_members',
+                      'create_proposal',
+                      'update_proposal',
+                      'delete_proposal',
+                      'force_delete_poll',
+                      'force_delete_proposal',
+                      'force_delete_comment')
 
     def post(self, request, group: int):
         serializer = self.InputSerializer(data=request.data)
@@ -65,6 +86,7 @@ class GroupPermissionUpdateApi(APIView):
         role_name = serializers.CharField()
         invite_user = serializers.BooleanField(required=False)
         create_poll = serializers.BooleanField(required=False)
+        poll_fast_forward = serializers.BooleanField(required=False)
         poll_quorum = serializers.BooleanField(required=False)
         allow_vote = serializers.BooleanField(required=False)
         kick_members = serializers.BooleanField(required=False)

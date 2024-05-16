@@ -54,6 +54,7 @@ class GroupListApi(APIView):
             view=self
         )
 
+
 class GroupFolderListApi(APIView): #use serializers.Serializers
     class Pagination(LimitOffsetPagination):
         default_limit = 20
@@ -73,6 +74,7 @@ class GroupFolderListApi(APIView): #use serializers.Serializers
             view=self
         ) 
 
+
 class GroupDetailApi(APIView):
     class OutputSerializer(serializers.ModelSerializer):
         member_count = serializers.IntegerField()
@@ -90,6 +92,7 @@ class GroupDetailApi(APIView):
                       'image',
                       'cover_image',
                       'member_count',
+                      'chat_id',
                       'jitsi_room')
 
     def get(self, request, group: int):

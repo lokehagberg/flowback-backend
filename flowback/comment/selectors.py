@@ -16,9 +16,6 @@ class BaseCommentFilter(django_filters.FilterSet):
 
     has_attachments = django_filters.BooleanFilter(method='has_attachments_filter')
 
-    def has_attachments_filter(self, queryset, name, value):
-        return queryset.filter(attachments__isnull=not value)
-
     class Meta:
         model = Comment
         fields = dict(id=['exact'],

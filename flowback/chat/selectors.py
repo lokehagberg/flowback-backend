@@ -3,6 +3,7 @@ import django_filters
 
 from .models import MessageChannel, Message, MessageChannelParticipant, MessageChannelTopic
 from flowback.user.models import User
+from ..common.filters import NumberInFilter, ExistsFilter
 from ..common.services import get_object
 
 
@@ -10,11 +11,12 @@ class BaseMessageFilter(django_filters.FilterSet):
     order_by = django_filters.OrderingFilter(fields=(('created_at', 'created_at_asc'),
                                                      ('-created_at', 'created_at_desc')))
     topic_name = django_filters.CharFilter(lookup_expr='exact', field_name='topic__name')
+    user_ids = NumberInFilter()
+    has_attachments = ExistsFilter(field_name='attachments')
 
     class Meta:
         model = Message
         fields = dict(id=['exact'],
-                      user_id=['exact'],
                       message=['icontains'],
                       topic_id=['exact'],
                       parent_id=['exact'],
@@ -72,6 +74,6 @@ def message_channel_preview_list(*, user: User, **filters):
                                 | Q(topic__hidden=False)),
                                 channel__messagechannelparticipant__user=user,
                                 active=True).annotate(timestamp=Subquery(timestamp)
-                                                      ).distinct('channel').all()
+                                                      ).order_by('channel').distinct('channel').all()
 
     return BaseMessageChannelPreviewFilter(filters, qs).qs

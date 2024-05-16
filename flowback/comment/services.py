@@ -29,7 +29,7 @@ def comment_section_delete(*, comments_id: int):
 def comment_create(*,
                    author_id: int,
                    comment_section_id: int,
-                   message: str,
+                   message: str = None,
                    parent_id: int,
                    attachments: list = None,
                    attachment_upload_to="",
