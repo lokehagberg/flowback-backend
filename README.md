@@ -1,6 +1,6 @@
-## Flowback Backend
+# Flowback Backend
 
-# About
+## About
 
 Flowback was created and project lead by Loke Hagberg. The co-creators of this version were:
 Siamand Shahkaram, Emil Svenberg and Yuliya Hagberg.
@@ -10,7 +10,7 @@ It is a decision making platform.
 
 The following is from Collected papers on finitist mathematics and phenomenalism: a digital phenomenology by Loke Hagberg 2023 [1] and Predictive Liquid Democracy by Loke Hagberg and Samuel Färdow Kazen [2].
 
-# How the backend is built 
+## How the backend is built 
 
 The Flowback backend is built with Python using the Django Rest Framework. 
 
@@ -22,7 +22,7 @@ Redis is used for messaging in chats.
 
 RabbitMQ is used for scheduling non-chat notifications. 
 
-# References: 
+## References: 
 
 [1]: Hagberg, L. (2023). Collected papers on finitist mathematics and phenomenalism: a digital phenomenology. BoD-Books on Demand.
 
