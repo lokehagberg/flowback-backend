@@ -18,14 +18,14 @@ class PollAreaStatementListAPI(APIView):
     class FilterSerializer(serializers.Serializer):
         order_by = serializers.ChoiceField(choices=['created_at', '-created_at', 'score', '-score'],
                                            required=False)
-        vote = serializers.BooleanField(required=False, allow_null=True, default=None)
+        user_vote = serializers.BooleanField(required=False, allow_null=True, default=None)
         tag = serializers.CharField(required=False)
 
     class OutputSerializer(serializers.Serializer):
         class SegmentSerializer(serializers.Serializer):
             tag_name = serializers.CharField(source='tag.name')
 
-        vote = serializers.BooleanField(allow_null=True)
+        user_vote = serializers.BooleanField(allow_null=True)
         tags = SegmentSerializer(many=True, source='pollareastatementsegment_set')
 
     def get(self, request, poll_id: int):

@@ -1,5 +1,4 @@
 import ntpath
-import os
 import uuid
 from typing import Union
 
@@ -9,9 +8,9 @@ from django.core.files.storage import default_storage
 from django.utils import timezone
 
 from .models import FileCollection, FileSegment
-from ..user.models import User
 
 
+# A function to allow uploading a collection of files to a specified directory
 def upload_collection(*, user_id: int, file: Union[list[InMemoryUploadedFile], InMemoryUploadedFile], upload_to="",
                       upload_to_uuid=True, upload_to_include_timestamp=True):
     files = file if isinstance(file, list) else [file]
@@ -30,6 +29,7 @@ def upload_collection(*, user_id: int, file: Union[list[InMemoryUploadedFile], I
     for file in files:
         file_name = file.name
 
+        # Generates an uuid instead of user defined file name
         if upload_to_uuid:
             extension = ntpath.splitext(file_name)
             extension = extension[1 if len(extension) > 1 else 0]

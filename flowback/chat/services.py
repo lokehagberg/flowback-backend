@@ -10,6 +10,11 @@ from flowback.files.services import upload_collection
 from flowback.user.models import User
 
 
+def user_message_channel_permission(*, user: User, channel: MessageChannel):
+    return get_object(MessageChannelParticipant, user=user, channel=channel,
+                      error_message="User is not participating in this channel")
+
+
 def message_create(*,
                    user_id: int,
                    channel_id: int,
@@ -19,12 +24,13 @@ def message_create(*,
                    topic_id: int = None):
     user = get_object(User, id=user_id)
     channel = get_object(MessageChannel, id=channel_id)
-    parent = get_object(Message, id=parent_id, channel_id=channel_id, topic_id=topic_id,
-                        error_message="Parent does not exist")
+    parent = get_object(Message, id=parent_id, raise_exception=False)
+
+    if parent and (parent.channel_id != channel_id or parent.topic_id != topic_id):
+        return ValidationError("Parent does not exist")
 
     # Check whether user is a participant or not
-    get_object(MessageChannelParticipant, user=user, channel=channel,
-               error_message="User is not participating in this channel")
+    user_message_channel_permission(user=user, channel=channel)
 
     if attachments_id:
         attachments = get_object(MessageFileCollection, id=attachments_id)
@@ -47,7 +53,7 @@ def message_create(*,
 
 def message_update(*, user_id: int, message_id: int, **data):
     user = get_object(User, id=user_id)
-    message = get_object(Message, id=message_id)
+    message = get_object(Message, id=message_id, active=True)
 
     if not user == message.user:
         raise ValidationError('User is not author of message')

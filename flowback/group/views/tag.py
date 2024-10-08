@@ -4,8 +4,10 @@ from rest_framework.views import APIView
 from flowback.common.pagination import LimitOffsetPagination, get_paginated_response
 
 from flowback.group.models import GroupTags
-from flowback.group.selectors import group_tags_list
-from flowback.group.services import group_tag_create, group_tag_update, group_tag_delete
+from flowback.group.selectors import group_tags_list, group_tags_interval_mean_absolute_correctness
+from flowback.group.services.tag import (group_tag_create,
+                                         group_tag_update,
+                                         group_tag_delete)
 
 
 class GroupTagsListApi(APIView):
@@ -38,6 +40,13 @@ class GroupTagsListApi(APIView):
             request=request,
             view=self
         )
+
+
+# TODO make this a part of GroupTagsListAPI
+class GroupTagIntervalMeanAbsoluteCorrectnessAPI(APIView):
+    def get(self, request, tag_id: int):
+        val = group_tags_interval_mean_absolute_correctness(tag_id=tag_id, fetched_by=request.user)
+        return Response(status=status.HTTP_200_OK, data=val)
 
 
 class GroupTagsCreateApi(APIView):

@@ -10,6 +10,8 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.0/ref/settings/
 """
 import os
+import sys
+
 import environ
 from pathlib import Path
 
@@ -33,9 +35,11 @@ env = environ.Env(DEBUG=(bool, False),
                   AWS_S3_CUSTOM_URL=(str, None),
                   DISABLE_DEFAULT_USER_REGISTRATION=(bool, False),
                   FLOWBACK_DEFAULT_GROUP_JOIN=(str, None),
+                  FLOWBACK_ALLOW_DYNAMIC_POLL=(bool, False),
                   FLOWBACK_ALLOW_GROUP_CREATION=(bool, True),
                   FLOWBACK_GROUP_ADMIN_USER_LIST_ACCESS_ONLY=(bool, False),
                   FLOWBACK_DEFAULT_PERMISSION=(str, 'rest_framework.permissions.IsAuthenticated'),
+                  PREDICTION_HISTORY_LIMIT=(int, 100),
                   EMAIL_HOST=(str, None),
                   EMAIL_PORT=(str, None),
                   EMAIL_FROM=(str, None),
@@ -44,13 +48,14 @@ env = environ.Env(DEBUG=(bool, False),
                   EMAIL_USE_TLS=(bool, None),
                   EMAIL_USE_SSL=(bool, None),
                   INTEGRATIONS=(list, []),
-                  SCORE_VOTE_CEILING=(int, None),
-                  SCORE_VOTE_FLOOR=(int, None)
+                  SCORE_VOTE_CEILING=(int, 100),
+                  SCORE_VOTE_FLOOR=(int, 0)
                   )
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-env.read_env(os.path.join(BASE_DIR, ".env"))
+TESTING = sys.argv[1:2] == ['test'] or "pytest" in sys.modules
+env.read_env(os.path.join(BASE_DIR, "../../.env"))
 
 
 # Quick-start development settings - unsuitable for production
@@ -80,6 +85,7 @@ if env('SECURE_PROXY_SSL_HEADERS'):
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 URL_SUBPATH = env('URL_SUBPATH')
+INTEGRATIONS = env('INTEGRATIONS')
 
 # Application definition
 
@@ -97,6 +103,7 @@ INSTALLED_APPS = [
     'rest_framework.authtoken',
     'django_celery_beat',
     'pgtrigger',
+    'oidc_provider',
     'flowback.user',
     'flowback.group',
     'flowback.poll',
@@ -227,6 +234,11 @@ CHANNEL_LAYERS = {
 }
 
 
+# OIDC Settings
+LOGIN_URL = '/accounts/login/'
+OIDC_USERINFO = 'backend.oidc_provider_settings.userinfo'
+
+
 # Database
 # https://docs.djangoproject.com/en/4.0/ref/settings/#databases
 
@@ -239,6 +251,13 @@ DATABASES = {
         },
     }
 }
+
+if TESTING:
+    with (open(PG_PASS) as pgpass):
+        data = pgpass.readlines()[0].replace('\n', '').split(':')
+        DATABASES['default']['NAME'] = data[2]
+        DATABASES['default']['USER'] = data[3]
+        DATABASES['default']['PASSWORD'] = data[4]
 
 
 # Password validation
@@ -272,6 +291,7 @@ DEFAULT_FROM_EMAIL = env('EMAIL_FROM', default=env('EMAIL_HOST_USER'))
 # Poll related settings
 SCORE_VOTE_CEILING = env('SCORE_VOTE_CEILING')
 SCORE_VOTE_FLOOR = env('SCORE_VOTE_FLOOR')
+FLOWBACK_ALLOW_DYNAMIC_POLL = env('FLOWBACK_ALLOW_DYNAMIC_POLL')
 
 
 # Logging

@@ -1,4 +1,5 @@
 from django.utils import timezone
+from django.core.exceptions import ObjectDoesNotExist
 from rest_framework.test import APIRequestFactory, force_authenticate, APITransactionTestCase
 from .factories import PollFactory, PollProposalFactory
 
@@ -11,8 +12,6 @@ from ...user.models import User
 
 
 class ProposalTest(APITransactionTestCase):
-    reset_sequences = True
-
     def setUp(self):
         self.group = GroupFactory()
         self.group_tag = GroupTagsFactory(group=self.group)
@@ -23,7 +22,7 @@ class ProposalTest(APITransactionTestCase):
         self.poll_schedule = PollFactory(created_by=self.group_user_one, poll_type=Poll.PollType.SCHEDULE,
                                          **generate_poll_phase_kwargs('proposal'))
         self.poll_cardinal = PollFactory(created_by=self.group_user_one, poll_type=Poll.PollType.CARDINAL,
-                                        **generate_poll_phase_kwargs('proposal'))
+                                         **generate_poll_phase_kwargs('proposal'))
         group_users = [self.group_user_one, self.group_user_two, self.group_user_three]
         (self.poll_schedule_proposal_one,
          self.poll_schedule_proposal_two,
@@ -99,6 +98,12 @@ class ProposalTest(APITransactionTestCase):
         self.assertEqual(proposal.description, 'Test')
         self.assertEqual(proposal.pollproposaltypeschedule.event.start_date, start_date)
         self.assertEqual(proposal.pollproposaltypeschedule.event.end_date, end_date)
+
+        response = self.proposal_create(user=self.group_user_one.user, poll=self.poll_schedule,
+                                        title='Test Proposal', description='Test',
+                                        event__start_date=start_date, event__end_date=end_date)
+
+        self.assertRaises(ObjectDoesNotExist, PollProposal.objects.get, id=proposal.id+1)
 
     def test_proposal_create_no_schedule_data(self):
         response = self.proposal_create(user=self.group_user_one.user, poll=self.poll_schedule,

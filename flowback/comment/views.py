@@ -1,10 +1,11 @@
-# Create your views here.
+# Collection of view templates to implement the comment system for other modules
+# Do note these views should not be used directly!
 from rest_framework import serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from flowback.comment.selectors import comment_list
-from flowback.comment.services import comment_create, comment_update, comment_delete
+from flowback.comment.selectors import comment_list, comment_ancestor_list
+from flowback.comment.services import comment_create, comment_update, comment_delete, comment_vote
 from flowback.common.pagination import LimitOffsetPagination, get_paginated_response
 from flowback.files.serializers import FileSerializer
 
@@ -22,7 +23,7 @@ class CommentListAPI(APIView):
                                                     'total_replies_asc',
                                                     'total_replies_desc',
                                                     'score_asc',
-                                                    'score_desc'], default='created_at_desc')
+                                                    'score_desc'], default='score_desc')
         id = serializers.IntegerField(required=False)
         message__icontains = serializers.ListField(child=serializers.CharField(), required=False)
         author_id = serializers.IntegerField(required=False)
@@ -41,9 +42,10 @@ class CommentListAPI(APIView):
         created_at = serializers.DateTimeField()
         edited = serializers.BooleanField()
         active = serializers.BooleanField()
-        message = serializers.CharField()
+        message = serializers.CharField(allow_null=True)
+        user_vote = serializers.BooleanField(allow_null=True)
         attachments = FileSerializer(source="attachments.filesegment_set", many=True, allow_null=True)
-        score = serializers.IntegerField()
+        score = serializers.IntegerField(source='raw_score')
 
     def get(self, request, *args, **kwargs):
         serializer = self.FilterSerializer(data=request.query_params)
@@ -61,12 +63,32 @@ class CommentListAPI(APIView):
                                       view=self)
 
 
+# Returns a list of ancestors to a specific comment
+class CommentAncestorListAPI(APIView):
+    lazy_action = comment_ancestor_list
+
+    class Pagination(LimitOffsetPagination):
+        default_limit = 20
+        max_limit = 100
+
+    def get(self, request, *args, **kwargs):
+        comments = self.lazy_action.__func__(fetched_by=request.user,
+                                             *args,
+                                             **kwargs)
+
+        return get_paginated_response(pagination_class=self.Pagination,
+                                      serializer_class=CommentListAPI.OutputSerializer,
+                                      queryset=comments,
+                                      request=request,
+                                      view=self)
+
+
 class CommentCreateAPI(APIView):
     lazy_action = comment_create
 
     class InputSerializer(serializers.Serializer):
         parent_id = serializers.IntegerField(required=False)
-        message = serializers.CharField()
+        message = serializers.CharField(required=False)
         attachments = serializers.ListField(child=serializers.FileField(), required=False, max_length=10)
 
     def post(self, request, *args, **kwargs):
@@ -105,5 +127,23 @@ class CommentDeleteAPI(APIView):
         self.lazy_action.__func__(*args,
                                   **kwargs,
                                   fetched_by=request.user)
+
+        return Response(status=status.HTTP_200_OK)
+
+
+class CommentVoteAPI(APIView):
+    lazy_action = comment_vote
+
+    class InputSerializer(serializers.Serializer):
+        vote = serializers.BooleanField(required=False, allow_null=True)
+
+    def post(self, request, *args, **kwargs):
+        serializer = self.InputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        self.lazy_action.__func__(*args,
+                                  **kwargs,
+                                  **serializer.validated_data,
+                                  fetched_by=request.user.id)
 
         return Response(status=status.HTTP_200_OK)

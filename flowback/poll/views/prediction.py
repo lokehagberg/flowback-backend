@@ -26,7 +26,8 @@ class PollPredictionStatementListAPI(APIView):
     class FilterSerializer(serializers.Serializer):
         id = serializers.IntegerField(required=False)
         poll_id = serializers.IntegerField(required=False)
-        proposals = serializers.ListField(required=False, child=serializers.IntegerField())
+        proposals = serializers.CharField(required=False)
+        title = serializers.CharField(required=False)
         description = serializers.CharField(required=False)
         created_by_id = serializers.IntegerField(required=False)
         user_prediction_bet_exists = serializers.BooleanField(required=False)
@@ -41,11 +42,15 @@ class PollPredictionStatementListAPI(APIView):
 
         id = serializers.IntegerField()
         poll_id = serializers.IntegerField()
-        description = serializers.CharField()
+        title = serializers.CharField()
+        description = serializers.CharField(allow_null=True)
+        attachments = serializers.ListField(child=serializers.FileField(), allow_null=True)
         created_by = GroupUserSerializer()
         end_date = serializers.DateTimeField()
         user_prediction_bet = serializers.IntegerField(required=False)
         user_prediction_statement_vote = serializers.BooleanField(required=False)
+        combined_bet = serializers.FloatField()
+        blockchain_id = serializers.IntegerField(allow_null=True)
 
         segments = StatementSegment(source='pollpredictionstatementsegment_set', many=True)
 
@@ -54,8 +59,8 @@ class PollPredictionStatementListAPI(APIView):
         filter_serializer.is_valid(raise_exception=True)
 
         prediction_statement = poll_prediction_statement_list(fetched_by=request.user,
-                                               group_id=group_id,
-                                               filters=filter_serializer.validated_data)
+                                                              group_id=group_id,
+                                                              filters=filter_serializer.validated_data)
 
         return get_paginated_response(
             pagination_class=self.Pagination,
@@ -86,6 +91,7 @@ class PollPredictionBetListAPI(APIView):
         id = serializers.IntegerField()
         prediction_statement_id = serializers.IntegerField()
         created_by = GroupUserSerializer()
+        blockchain_id = serializers.IntegerField(allow_null=True)
         score = serializers.IntegerField()
 
     def get(self, request, group_id: int):
@@ -111,9 +117,12 @@ class PollPredictionStatementCreateAPI(APIView):
             proposal_id = serializers.IntegerField()
             is_true = serializers.BooleanField()
 
-        description = serializers.CharField()
+        title = serializers.CharField()
+        description = serializers.CharField(required=False)
         end_date = serializers.DateTimeField()
         segments = SegmentSerializer(many=True)
+        blockchain_id = serializers.IntegerField(required=False, allow_null=True)
+        attachments = serializers.ListField(child=serializers.FileField(), required=False)
 
     def post(self, request, poll_id: int):
         serializer = self.InputSerializer(data=request.data)
@@ -138,6 +147,7 @@ class PollPredictionStatementDeleteAPI(APIView):
 class PollPredictionBetCreateAPI(APIView):
     class InputSerializer(serializers.Serializer):
         score = serializers.IntegerField()
+        blockchain_id = serializers.IntegerField(min_value=1, required=False)
 
     def post(self, request, prediction_statement_id: int):
         serializer = self.InputSerializer(data=request.data)

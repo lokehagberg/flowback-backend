@@ -6,13 +6,16 @@ from .views import (MessageListAPI,
                     MessageChannelPreviewAPI,
                     MessageFileCollectionUploadAPI,
                     MessageChannelUserDataUpdateAPI,
-                    MessageChannelTopicListAPI)
+                    MessageChannelTopicListAPI, MessageChannelParticipantListAPI)
 
 subpath = f'{URL_SUBPATH}/' if URL_SUBPATH else ''
 
 chat_patterns = [
     path('message/channel/<int:channel_id>/list', MessageListAPI.as_view(), name='message_list'),
     path('message/channel/preview/list', MessageChannelPreviewAPI.as_view(), name='message_channel_preview'),
+    path('message/channel/<int:channel_id>/participant/list',
+         MessageChannelParticipantListAPI.as_view(),
+         name='message_channel_participant_list'),
     path('message/channel/<int:channel_id>/file/upload', MessageFileCollectionUploadAPI.as_view(),
          name='message_channel_file_upload'),
     path('message/channel/userdata/update', MessageChannelUserDataUpdateAPI.as_view(),

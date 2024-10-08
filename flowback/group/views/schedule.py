@@ -7,9 +7,10 @@ from flowback.schedule.views import (ScheduleEventListTemplateAPI,
                                      ScheduleEventCreateTemplateAPI,
                                      ScheduleEventUpdateTemplateAPI,
                                      ScheduleEventDeleteAPI)
-from flowback.group.services import (group_schedule_event_create,
-                                     group_schedule_event_update,
-                                     group_schedule_event_delete, group_schedule_subscribe)
+from flowback.group.services.schedule import (group_schedule_event_create,
+                                              group_schedule_event_update,
+                                              group_schedule_event_delete,
+                                              group_schedule_subscribe)
 from flowback.group.selectors import group_schedule_event_list
 
 

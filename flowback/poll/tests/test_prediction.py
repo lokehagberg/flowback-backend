@@ -1,14 +1,20 @@
 import json
 import random
+from pprint import pprint
 
+from django.db import models
+from django.db.models import Sum, Case, When, F
+from django.db.models.functions import Abs
 from django.utils import timezone
 from rest_framework.test import APIRequestFactory, force_authenticate, APITransactionTestCase
 
 from flowback.group.models import GroupUser
-from flowback.group.tests.factories import GroupFactory, GroupUserFactory
+from flowback.group.tests.factories import GroupFactory, GroupUserFactory, GroupTagsFactory
+from flowback.group.views.tag import GroupTagsListApi, GroupTagIntervalMeanAbsoluteCorrectnessAPI
 from flowback.poll.models import Poll, PollPredictionStatement, PollPredictionStatementSegment, PollPredictionBet, \
     PollPredictionStatementVote
-from flowback.poll.tests.factories import PollFactory, PollPredictionFactory, PollProposalFactory, \
+from flowback.poll.tasks import poll_prediction_bet_count
+from flowback.poll.tests.factories import PollFactory, PollPredictionBetFactory, PollProposalFactory, \
     PollPredictionStatementFactory, PollPredictionStatementSegmentFactory, PollPredictionStatementVoteFactory
 from flowback.poll.tests.utils import generate_poll_phase_kwargs
 
@@ -25,8 +31,6 @@ from flowback.poll.views.prediction import (PollPredictionStatementCreateAPI,
 
 
 class PollPredictionStatementTest(APITransactionTestCase):
-    reset_sequences = True
-
     def setUp(self):
         # Group Preparation
         self.group = GroupFactory.create()
@@ -39,6 +43,9 @@ class PollPredictionStatementTest(APITransactionTestCase):
 
         # Poll Preparation
         self.poll = PollFactory(created_by=self.user_group_creator,
+                                poll_type=4,
+                                dynamic=True,
+                                tag=GroupTagsFactory(group=self.user_group_creator.group),
                                 **generate_poll_phase_kwargs('prediction_statement'))
         (self.proposal_one,
          self.proposal_two,
@@ -60,7 +67,8 @@ class PollPredictionStatementTest(APITransactionTestCase):
         user = self.user_prediction_creator.user
         view = PollPredictionStatementCreateAPI.as_view()
 
-        data = dict(description="A Test PredictionBet",
+        data = dict(title="Test",
+                    description="A Test PredictionBet",
                     end_date=timezone.now() + timezone.timedelta(hours=8),
                     segments=[dict(proposal_id=self.proposal_one.id, is_true=True),
                               dict(proposal_id=self.proposal_two.id, is_true=False)])
@@ -69,6 +77,7 @@ class PollPredictionStatementTest(APITransactionTestCase):
         force_authenticate(request, user=user)
         response = view(request, poll_id=self.poll.id)
 
+        self.assertEqual(response.status_code, 201, msg=response.data)
         prediction_statement = PollPredictionStatement.objects.get(id=int(response.rendered_content))
 
         total_segments = PollPredictionStatementSegment.objects.filter(prediction_statement=prediction_statement
@@ -112,6 +121,7 @@ class PollPredictionStatementTest(APITransactionTestCase):
         force_authenticate(request, user=self.user_prediction_caster_one.user)
         response = view(request, prediction_statement_id=self.prediction_statement.id)
 
+        self.assertEqual(response.status_code, 201, msg=response.data)
         bets = PollPredictionBet.objects.filter(created_by=self.user_prediction_caster_one,
                                                 prediction_statement_id=self.prediction_statement.id)
 
@@ -127,11 +137,11 @@ class PollPredictionStatementTest(APITransactionTestCase):
 
         (self.prediction_one,
          self.prediction_two,
-         self.prediction_three) = [PollPredictionFactory(prediction_statement=self.prediction_statement,
-                                                         created_by=group_user
-                                                         ) for group_user in [self.user_prediction_caster_one,
-                                                                              self.user_prediction_caster_two,
-                                                                              self.user_prediction_caster_three]]
+         self.prediction_three) = [PollPredictionBetFactory(prediction_statement=self.prediction_statement,
+                                                            created_by=group_user
+                                                            ) for group_user in [self.user_prediction_caster_one,
+                                                                                 self.user_prediction_caster_two,
+                                                                                 self.user_prediction_caster_three]]
 
         new_score = self.prediction_one.score
         new_score = random.choice([x for x in range(6) if x != new_score])
@@ -140,8 +150,9 @@ class PollPredictionStatementTest(APITransactionTestCase):
 
         request = factory.post('', data)
         force_authenticate(request, user=self.user_prediction_caster_one.user)
-        view(request, prediction_statement_id=self.prediction_one.id)
+        response = view(request, prediction_statement_id=self.prediction_one.prediction_statement.id)
 
+        self.assertEqual(response.status_code, 200, msg=response.data)
         score = PollPredictionBet.objects.get(id=self.prediction_one.id).score
         self.assertEqual(score, new_score, f"Score '{score}' is not matching the new score {new_score}.")
 
@@ -153,16 +164,17 @@ class PollPredictionStatementTest(APITransactionTestCase):
 
         (self.prediction_one,
          self.prediction_two,
-         self.prediction_three) = [PollPredictionFactory(prediction_statement=self.prediction_statement,
-                                                         created_by=group_user
-                                                         ) for group_user in [self.user_prediction_caster_one,
-                                                                              self.user_prediction_caster_two,
-                                                                              self.user_prediction_caster_three]]
+         self.prediction_three) = [PollPredictionBetFactory(prediction_statement=self.prediction_statement,
+                                                            created_by=group_user
+                                                            ) for group_user in [self.user_prediction_caster_one,
+                                                                                 self.user_prediction_caster_two,
+                                                                                 self.user_prediction_caster_three]]
 
         request = factory.post('')
         force_authenticate(request, user=self.user_prediction_caster_one.user)
-        view(request, prediction_statement_id=self.prediction_one.id)
+        response = view(request, prediction_statement_id=self.prediction_one.prediction_statement.id)
 
+        self.assertEqual(response.status_code, 200, msg=response.data)
         with self.assertRaises(PollPredictionBet.DoesNotExist, msg='PredictionBet not removed.'):
             PollPredictionBet.objects.get(id=self.prediction_one.id)
 
@@ -175,6 +187,7 @@ class PollPredictionStatementTest(APITransactionTestCase):
         request = factory.post('', dict(vote=True))
         force_authenticate(request, user=self.user_prediction_caster_one.user)
         response = view(request, prediction_statement_id=self.prediction_statement.id)
+        self.assertEqual(response.status_code, 201, msg=response.data)
 
         prediction = PollPredictionStatementVote.objects.get(created_by=self.user_prediction_caster_one,
                                                              prediction_statement=self.prediction_statement)
@@ -191,7 +204,8 @@ class PollPredictionStatementTest(APITransactionTestCase):
 
         request = factory.post('', dict(vote=False))
         force_authenticate(request, user=self.user_prediction_caster_one.user)
-        response = view(request, prediction_statement_id=prediction_vote.id)
+        response = view(request, prediction_statement_id=prediction_vote.prediction_statement.id)
+        self.assertEqual(response.status_code, 200, msg=response.data)
 
         prediction_vote.refresh_from_db()
 
@@ -208,7 +222,8 @@ class PollPredictionStatementTest(APITransactionTestCase):
 
         request = factory.post('')
         force_authenticate(request, user=self.user_prediction_caster_one.user)
-        response = view(request, prediction_statement_id=prediction_vote.id)
+        response = view(request, prediction_statement_id=prediction_vote.prediction_statement.id)
+        self.assertEqual(response.status_code, 200, msg=response.data)
 
         with self.assertRaises(PollPredictionStatementVote.DoesNotExist, msg='Prediction Vote not removed.'):
             PollPredictionStatementVote.objects.get(id=prediction_vote.id)
@@ -217,9 +232,10 @@ class PollPredictionStatementTest(APITransactionTestCase):
         factory = APIRequestFactory()
         view = PollPredictionStatementListAPI.as_view()
 
-        request = factory.get('')
+        request = factory.get('', data=dict(proposals='1,3'))
         force_authenticate(request, user=self.user_prediction_caster_one.user)
         response = view(request, group_id=self.group.id)
+        self.assertEqual(response.status_code, 200, msg=response.data)
 
         self.assertEqual(len(json.loads(response.rendered_content)['results']), 1,
                          'Incorrect amount of prediction statements returned')
@@ -230,18 +246,136 @@ class PollPredictionStatementTest(APITransactionTestCase):
         factory = APIRequestFactory()
         view = PollPredictionBetListAPI.as_view()
 
-
         (self.prediction_one,
          self.prediction_two,
-         self.prediction_three) = [PollPredictionFactory(prediction_statement=self.prediction_statement,
-                                                         created_by=group_user
-                                                         ) for group_user in [self.user_prediction_caster_one,
-                                                                              self.user_prediction_caster_two,
-                                                                              self.user_prediction_caster_three]]
+         self.prediction_three) = [PollPredictionBetFactory(prediction_statement=self.prediction_statement,
+                                                            created_by=group_user
+                                                            ) for group_user in [self.user_prediction_caster_one,
+                                                                                 self.user_prediction_caster_two,
+                                                                                 self.user_prediction_caster_three]]
 
         request = factory.get('')
         force_authenticate(request, user=self.user_prediction_caster_one.user)
         response = view(request, group_id=self.group.id)
+        self.assertEqual(response.status_code, 200, msg=response.data)
 
         self.assertEqual(len(json.loads(response.rendered_content)['results']), 1,
                          'Incorrect amount of predictions returned')
+
+    class BetUser:
+        def __init__(self, group_user: GroupUser, score: int, vote: bool):
+            self.group_user = group_user
+            self.score = score
+            self.vote = vote
+
+        group_user: GroupUser
+        score: int  # between 0 and 5
+        vote: bool
+
+    @staticmethod
+    def generate_previous_bet(poll: Poll, bet_users: list[BetUser]):
+        statement = PollPredictionStatementFactory(poll=poll)
+
+        for bet_user in bet_users:
+            PollPredictionBetFactory(prediction_statement=statement,
+                                     created_by=bet_user.group_user,
+                                     score=bet_user.score)
+            PollPredictionStatementVoteFactory(prediction_statement=statement,
+                                               created_by=bet_user.group_user,
+                                               vote=bet_user.vote)
+
+    def test_poll_prediction_combined_bet(self):
+        # Make random previous bets
+        poll_one_bets = [self.BetUser(group_user=self.user_prediction_caster_one,
+                                      score=0,
+                                      vote=True),
+                         self.BetUser(group_user=self.user_prediction_caster_two,
+                                      score=0,
+                                      vote=True),
+                         self.BetUser(group_user=self.user_prediction_caster_three,
+                                      score=0,
+                                      vote=True)]
+
+        poll = PollFactory(created_by=self.user_group_creator,
+                           tag=self.poll.tag,
+                           **generate_poll_phase_kwargs('prediction_vote'))
+        self.generate_previous_bet(poll=poll, bet_users=poll_one_bets)
+        poll_prediction_bet_count(poll_id=poll.id)
+
+        poll_two_bets = [self.BetUser(group_user=self.user_prediction_caster_one,
+                                      score=0,
+                                      vote=True),
+                         self.BetUser(group_user=self.user_prediction_caster_two,
+                                      score=0,
+                                      vote=True),
+                         self.BetUser(group_user=self.user_prediction_caster_three,
+                                      score=0,
+                                      vote=True)]
+
+        poll = PollFactory(created_by=self.user_group_creator,
+                           tag=self.poll.tag,
+                           **generate_poll_phase_kwargs('prediction_vote'))
+        self.generate_previous_bet(poll=poll, bet_users=poll_two_bets)
+        poll_prediction_bet_count(poll_id=poll.id)
+
+        # For irrelevant poll
+        poll_three_bets = [self.BetUser(group_user=self.user_prediction_caster_one,
+                                        score=0,
+                                        vote=True),
+                           self.BetUser(group_user=self.user_prediction_caster_two,
+                                        score=3,
+                                        vote=True),
+                           self.BetUser(group_user=self.user_prediction_caster_three,
+                                        score=3,
+                                        vote=True)]
+
+        poll = PollFactory(created_by=self.user_group_creator,
+                           tag=GroupTagsFactory(),
+                           **generate_poll_phase_kwargs('prediction_vote'))
+        self.generate_previous_bet(poll=poll, bet_users=poll_three_bets)
+        poll_prediction_bet_count(poll_id=poll.id)
+
+        # Calculate combined_bet
+        (self.prediction_one,
+         self.prediction_two,
+         self.prediction_three) = [PollPredictionBetFactory(prediction_statement=self.prediction_statement,
+                                                            score=0,
+                                                            created_by=group_user,
+                                                            ) for group_user in [self.user_prediction_caster_one,
+                                                                                 self.user_prediction_caster_two,
+                                                                                 self.user_prediction_caster_three]]
+
+        poll_prediction_bet_count(poll_id=self.poll.id)
+        print(self.poll.tag, self.prediction_statement.combined_bet)
+        print([i.combined_bet for i in PollPredictionStatement.objects.all()])
+
+        # Query Test
+        qs = PollPredictionStatement.objects.filter(poll__tag=self.poll.tag, pollpredictionstatementvote__isnull=False)
+
+        qs_outcome = qs.annotate(
+            outcome_sum=Sum(Case(When(pollpredictionstatementvote__vote=True, then=1),
+                                 When(pollpredictionstatementvote__vote=False, then=-1),
+                                 default=0,
+                                 output_field=models.IntegerField())),
+
+            outcome=Case(When(outcome_sum__gt=0, then=1),
+                         When(outcome_sum__lte=0, then=0),
+                         default=0.5,
+                         output_field=models.DecimalField(max_digits=14, decimal_places=4)),
+            has_bets=Case(When(pollpredictionbet__isnull=True, then=0), default=1),
+            p1=Abs(F('combined_bet') - F('outcome')))
+
+        pprint([i.__dict__ for i in qs_outcome])
+        print(qs_outcome.aggregate(interval_mean_absolute_error=(Sum('p1') / Sum('has_bets'))))
+
+        # Request Test
+        factory = APIRequestFactory()
+        user = self.user_group_creator.user
+        view = GroupTagIntervalMeanAbsoluteCorrectnessAPI.as_view()
+
+        request = factory.get('', data=dict(limit=10))
+        force_authenticate(request, user=user)
+        response = view(request, tag_id=self.poll.tag_id)
+
+        data = json.loads(response.rendered_content)
+        pprint(data)

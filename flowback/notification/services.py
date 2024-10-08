@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import Union
 
+from django.db.models import F
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
@@ -59,6 +60,18 @@ def notification_create(*, action: str, category: str, sender_type: str, sender_
     return notification_object
 
 
+def notification_shift(*, category: str, sender_type: str, sender_id: int,
+                       related_id: int = None, timestamp: datetime = None,
+                       timestamp__lt: datetime = None, timestamp__gt: datetime = None, action: str = None,
+                       delta: timezone.timedelta):
+    channel = notification_load_channel(category=category, sender_type=sender_type, sender_id=sender_id)
+    timestamp = timestamp or timezone.now()
+    filters = {a: b for a, b in dict(channel=channel, action=action, related_id=related_id, timestamp=timestamp,
+                                     timestamp__lt=timestamp__lt, timestamp__gt=timestamp__gt).items() if b is not None}
+
+    notifications = NotificationObject.objects.filter(**filters).update(timestamp=F('timestamp') + delta)
+
+
 def notification_delete(*, category: str, sender_type: str, sender_id: int,
                         related_id: int = None, timestamp: datetime = None,
                         timestamp__lt: datetime = None, timestamp__gt: datetime = None, action: str = None):
@@ -86,7 +99,7 @@ def notification_channel_subscribe(*,
     channel = notification_load_channel(category=category,
                                         sender_type=sender_type,
                                         sender_id=sender_id,
-                                        create_if_not_exist=False)
+                                        create_if_not_exist=True)
     get_object(NotificationSubscription, user_id=user_id, channel=channel,
                error_message='User is already subscribed', reverse=True)
     subscription = NotificationSubscription(user_id=user_id, channel=channel)
@@ -166,6 +179,14 @@ class NotificationManager:
 
         notification_create(action=action, category=category, sender_type=self.sender_type, sender_id=sender_id,
                             message=message, timestamp=timestamp, related_id=related_id, target_user_id=target_user_id)
+
+    def shift(self, *, category: str, sender_id: int, related_id: int = None, timestamp: datetime = None,
+              timestamp__lt: datetime = None, timestamp__gt: datetime = None, action: str = None,
+              delta: timezone.timedelta):
+        self.category_is_possible(category)
+        notification_shift(category=category, sender_type=self.sender_type, sender_id=sender_id, related_id=related_id,
+                           timestamp=timestamp, timestamp__lt=timestamp__lt, timestamp__gt=timestamp__gt,
+                           action=action, delta=delta)
 
     def delete(self, *, category: str, sender_id: int, related_id: int = None, action: str = None,
                timestamp: datetime = None, timestamp__lt: datetime = None, timestamp__gt: datetime = None):

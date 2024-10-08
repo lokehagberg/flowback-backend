@@ -5,6 +5,7 @@ from django.db.models.fields.related import RelatedField
 from django.db.models.lookups import LessThan
 from django.utils import timezone
 
+from flowback.common.filters import NumberInFilter
 from flowback.group.selectors import group_user_permissions
 from flowback.poll.models import PollPredictionStatement, PollPredictionBet, PollPredictionStatementVote, \
     PollPredictionStatementSegment
@@ -12,12 +13,12 @@ from flowback.user.models import User
 
 
 class BasePollPredictionStatementFilter(django_filters.FilterSet):
-    proposals = django_filters.NumberFilter(field_name='pollpredictionstatementsegment__proposal', lookup_expr='in')
+    proposals = NumberInFilter(field_name='pollpredictionstatementsegment__proposal')
+    title = django_filters.CharFilter(lookup_expr='icontains')
     description = django_filters.CharFilter(lookup_expr='icontains')
     created_by_id = django_filters.NumberFilter(field_name='created_by__user_id', lookup_expr='exact')
     user_prediction_bet__exists = django_filters.BooleanFilter(lookup_expr='isnull', exclude=True)
     user_vote__exists = django_filters.BooleanFilter(lookup_expr='isnull', exclude=True)
-
 
     class Meta:
         model = PollPredictionStatement
@@ -27,7 +28,7 @@ class BasePollPredictionStatementFilter(django_filters.FilterSet):
 
 def poll_prediction_statement_list(*, fetched_by: User, group_id: int, filters=None):
     filters = filters or {}
-    group_user = group_user_permissions(group=group_id, user=fetched_by)
+    group_user = group_user_permissions(user=fetched_by, group=group_id)
 
     # Annotations
     score = Case(When(LessThan(F('end_date'), timezone.now()),
@@ -52,7 +53,7 @@ def poll_prediction_statement_list(*, fetched_by: User, group_id: int, filters=N
 
 
 # poll_prediction_list
-class BasePollPredictionFilter(django_filters.FilterSet):
+class BasePollPredictionBetFilter(django_filters.FilterSet):
     created_by_id = django_filters.NumberFilter(field_name='created_by__user_id')
 
     class Meta:
@@ -65,8 +66,8 @@ class BasePollPredictionFilter(django_filters.FilterSet):
 
 def poll_prediction_bet_list(*, fetched_by: User, group_id: int = None, filters=None):
     filters = filters or {}
-    group_user_permissions(group=group_id, user=fetched_by)
+    group_user_permissions(user=fetched_by, group=group_id)
 
     qs = PollPredictionBet.objects.filter(prediction_statement__created_by__group_id=group_id,
                                           created_by__user=fetched_by).all()
-    return BasePollPredictionFilter(filters, qs).qs
+    return BasePollPredictionBetFilter(filters, qs).qs

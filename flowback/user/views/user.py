@@ -143,9 +143,16 @@ class UserDeleteAPI(APIView):
 
 
 class UserGetChatChannelAPI(APIView):
+    class FilterSerializer(serializers.Serializer):
+        target_user_ids = serializers.ListField(child=serializers.IntegerField())
+
     class OutputSerializer(serializers.Serializer):
         id = serializers.IntegerField()
+        title = serializers.CharField()
 
-    def get(self, request, target_user_id: int):
-        data = user_get_chat_channel(user_id=request.user.id, target_user_id=target_user_id)
+    def get(self, request):
+        serializer = self.FilterSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        data = user_get_chat_channel(user_id=request.user.id, **serializer.validated_data)
+
         return Response(status=status.HTTP_200_OK, data=self.OutputSerializer(data).data)

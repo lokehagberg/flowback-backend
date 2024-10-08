@@ -6,7 +6,7 @@ from flowback.common.pagination import LimitOffsetPagination, get_paginated_resp
 from flowback.group.models import GroupUserDelegator, GroupTags
 from flowback.group.selectors import group_user_delegate_list, group_user_delegate_pool_list
 from flowback.group.serializers import GroupUserSerializer
-from flowback.group.services import group_user_delegate, group_user_delegate_update, group_user_delegate_remove, \
+from flowback.group.services.delegate import group_user_delegate, group_user_delegate_update, group_user_delegate_remove, \
     group_user_delegate_pool_create, group_user_delegate_pool_delete
 
 
@@ -74,9 +74,10 @@ class GroupUserDelegateListApi(APIView):
         delegates = Delegates(many=True,
                               source='delegate_pool.groupuserdelegate_set',
                               read_only=True)
+        blockchain_id = serializers.IntegerField(source='delegate_pool.blockchain_id')
         class Meta:
             model = GroupUserDelegator
-            fields = ('id', 'tags', 'delegates', 'delegate_pool_id')
+            fields = ('id', 'tags', 'delegates', 'delegate_pool_id', 'blockchain_id')
 
     def get(self, request, group: int):
         filter_serializer = self.FilterSerializer(data=request.query_params)
@@ -96,8 +97,14 @@ class GroupUserDelegateListApi(APIView):
 
 
 class GroupUserDelegatePoolCreateApi(APIView):
+    class InputSerializer(serializers.Serializer):
+        blockchain_id = serializers.IntegerField(required=False, min_value=1)
+
     def post(self, request, group: int):
-        group_user_delegate_pool_create(user=request.user.id, group=group)
+        serializer = self.InputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        group_user_delegate_pool_create(user=request.user.id, group=group, **serializer.validated_data)
 
         return Response(status=status.HTTP_200_OK)
 

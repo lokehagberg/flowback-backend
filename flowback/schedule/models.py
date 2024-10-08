@@ -20,6 +20,7 @@ class ScheduleEvent(BaseModel):
     start_date = models.DateTimeField()
     end_date = models.DateTimeField(null=True, blank=True)
     active = models.BooleanField(default=True)
+    work_group = models.ForeignKey('group.WorkGroup', on_delete=models.CASCADE, null=True, blank=True)
 
     origin_name = models.CharField(max_length=255)
     origin_id = models.IntegerField()

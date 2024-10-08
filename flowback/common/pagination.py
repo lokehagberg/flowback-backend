@@ -4,6 +4,7 @@ from rest_framework.pagination import LimitOffsetPagination as _LimitOffsetPagin
 from rest_framework.response import Response
 
 
+# Default pagination getter for list views
 def get_paginated_response(*, pagination_class, serializer_class, queryset, request, view):
     paginator = pagination_class()
 
@@ -18,6 +19,7 @@ def get_paginated_response(*, pagination_class, serializer_class, queryset, requ
     return Response(data=serializer.data)
 
 
+# Default pagination class for list views
 class LimitOffsetPagination(_LimitOffsetPagination):
     default_limit = 10
     max_limit = 50

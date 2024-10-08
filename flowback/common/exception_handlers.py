@@ -6,6 +6,7 @@ from rest_framework import exceptions
 from rest_framework.serializers import as_serializer_error
 
 
+# The default exception handler
 def drf_default_with_modifications_exception_handler(exc, ctx):
     if isinstance(exc, DjangoValidationError):
         exc = exceptions.ValidationError(as_serializer_error(exc))

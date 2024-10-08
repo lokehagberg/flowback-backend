@@ -22,10 +22,15 @@ class PollProposalListAPI(APIView):
         default_limit = 10
 
     class FilterSerializer(serializers.Serializer):
+        order_by = serializers.ChoiceField(required=False,
+                                           default='created_at_desc',
+                                           choices=['created_at_asc', 'created_at_desc',
+                                                    'score_asc', 'score_desc'])
         id = serializers.IntegerField(required=False)
-        created_by = serializers.IntegerField(required=False)
+        created_by_user_id_list = serializers.CharField(required=False)
         title = serializers.CharField(required=False)
         title__icontains = serializers.CharField(required=False)
+        has_attachments = serializers.BooleanField(required=False, allow_null=True, default=None)
 
     class FilterSerializerTypeSchedule(FilterSerializer):
         start_date = serializers.DateTimeField(required=False)
@@ -33,11 +38,12 @@ class PollProposalListAPI(APIView):
 
     class OutputSerializer(serializers.Serializer):
         id = serializers.IntegerField()
-        created_by = GroupUserSerializer()
+        created_by = GroupUserSerializer(required=False)
         poll = serializers.IntegerField(source='poll_id')
         title = serializers.CharField()
         description = serializers.CharField()
         attachments = FileSerializer(many=True, source="attachments.filesegment_set", allow_null=True)
+        blockchain_id = serializers.IntegerField(min_value=0, allow_null=True)
         score = serializers.IntegerField()
 
     class OutputSerializerTypeSchedule(OutputSerializer):
@@ -75,7 +81,7 @@ class PollProposalCreateAPI(APIView):
 
         class Meta:
             model = PollProposal
-            fields = ('title', 'description', 'attachments')
+            fields = ('title', 'description', 'attachments', 'blockchain_id')
 
     class InputSerializerSchedule(serializers.ModelSerializer):
         start_date = serializers.DateTimeField()

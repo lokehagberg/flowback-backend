@@ -33,13 +33,15 @@ def create_event(*,
                  end_date: timezone.datetime,
                  origin_name: str,
                  origin_id: int,
-                 description: str = None) -> ScheduleEvent:
+                 description: str = None,
+                 work_group_id: int = None) -> ScheduleEvent:
     event = ScheduleEvent(schedule_id=schedule_id,
                           title=title,
                           description=description,
                           start_date=start_date,
                           end_date=end_date,
                           origin_name=origin_name,
+                          work_group_id=work_group_id,
                           origin_id=origin_id)
     event.full_clean()
     event.save()
@@ -102,12 +104,18 @@ class ScheduleManager:
         delete_schedule(schedule_id=schedule.id)
 
     # Event
-    def get_schedule_event(self, schedule_origin_id: int, event_id: int, raise_exception: bool = True):
-        return get_object(ScheduleEvent,
-                          id=event_id,
-                          schedule__origin_name=self.origin_name,
-                          schedule__origin_id=schedule_origin_id,
-                          raise_exception=raise_exception)
+    def get_schedule_event(self,
+                           event_id: int,
+                           schedule_origin_id: int = None,
+                           raise_exception: bool = True) -> ScheduleEvent:
+        data = dict(id=event_id,
+                    schedule__origin_name=self.origin_name,
+                    raise_exception=raise_exception)
+
+        if schedule_origin_id is not None:
+            data['schedule_origin_id'] = schedule_origin_id
+
+        return get_object(ScheduleEvent, **data)
 
     def create_event(self,
                      *,
@@ -117,7 +125,8 @@ class ScheduleManager:
                      end_date: timezone.datetime,
                      origin_name: str,
                      origin_id: int,
-                     description: str = None) -> ScheduleEvent:
+                     description: str = None,
+                     work_group_id: int = None) -> ScheduleEvent:
 
         self.validate_origin_name(origin_name=origin_name)
 
@@ -127,6 +136,7 @@ class ScheduleManager:
                             end_date=end_date,
                             origin_name=origin_name,
                             origin_id=origin_id,
+                            work_group_id=work_group_id,
                             description=description)
 
     def update_event(self, *, schedule_origin_id: int, event_id: int, data):

@@ -6,6 +6,7 @@ from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
 from django.db.models.signals import post_save, post_delete
 from django.utils import timezone
+from django.utils.functional import classproperty
 
 from rest_framework.authtoken.models import Token
 
@@ -73,7 +74,7 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     objects = CustomUserManager()
 
-    @property
+    @classproperty
     def message_channel_origin(self) -> str:
         return "user"
 
@@ -117,3 +118,9 @@ class PasswordReset(BaseModel):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     verification_code = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     is_verified = models.BooleanField(default=False)
+
+
+class Report(BaseModel):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    title = models.CharField(max_length=255)
+    description = models.TextField()

@@ -11,7 +11,9 @@ from flowback.group.models import (Group,
                                    GroupUserInvite,
                                    GroupUserDelegate,
                                    GroupUserDelegatePool,
-                                   GroupUserDelegator)
+                                   GroupUserDelegator, GroupThreadVote, WorkGroup, WorkGroupUser,
+                                   WorkGroupUserJoinRequest)
+from flowback.kanban.models import KanbanEntry
 from flowback.user.tests.factories import UserFactory
 
 
@@ -33,6 +35,30 @@ class GroupUserFactory(factory.django.DjangoModelFactory):
     is_admin = factory.LazyAttribute(lambda o: o.group.created_by == o.user)
 
 
+class WorkGroupFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = WorkGroup
+
+    name = factory.LazyAttribute(lambda _: fake.unique.first_name())
+    group = factory.SubFactory(GroupFactory)
+
+
+class WorkGroupUserFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = WorkGroupUser
+
+    group_user = factory.SubFactory(GroupUserFactory)
+    work_group = factory.SubFactory(WorkGroupFactory, group=factory.SelfAttribute('..group_user.group'))
+
+
+class WorkGroupJoinRequestFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = WorkGroupUserJoinRequest
+
+    group_user = factory.SubFactory(GroupUserFactory)
+    work_group = factory.SubFactory(WorkGroupFactory, group=factory.SelfAttribute('..group_user.group'))
+
+
 class GroupTagsFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = GroupTags
@@ -48,6 +74,15 @@ class GroupThreadFactory(factory.django.DjangoModelFactory):
     created_by = factory.SubFactory(GroupUserFactory)
     title = factory.LazyAttribute(lambda _: fake.unique.sentence(nb_words=10).lower())
     comment_section = factory.SubFactory(CommentSectionFactory)
+
+
+class GroupThreadVoteFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = GroupThreadVote
+
+    created_by = factory.SubFactory(GroupUserFactory)
+    thread = factory.SubFactory(GroupThreadFactory, created_by=factory.SelfAttribute('..created_by'))
+    vote = factory.LazyAttribute(lambda _: fake.boolean())
 
 
 class GroupPermissionsFactory(factory.django.DjangoModelFactory):
