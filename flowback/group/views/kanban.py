@@ -10,6 +10,7 @@ from flowback.kanban.views import KanbanEntryListApi, KanbanEntryCreateAPI, Kanb
 
 class GroupKanbanEntryListAPI(KanbanEntryListApi):
     class OutputSerializer(KanbanEntryListApi.OutputSerializer):
+        work_group_ids = serializers.CharField(required=False)
         group_name = serializers.CharField()
 
     def get(self, request, group_id: int):

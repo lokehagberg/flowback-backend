@@ -5,7 +5,7 @@ from rest_framework.exceptions import ValidationError
 
 from backend.settings import env, DEFAULT_FROM_EMAIL
 from flowback.common.services import get_object, model_update
-from flowback.group.models import Group, GroupUser, GroupPermissions, GroupUserInvite
+from flowback.group.models import Group, GroupUser, GroupPermissions, GroupUserInvite, WorkGroupUser
 from flowback.group.selectors import group_user_permissions
 from flowback.notification.services import NotificationManager
 from flowback.user.models import User
@@ -47,7 +47,8 @@ def group_create(*,
 def group_update(*, user: int, group: int, data) -> Group:
     group_user = group_user_permissions(user=user, group=group, permissions=['admin'])
     non_side_effect_fields = ['name', 'description', 'image', 'cover_image', 'hide_poll_users',
-                              'public', 'direct_join', 'default_permission', 'default_quorum']
+                              'public', 'direct_join', 'default_permission', 'default_quorum',
+                              'poll_phase_minimum_space']
 
     # Check if group_permission exists to allow for a new default_permission
     if default_permission := data.get('default_permission'):
@@ -67,14 +68,33 @@ def group_delete(*, user: int, group: int) -> None:
     group_user_permissions(user=user, group=group, permissions=['creator']).group.delete()
 
 
-def group_mail(*, fetched_by: int, group: int, title: str, message: str) -> None:
-    group_user = group_user_permissions(user=fetched_by, group=group, permissions=['admin'])
+def group_mail(*, fetched_by: int, group: int, title: str, message: str, work_group_id: int = None) -> None:
+    group_user = group_user_permissions(user=fetched_by,
+                                        group=group,
+                                        permissions=['admin', 'send_group_email'],
+                                        work_group=work_group_id)
 
     subject = f'[{group_user.group.name}] - {title}'
-    targets = GroupUser.objects.filter(group_id=group).values('user__email').all()
 
-    send_mass_mail([subject, message, DEFAULT_FROM_EMAIL,
-                    [target['user__email']]] for target in targets)
+    if not work_group_id:
+        group_user_permissions(user=fetched_by,
+                               group=group,
+                               permissions=['admin', 'send_group_email'])
+
+        targets = GroupUser.objects.filter(group_id=group).values('user__email').all()
+        send_mass_mail([subject, message, DEFAULT_FROM_EMAIL,
+                        [target['user__email']]] for target in targets)
+
+    else:
+        group_user_permissions(user=fetched_by,
+                               group=group,
+                               permissions=['work_group_moderator'],
+                               work_group=work_group_id,
+                               allow_admin=True)
+
+        targets = WorkGroupUser.objects.filter(work_group_id=work_group_id).values('group_user__user__email').all()
+        send_mass_mail([subject, message, DEFAULT_FROM_EMAIL,
+                        [target['group_user__user__email']]] for target in targets)
 
 
 def group_join(*, user: int, group: int) -> Union[GroupUser, GroupUserInvite]:

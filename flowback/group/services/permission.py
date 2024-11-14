@@ -26,6 +26,7 @@ def group_permission_update(*, user: int, group: int, permission_id: int, data) 
                               'allow_delegate',
                               'kick_members',
                               'ban_members',
+                              'send_group_email',
 
                               'create_proposal',
                               'update_proposal',

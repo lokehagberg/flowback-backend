@@ -1,32 +1,9 @@
-from math import sqrt
-
-from django.db.models import Sum, Count, Q
 from rest_framework.exceptions import ValidationError
 
-from flowback.comment.models import CommentSection, Comment, CommentVote
+from flowback.comment.models import Comment, CommentVote
 from flowback.common.services import model_update, get_object
 from flowback.files.services import upload_collection
 from flowback.user.models import User
-
-
-def comment_section_create(*, active: bool = True) -> CommentSection:
-    comments = CommentSection(active=active)
-    comments.full_clean()
-    comments.save()
-
-    return comments
-
-
-def comment_section_create_model_default() -> int:
-    comment_section = CommentSection()
-    comment_section.full_clean()
-    comment_section.save()
-
-    return comment_section.id
-
-
-def comment_section_delete(*, comments_id: int):
-    CommentSection.objects.get(comments_id=comments_id).delete()
 
 
 def comment_create(*,

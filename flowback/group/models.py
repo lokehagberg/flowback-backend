@@ -1,3 +1,4 @@
+import logging
 import uuid
 
 from django.core.validators import MinValueValidator, MaxValueValidator
@@ -8,16 +9,11 @@ from rest_framework.exceptions import ValidationError
 
 from backend.settings import FLOWBACK_DEFAULT_GROUP_JOIN
 from flowback.chat.models import MessageChannel, MessageChannelParticipant
-from flowback.chat.services import message_channel_create, message_channel_join
-from flowback.comment.models import CommentSection
-from flowback.comment.services import comment_section_create, comment_section_create_model_default
+from flowback.comment.models import CommentSection, comment_section_create, comment_section_create_model_default
 from flowback.common.models import BaseModel
-from flowback.common.services import get_object
 from flowback.files.models import FileCollection
-from flowback.kanban.models import Kanban
-from flowback.kanban.services import kanban_create, kanban_subscription_create, kanban_subscription_delete
+from flowback.kanban.models import Kanban, KanbanSubscription
 from flowback.schedule.models import Schedule
-from flowback.schedule.services import create_schedule
 from flowback.user.models import User
 from django.db import models
 
@@ -52,6 +48,7 @@ class Group(BaseModel):
     image = models.ImageField(upload_to='group/image', null=True, blank=True)
     cover_image = models.ImageField(upload_to='group/cover_image', null=True, blank=True)
     hide_poll_users = models.BooleanField(default=False)  # Hides users in polls, TODO remove bool from views
+    poll_phase_minimum_space = models.IntegerField(default=0)  # The minimum space between poll phases (in seconds)
     default_quorum = models.IntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(100)])
     schedule = models.ForeignKey(Schedule, null=True, blank=True, on_delete=models.PROTECT)
     kanban = models.ForeignKey(Kanban, null=True, blank=True, on_delete=models.PROTECT)
@@ -68,13 +65,21 @@ class Group(BaseModel):
     @classmethod
     def pre_save(cls, instance, raw, using, update_fields, *args, **kwargs):
         if instance.pk is None:
-            instance.chat = message_channel_create(origin_name='group')
+            channel = MessageChannel(origin_name='group')
+            channel.save()
+
+            instance.chat = channel
 
     @classmethod
     def post_save(cls, instance, created, update_fields, *args, **kwargs):
         if created:
-            instance.schedule = create_schedule(name=instance.name, origin_name='group', origin_id=instance.id)
-            instance.kanban = kanban_create(name=instance.name, origin_type='group', origin_id=instance.id)
+            schedule = Schedule(name=instance.name, origin_name='group', origin_id=instance.id)
+            schedule.save()
+            kanban = Kanban(name=instance.name, origin_type='group', origin_id=instance.id)
+            kanban.save()
+
+            instance.schedule = schedule
+            instance.kanban = kanban
             instance.save()
 
         if update_fields:
@@ -91,10 +96,15 @@ class Group(BaseModel):
     def user_post_save(cls, instance: User, created: bool, *args, **kwargs):
         if created and FLOWBACK_DEFAULT_GROUP_JOIN:
             for group_id in FLOWBACK_DEFAULT_GROUP_JOIN:
-                if get_object(Group, id=group_id, raise_exception=False):
+                try:
+                    group = Group.objects.get(id=group_id)
                     group_user = GroupUser(user=instance, group_id=group_id)
                     # TODO FIX pre_save check group_user.full_clean()
                     group_user.save()
+
+                except Group.DoesNotExist:
+                    logger = logging.getLogger(__name__)
+                    logger.warning(msg="FLOWBACK_DEFAULT_GROUP_JOIN references a group that does not exist")
 
     @classmethod
     def post_delete(cls, instance, *args, **kwargs):
@@ -118,6 +128,7 @@ class GroupPermissions(BaseModel):
     poll_fast_forward = models.BooleanField(default=False)
     poll_quorum = models.BooleanField(default=False)
     allow_vote = models.BooleanField(default=True)
+    send_group_email = models.BooleanField(default=False)
     allow_delegate = models.BooleanField(default=True)
     kick_members = models.BooleanField(default=False)
     ban_members = models.BooleanField(default=False)
@@ -197,21 +208,20 @@ class GroupUser(BaseModel):
     def pre_save(cls, instance, raw, using, update_fields, *args, **kwargs):
         if instance.pk is None:
             # Joins the chatroom associated with the poll
-            instance.chat_participant = message_channel_join(user_id=instance.user_id,
-                                                             channel_id=instance.group.chat_id)
+            participant = MessageChannelParticipant(user=instance.user, channel=instance.group.chat)
+            participant.save()
+
+            instance.chat_participant = participant
 
     @classmethod
     def post_save(cls, instance, created, update_fields, *args, **kwargs):
         if created:
-            kanban_subscription_create(kanban_id=instance.user.kanban_id,
-                                       target_id=instance.group.kanban_id)
-            instance.save()
-            return
+            KanbanSubscription(kanban_id=instance.user.kanban_id, target_id=instance.group.kanban_id)
 
     @classmethod
     def post_delete(cls, instance, *args, **kwargs):
-        kanban_subscription_delete(kanban_id=instance.user.kanban_id,
-                                   target_id=instance.group.kanban_id)
+        KanbanSubscription.objects.filter(kanban_id=instance.user.kanban_id,
+                                          target_id=instance.group.kanban_id).delete()
         instance.chat_participant.delete()
 
     class Meta:

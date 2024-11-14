@@ -15,7 +15,8 @@ def group_schedule_event_create(*,
                                 start_date: timezone.datetime,
                                 description: str = None,
                                 work_group_id: int = None,
-                                end_date: timezone.datetime = None) -> ScheduleEvent:
+                                end_date: timezone.datetime = None,
+                                assignee_ids: list[int] = None) -> ScheduleEvent:
     group_user = group_user_permissions(user=user_id, group=group_id, work_group=work_group_id)
     return group_schedule.create_event(schedule_id=group_user.group.schedule.id,
                                        title=title,
@@ -24,7 +25,8 @@ def group_schedule_event_create(*,
                                        origin_id=group_user.group.id,
                                        origin_name='group',
                                        work_group_id=work_group_id,
-                                       description=description)
+                                       description=description,
+                                       assignee_ids=assignee_ids)
 
 
 def group_schedule_event_update(*,

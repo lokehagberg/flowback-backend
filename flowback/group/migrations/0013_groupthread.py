@@ -3,6 +3,8 @@
 from django.db import migrations, models
 import django.db.models.deletion
 import django.utils.timezone
+
+import flowback.comment.models
 import flowback.comment.services
 
 
@@ -22,7 +24,7 @@ class Migration(migrations.Migration):
                 ('updated_at', models.DateTimeField(auto_now=True)),
                 ('title', models.CharField(max_length=200)),
                 ('active', models.BooleanField(default=True)),
-                ('comment_section', models.ForeignKey(default=flowback.comment.services.comment_section_create, on_delete=django.db.models.deletion.DO_NOTHING, to='comment.commentsection')),
+                ('comment_section', models.ForeignKey(default=flowback.comment.models.comment_section_create, on_delete=django.db.models.deletion.DO_NOTHING, to='comment.commentsection')),
                 ('created_by', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='group.groupuser')),
             ],
             options={

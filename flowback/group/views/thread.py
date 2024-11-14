@@ -27,6 +27,7 @@ class GroupThreadListAPI(APIView):
     class FilterSerializer(serializers.Serializer):
         order_by = serializers.CharField(required=False)
         id = serializers.IntegerField(required=False)
+        id_list = serializers.CharField(required=False)
         title = serializers.CharField(required=False)
         user_vote = serializers.BooleanField(required=False, allow_null=True, default=None)
 
@@ -70,8 +71,8 @@ class GroupThreadCreateAPI(APIView):
 
 class GroupThreadUpdateAPI(APIView):
     class InputSerializer(serializers.Serializer):
-        title = serializers.CharField()
-        pinned = serializers.BooleanField(default=False)
+        title = serializers.CharField(required=False)
+        pinned = serializers.BooleanField(allow_null=True, default=None)
         attachments = serializers.ListField(child=serializers.FileField(), required=False, max_length=10)
 
     def post(self, request, thread_id: int):

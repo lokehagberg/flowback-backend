@@ -1,5 +1,3 @@
-from typing import Union
-
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
 from django.db.models import Q, F, Count
@@ -15,10 +13,9 @@ from flowback.prediction.models import (PredictionBet,
                                         PredictionStatement,
                                         PredictionStatementSegment,
                                         PredictionStatementVote)
-from flowback.comment.services import comment_section_create_model_default
 from flowback.common.models import BaseModel
 from flowback.group.models import Group, GroupUser, GroupUserDelegatePool, GroupTags
-from flowback.comment.models import CommentSection
+from flowback.comment.models import CommentSection, comment_section_create_model_default
 import pgtrigger
 
 from flowback.schedule.models import Schedule, ScheduleEvent
@@ -132,8 +129,14 @@ class Poll(BaseModel):
     def clean(self):
         labels = self.labels
         for x in range(len(labels) - 1):
-            if labels[x][0] > labels[x + 1][0]:
-                raise ValidationError(f'{labels[x][1].title()} is greater than {labels[x + 1][1]}')
+            phase = labels[x]
+            next_phase = labels[x + 1]
+            if phase[0] >= next_phase[0]:
+                raise ValidationError(f'{phase[1].replace("_", " ").title()} '
+                                      f'starts after {next_phase[1].replace("_", " ").title()}')
+            elif phase[0] + timezone.timedelta(seconds=self.created_by.group.poll_phase_minimum_space) >= next_phase[0]:
+                raise ValidationError(f'The time between phases {phase[1].replace("_", " ").title()} '
+                                      f'and {next_phase[1].replace("_", " ").title()} is below minimum')
 
     class Meta:
         constraints = [models.CheckConstraint(check=Q(Q(area_vote_end_date__isnull=True)

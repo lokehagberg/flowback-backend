@@ -16,9 +16,9 @@ from ...user.models import User
 def poll_prediction_statement_create(poll: int,
                                      user: Union[int, User],
                                      title: str,
-                                     description: str,
                                      end_date: timezone.datetime,
                                      segments: list[dict],
+                                     description: str = None,
                                      attachments: list = None,
                                      blockchain_id: int = None) -> int:
     poll = get_object(Poll, id=poll)

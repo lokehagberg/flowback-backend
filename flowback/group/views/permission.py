@@ -30,6 +30,7 @@ class GroupPermissionListApi(APIView):
                       'poll_quorum',
                       'allow_vote',
                       'allow_delegate',
+                      'send_group_email',
                       'kick_members',
                       'ban_members',
 
@@ -122,6 +123,7 @@ class GroupPermissionUpdateApi(APIView):
         allow_delegate = serializers.BooleanField(required=False)
         kick_members = serializers.BooleanField(required=False)
         ban_members = serializers.BooleanField(required=False)
+        send_group_email = serializers.BooleanField(required=False)
 
         create_proposal = serializers.BooleanField(required=False)
         update_proposal = serializers.BooleanField(required=False)

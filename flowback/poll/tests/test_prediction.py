@@ -2,6 +2,7 @@ import json
 import random
 from pprint import pprint
 
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import models
 from django.db.models import Sum, Case, When, F
 from django.db.models.functions import Abs
@@ -71,7 +72,11 @@ class PollPredictionStatementTest(APITransactionTestCase):
                     description="A Test PredictionBet",
                     end_date=timezone.now() + timezone.timedelta(hours=8),
                     segments=[dict(proposal_id=self.proposal_one.id, is_true=True),
-                              dict(proposal_id=self.proposal_two.id, is_true=False)])
+                              dict(proposal_id=self.proposal_two.id, is_true=False)],
+                    attachments=[SimpleUploadedFile('something_one.txt',
+                                                    f'test?'.encode(), content_type='text/plain'),
+                                 SimpleUploadedFile('something_two.txt',
+                                                    f'test_two?'.encode(), content_type='text/plain')])
 
         request = factory.post('', data, format='json')
         force_authenticate(request, user=user)

@@ -141,6 +141,7 @@ class GroupUpdateApi(APIView):
         cover_image = serializers.ImageField(required=False)
         public = serializers.BooleanField(required=False)
         hide_poll_users = serializers.BooleanField(required=False)
+        poll_phase_minimum_space = serializers.IntegerField(required=False)
         direct_join = serializers.BooleanField(required=False)
         default_permission = serializers.IntegerField(required=False, allow_null=True)
         default_quorum = serializers.IntegerField(required=False, allow_null=True)
@@ -173,6 +174,7 @@ class GroupMailApi(APIView):
     class InputSerializer(serializers.Serializer):
         title = serializers.CharField()
         message = serializers.CharField()
+        work_group_id = serializers.IntegerField(required=False)
 
     def post(self, request, group: int):
         serializer = self.InputSerializer(data=request.data)
@@ -194,9 +196,10 @@ class WorkGroupListAPI(APIView):
         name__icontains = serializers.CharField(required=False)
 
     class OutputSerializer(serializers.Serializer):
-        id = serializers.IntegerField(required=False)
-        name = serializers.CharField(required=False)
-        direct_join = serializers.BooleanField(required=False)
+        id = serializers.IntegerField()
+        name = serializers.CharField()
+        member_count = serializers.IntegerField()
+        direct_join = serializers.BooleanField()
 
     def get(self, request, group_id: int):
         serializer = self.FilterSerializer(data=request.query_params)
@@ -220,6 +223,10 @@ class WorkGroupUserListAPI(APIView):
         user_id = serializers.IntegerField(required=False)
         group_user_id = serializers.IntegerField(required=False)
         username = serializers.CharField(required=False)
+        order_by = serializers.ChoiceField(required=False, choices=['created_at_asc',
+                                                                    'created_at_desc',
+                                                                    'name_asc',
+                                                                    'name_desc'])
 
     class OutputSerializer(serializers.Serializer):
         id = serializers.IntegerField()

@@ -4,12 +4,14 @@ from django.db.models import Q, F
 
 from flowback.common.filters import NumberInFilter
 from flowback.group.models import WorkGroupUser
-from flowback.schedule.models import ScheduleEvent, Schedule, ScheduleSubscription
+from flowback.schedule.models import ScheduleEvent, ScheduleSubscription
 
 
 class ScheduleEventBaseFilter(django_filters.FilterSet):
     title = django_filters.CharFilter(lookup_expr='iexact')
     work_group_ids = NumberInFilter()
+    assignee_ids = NumberInFilter(field_name='assignees__id')
+
 
     class Meta:
         model = ScheduleEvent

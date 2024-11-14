@@ -11,6 +11,8 @@ class ScheduleFactory(factory.django.DjangoModelFactory):
         model = Schedule
 
     name = factory.LazyAttribute(lambda _: fake.unique.first_name)
+    origin_name = "test"
+    origin_id = factory.LazyAttribute(lambda _: fake.unique.random_int(min=1, max=99999999))
 
 
 class ScheduleEventFactory(factory.django.DjangoModelFactory):

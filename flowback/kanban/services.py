@@ -31,11 +31,11 @@ def kanban_subscription_delete(*, kanban_id: int, target_id: int) -> None:
 def kanban_entry_create(*,
                         kanban_id: int,
                         created_by_id: int,
-                        assignee_id: int,
                         title: str,
                         description: str,
                         tag: int,
                         priority: int,
+                        assignee_id: int = None,
                         attachments: list = None,
                         work_group_id=None,
                         end_date: timezone.datetime = None) -> KanbanEntry:

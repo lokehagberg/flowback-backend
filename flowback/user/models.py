@@ -11,9 +11,8 @@ from django.utils.functional import classproperty
 from rest_framework.authtoken.models import Token
 
 from flowback.common.models import BaseModel
-from flowback.kanban.services import kanban_create
+from flowback.kanban.models import Kanban
 from flowback.schedule.models import Schedule
-from flowback.schedule.services import create_schedule
 
 
 class CustomUserManager(BaseUserManager):
@@ -63,10 +62,14 @@ class User(AbstractBaseUser, PermissionsMixin):
     email_notifications = models.BooleanField(default=False)
     dark_theme = models.BooleanField(default=False)
 
+    user_config = models.TextField(null=True, blank=True)
+
     bio = models.TextField(null=True, blank=True)
     website = models.TextField(null=True, blank=True)
+    contact_email = models.EmailField(null=True, blank=True)
+    contact_phone = models.CharField(max_length=20, null=True, blank=True)
 
-    schedule = models.ForeignKey(Schedule, on_delete=models.SET_NULL, null=True, blank=True)
+    schedule = models.ForeignKey('schedule.Schedule', on_delete=models.SET_NULL, null=True, blank=True)
     kanban = models.ForeignKey('kanban.Kanban', on_delete=models.SET_NULL, null=True, blank=True)
 
     USERNAME_FIELD = 'email'
@@ -82,12 +85,17 @@ class User(AbstractBaseUser, PermissionsMixin):
     # Updates Schedule name
     def post_save(cls, instance, created, update_fields, **kwargs):
         if created:
-            instance.kanban = kanban_create(name=instance.username, origin_type='user', origin_id=instance.id)
-            instance.schedule = create_schedule(name=instance.username, origin_name='user', origin_id=instance.id)
+            kanban = Kanban(name=instance.username, origin_type='user', origin_id=instance.id)
+            kanban.save()
+            schedule = Schedule(name=instance.username, origin_name='user', origin_id=instance.id)
+            schedule.save()
+
+            instance.kanban = kanban
+            instance.schedule = schedule
             instance.save()
             return
 
-        if not update_fields:
+        elif not update_fields:
             return
 
         fields = [str(field) for field in update_fields]

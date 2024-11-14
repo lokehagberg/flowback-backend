@@ -26,7 +26,7 @@ env = environ.Env(DEBUG=(bool, False),
                   PG_PASS=(str, '.flowback_pgpass'),
                   REDIS_IP=(str, 'localhost'),
                   REDIS_PORT=(str, '6379'),
-                  RABBITMQ_BROKER_URL=str,
+                  RABBITMQ_BROKER_URL=(str, 'amqp://flowback:flowback@localhost:5672/flowback'),
                   URL_SUBPATH=(str, ''),
                   AWS_S3_ENDPOINT_URL=(str, None),
                   AWS_S3_ACCESS_KEY_ID=(str, None),
@@ -113,8 +113,10 @@ INSTALLED_APPS = [
     'flowback.comment',
     'flowback.schedule',
     'flowback.files',
-    'drf_spectacular'
-] + env('INTEGRATIONS')
+    'drf_spectacular',
+    'phonenumber_field',
+    ] + env('INTEGRATIONS')
+
 
 CELERY_BROKER_URL = env('RABBITMQ_BROKER_URL')
 

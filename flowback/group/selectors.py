@@ -8,6 +8,7 @@ from django.db.models.functions import Abs
 from django.forms import model_to_dict
 
 from flowback.comment.selectors import comment_list, comment_ancestor_list
+from flowback.common.filters import NumberInFilter
 from flowback.common.services import get_object
 from flowback.kanban.selectors import kanban_entry_list
 from flowback.poll.models import PollPredictionStatement
@@ -53,6 +54,7 @@ def group_user_permissions(*,
 
     permissions = permissions or []
     admin = False
+    work_group_moderator_check = False
 
     if isinstance(permissions, str):
         permissions = [permissions]
@@ -95,6 +97,12 @@ def group_user_permissions(*,
 
         permissions.remove('creator')
 
+    # Check if work_group_moderator is present, mark as true and check further down
+    if 'work_group_moderator' in permissions:
+        work_group_moderator_check = True
+
+        permissions.remove('work_group_moderator')
+
     validated_permissions = any([user_permissions.get(key, False) for key in permissions]) or not permissions
     if not validated_permissions and not (admin and allow_admin):
         if raise_exception:
@@ -104,11 +112,10 @@ def group_user_permissions(*,
             return False
 
     if work_group and not (admin and allow_admin):
-        work_group_user = WorkGroupUser.objects.filter(group_user__in=[group_user],
-                                                       work_group=work_group)
+        work_group_user = WorkGroupUser.objects.get(group_user=group_user, work_group=work_group)
 
-        if not work_group_user.exists():
-            raise PermissionDenied("User is not in requested work group(s)")
+        if work_group_moderator_check and not work_group_user.is_moderator:
+            raise PermissionDenied("Requires work group moderator permission")
 
     return group_user
 
@@ -317,6 +324,7 @@ class BaseGroupThreadFilter(django_filters.FilterSet):
                 ('-created_at', 'created_at_desc'),
                 ('pinned', 'pinned')))
     user_vote = django_filters.BooleanFilter()
+    id_list = NumberInFilter(field_name='id')
 
     class Meta:
         model = GroupThread
@@ -367,6 +375,11 @@ def group_delegate_pool_comment_list(*, fetched_by: User, delegate_pool_id: int,
 
 # Work Group
 class BaseWorkGroupFilter(django_filters.FilterSet):
+    order_by = django_filters.OrderingFilter(fields=(('created_at', 'created_at_asc'),
+                                                     ('-created_at', 'created_at_desc'),
+                                                     ('name', 'name_asc'),
+                                                     ('-name', 'name_desc'))
+                                             )
     joined = django_filters.BooleanFilter()
 
     class Meta:
@@ -380,7 +393,8 @@ def work_group_list(*, group_id: int, fetched_by: User, filters=None):
     group_user = group_user_permissions(user=fetched_by, group=group_id)
 
     qs = WorkGroup.objects.filter(group_id=group_id
-                                  ).annotate(joined=Q(workgroupuser__group_user__in=[group_user]))
+                                  ).annotate(joined=Q(workgroupuser__group_user__in=[group_user]),
+                                             member_count=Count('workgroupuser'))
 
     return BaseWorkGroupFilter(filters, qs).qs
 
