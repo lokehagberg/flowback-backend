@@ -140,16 +140,16 @@ def group_thread_comment_update(author_id: int, thread_id: int, comment_id: int,
                           data=data)
 
 
-def group_thread_comment_delete(author_id: int, thread_id: int, comment_id: int):
+def group_thread_comment_delete(fetched_by: int, thread_id: int, comment_id: int):
     thread = get_object(GroupThread, id=thread_id)
     comment = get_object(Comment, id=comment_id)
 
-    group_user = group_user_permissions(user=author_id, group=thread.created_by.group)
+    group_user = group_user_permissions(user=fetched_by, group=thread.created_by.group)
 
-    if comment.author.id != author_id and not group_user.is_admin:
+    if comment.author.id != fetched_by and not group_user.is_admin:
         raise ValidationError('Comment is not owned by user.')
 
-    return comment_delete(fetched_by=author_id,
+    return comment_delete(fetched_by=fetched_by,
                           comment_section_id=thread.comment_section_id,
                           comment_id=comment_id)
 

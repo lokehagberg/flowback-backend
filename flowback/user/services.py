@@ -176,7 +176,7 @@ def user_kanban_entry_create(*,
                              description: str = None,
                              attachments: list = None,
                              priority: int,
-                             tag: int,
+                             lane: int,
                              end_date: timezone.datetime = None):
     return user_kanban.kanban_entry_create(origin_id=user_id,
                                            created_by_id=user_id,
@@ -186,7 +186,7 @@ def user_kanban_entry_create(*,
                                            attachments=attachments,
                                            priority=priority,
                                            end_date=end_date,
-                                           tag=tag)
+                                           lane=lane)
 
 
 def user_kanban_entry_update(*, user_id: int, entry_id: int, data):

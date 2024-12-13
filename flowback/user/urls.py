@@ -1,7 +1,7 @@
 from django.urls import path
 from rest_framework.authtoken import views
 
-from backend.settings import DISABLE_DEFAULT_USER_REGISTRATION
+from backend.settings import FLOWBACK_DISABLE_DEFAULT_USER_REGISTRATION
 from flowback.user.views.report import ReportCreateAPI
 from flowback.user.views.user import (UserCreateApi,
                                       UserCreateVerifyApi,
@@ -47,7 +47,7 @@ user_patterns = [
     path('report/create', ReportCreateAPI.as_view(), name='report_create'),
 ]
 
-if not DISABLE_DEFAULT_USER_REGISTRATION:
+if not FLOWBACK_DISABLE_DEFAULT_USER_REGISTRATION:
     user_patterns += [
         path('register', UserCreateApi.as_view(), name='register'),
         path('register/verify', UserCreateVerifyApi.as_view(), name='register_verify'),

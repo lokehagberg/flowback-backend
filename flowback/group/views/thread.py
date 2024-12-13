@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema
 from rest_framework import serializers, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -20,6 +21,7 @@ from flowback.group.services.thread import (group_thread_create,
 from flowback.user.serializers import BasicUserSerializer
 
 
+@extend_schema(tags=['group/thread'])
 class GroupThreadListAPI(APIView):
     class Pagination(LimitOffsetPagination):
         max_limit = 1000
@@ -54,6 +56,7 @@ class GroupThreadListAPI(APIView):
                                       view=self)
 
 
+@extend_schema(tags=['group/thread'])
 class GroupThreadCreateAPI(APIView):
     class InputSerializer(serializers.Serializer):
         title = serializers.CharField()
@@ -69,6 +72,7 @@ class GroupThreadCreateAPI(APIView):
         return Response(status=status.HTTP_201_CREATED, data=thread.id)
 
 
+@extend_schema(tags=['group/thread'])
 class GroupThreadUpdateAPI(APIView):
     class InputSerializer(serializers.Serializer):
         title = serializers.CharField(required=False)
@@ -84,6 +88,7 @@ class GroupThreadUpdateAPI(APIView):
         return Response(status=status.HTTP_200_OK)
 
 
+@extend_schema(tags=['group/thread'])
 class GroupThreadDeleteAPI(APIView):
     def post(self, request, thread_id: int):
         group_thread_delete(user_id=request.user, thread_id=thread_id)
@@ -91,6 +96,7 @@ class GroupThreadDeleteAPI(APIView):
         return Response(status=status.HTTP_200_OK)
 
 
+@extend_schema(tags=['group/thread'])
 class GroupThreadNotificationSubscribeAPI(APIView):
     class InputSerializer(serializers.Serializer):
         categories = serializers.MultipleChoiceField(choices=group_thread_notification.possible_categories)
@@ -102,6 +108,7 @@ class GroupThreadNotificationSubscribeAPI(APIView):
         return Response(status=status.HTTP_200_OK)
 
 
+@extend_schema(tags=['group/thread'])
 class GroupThreadVoteUpdateAPI(APIView):
     class InputSerializer(serializers.Serializer):
         vote = serializers.BooleanField(required=False, allow_null=True, default=None)
@@ -117,25 +124,31 @@ class GroupThreadVoteUpdateAPI(APIView):
         return Response(status=status.HTTP_200_OK)
 
 
+@extend_schema(tags=['group/thread'])
 class GroupThreadCommentListAPI(CommentListAPI):
     lazy_action = group_thread_comment_list
 
 
+@extend_schema(tags=['group/thread'])
 class GroupThreadCommentAncestorListAPI(CommentAncestorListAPI):
     lazy_action = group_thread_comment_ancestor_list
 
 
+@extend_schema(tags=['group/thread'])
 class GroupThreadCommentCreateAPI(CommentCreateAPI):
     lazy_action = group_thread_comment_create
 
 
+@extend_schema(tags=['group/thread'])
 class GroupThreadCommentUpdateAPI(CommentUpdateAPI):
     lazy_action = group_thread_comment_update
 
 
+@extend_schema(tags=['group/thread'])
 class GroupThreadCommentDeleteAPI(CommentDeleteAPI):
     lazy_action = group_thread_comment_delete
 
 
+@extend_schema(tags=['group/thread'])
 class GroupThreadCommentVoteAPI(CommentVoteAPI):
     lazy_action = group_thread_comment_vote

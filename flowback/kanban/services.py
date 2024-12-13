@@ -33,7 +33,7 @@ def kanban_entry_create(*,
                         created_by_id: int,
                         title: str,
                         description: str,
-                        tag: int,
+                        lane: int,
                         priority: int,
                         assignee_id: int = None,
                         attachments: list = None,
@@ -44,7 +44,7 @@ def kanban_entry_create(*,
                          assignee_id=assignee_id,
                          title=title,
                          description=description,
-                         tag=tag,
+                         lane=lane,
                          priority=priority,
                          work_group_id=work_group_id,
                          end_date=end_date)
@@ -67,7 +67,7 @@ def kanban_entry_create(*,
 def kanban_entry_update(*, kanban_entry_id: int, data) -> KanbanEntry:
     kanban = get_object(KanbanEntry, id=kanban_entry_id)
 
-    non_side_effect_fields = ['title', 'description', 'assignee_id', 'priority', 'tag', 'end_date']
+    non_side_effect_fields = ['title', 'description', 'assignee_id', 'priority', 'lane', 'end_date']
 
     kanban, has_updated = model_update(instance=kanban,
                                        fields=non_side_effect_fields,
@@ -122,7 +122,7 @@ class KanbanManager:
                             title: str,
                             description: str = None,
                             priority: int,
-                            tag: int,
+                            lane: int,
                             attachments: list = None,
                             work_group_id=None,
                             end_date: timezone.datetime = None) -> KanbanEntry:
@@ -136,7 +136,7 @@ class KanbanManager:
                                    work_group_id=work_group_id,
                                    priority=priority,
                                    end_date=end_date,
-                                   tag=tag,)
+                                   lane=lane,)
 
     def kanban_entry_update(self,
                             *,

@@ -15,12 +15,6 @@ class Schedule(BaseModel):
 
 
 class ScheduleEvent(BaseModel):
-    # class Recurrence(models.TextChoices):
-    #     DAY = ("D", _("Daily"))
-    #     WEEK = ("W", _("Weekly"))
-    #     MONTH = ("M", _("Monthly"))
-    #     YEAR = ("Y", _("Yearly"))
-
     schedule = models.ForeignKey(Schedule, on_delete=models.CASCADE)
     title = models.TextField()
     description = models.TextField(null=True, blank=True)
@@ -29,10 +23,7 @@ class ScheduleEvent(BaseModel):
     active = models.BooleanField(default=True)
     work_group = models.ForeignKey('group.WorkGroup', on_delete=models.CASCADE, null=True, blank=True)
     assignees = models.ManyToManyField('group.GroupUser')
-
-    # recurrence_frequency = models.CharField(choices=Recurrence, null=True, blank=True)  # Type of recurrence
-    # recurrence_count = models.IntegerField(null=True, blank=True)  # Amount of recurrences
-    # recurrence_max = models.IntegerField(null=True, blank=True)  # End recurrence after date
+    meeting_link = models.URLField(null=True, blank=True)
 
     origin_name = models.CharField(max_length=255)
     origin_id = models.IntegerField()

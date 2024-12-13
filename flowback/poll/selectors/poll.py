@@ -13,7 +13,8 @@ from flowback.group.selectors import group_user_permissions
 
 
 class BasePollFilter(django_filters.FilterSet):
-    order_by = django_filters.OrderingFilter(fields=(('start_date', 'start_date_asc'),
+    order_by = django_filters.OrderingFilter(fields=(('-pinned', 'pinned'),
+                                                     ('start_date', 'start_date_asc'),
                                                      ('-start_date', 'start_date_desc'),
                                                      ('end_date', 'end_date_asc'),
                                                      ('-end_date', 'end_date_desc')))

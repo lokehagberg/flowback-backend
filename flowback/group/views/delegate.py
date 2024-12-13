@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema
 from rest_framework import serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -10,6 +11,7 @@ from flowback.group.services.delegate import group_user_delegate, group_user_del
     group_user_delegate_pool_create, group_user_delegate_pool_delete
 
 
+@extend_schema(tags=['group/delegate'])
 class GroupUserDelegatePoolListApi(APIView):
     class Pagination(LimitOffsetPagination):
         default_limit = 10
@@ -45,6 +47,7 @@ class GroupUserDelegatePoolListApi(APIView):
         )
 
 
+@extend_schema(tags=['group/delegate'])
 class GroupUserDelegateListApi(APIView):
     class Pagination(LimitOffsetPagination):
         default_limit = 10
@@ -96,6 +99,7 @@ class GroupUserDelegateListApi(APIView):
         )
 
 
+@extend_schema(tags=['group/delegate'])
 class GroupUserDelegatePoolCreateApi(APIView):
     class InputSerializer(serializers.Serializer):
         blockchain_id = serializers.IntegerField(required=False, min_value=1)
@@ -109,6 +113,7 @@ class GroupUserDelegatePoolCreateApi(APIView):
         return Response(status=status.HTTP_200_OK)
 
 
+@extend_schema(tags=['group/delegate'])
 class GroupUserDelegatePoolDeleteApi(APIView):
     def post(self, request, group: int):
         group_user_delegate_pool_delete(user=request.user.id, group=group)
@@ -116,6 +121,7 @@ class GroupUserDelegatePoolDeleteApi(APIView):
         return Response(status=status.HTTP_200_OK)
 
 
+@extend_schema(tags=['group/delegate'])
 class GroupUserDelegateApi(APIView):
     class InputSerializer(serializers.Serializer):
         delegate_pool_id = serializers.IntegerField()
@@ -129,6 +135,7 @@ class GroupUserDelegateApi(APIView):
         return Response(status=status.HTTP_200_OK)
 
 
+@extend_schema(tags=['group/delegate'])
 class GroupUserDelegateUpdateApi(APIView):
     class InputSerializer(serializers.Serializer):
         delegate_pool_id = serializers.IntegerField()
@@ -142,6 +149,7 @@ class GroupUserDelegateUpdateApi(APIView):
         return Response(status=status.HTTP_200_OK)
 
 
+@extend_schema(tags=['group/delegate'])
 class GroupUserDelegateDeleteApi(APIView):
     class InputSerializer(serializers.Serializer):
         delegate_pool_id = serializers.IntegerField()

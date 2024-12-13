@@ -14,7 +14,7 @@ def group_kanban_entry_create(*,
                               title: str,
                               description: str = None,
                               priority: int,
-                              tag: int,
+                              lane: int,
                               work_group_id: int = None,
                               attachments: list = None,
                               end_date: timezone.datetime = None
@@ -32,7 +32,7 @@ def group_kanban_entry_create(*,
                                             work_group_id=work_group_id,
                                             priority=priority,
                                             end_date=end_date,
-                                            tag=tag)
+                                            lane=lane)
 
 
 def group_kanban_entry_update(*,

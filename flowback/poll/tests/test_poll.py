@@ -11,6 +11,7 @@ from .utils import generate_poll_phase_kwargs
 from ..models import Poll
 from ..services.poll import poll_fast_forward, poll_create
 from ..views.poll import PollListApi, PollCreateAPI, PollUpdateAPI, PollDeleteAPI
+from ...common.tests import generate_request
 from ...files.tests.factories import FileSegmentFactory
 from ...group.tests.factories import GroupFactory, GroupUserFactory, GroupTagsFactory
 from ...notification.models import NotificationChannel
@@ -34,15 +35,19 @@ class PollTest(APITransactionTestCase):
         self.poll_three.save()
 
     def test_list_polls(self):
-        factory = APIRequestFactory()
-        user = self.group_user_creator.user
-        view = PollListApi.as_view()
+        self.poll_three.pinned = True
+        self.poll_three.save()
 
-        request = factory.get('')
-        force_authenticate(request, user)
-        response = view(request, group_id=self.group.id)
+        response = generate_request(api=PollListApi,
+                                    data=dict(order_by='pinned,start_date_asc'),
+                                    user=self.group_user_creator.user)
 
-        self.assertEqual(len(json.loads(response.rendered_content)['results']), 3)
+        print(response.data)
+
+        self.assertTrue(response.data['results'][0]['pinned'])
+        self.assertEqual(response.data['count'], 3)
+        self.assertGreater(response.data['results'][2]['start_date'], response.data['results'][1]['start_date'])
+        self.assertGreater(response.data['results'][0]['start_date'], response.data['results'][2]['start_date'])
 
     def test_create_poll(self):
         factory = APIRequestFactory()

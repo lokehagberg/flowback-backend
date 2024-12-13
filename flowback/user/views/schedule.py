@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.response import Response
 
@@ -13,6 +14,7 @@ from flowback.user.services import (user_schedule_event_create,
 from flowback.user.selectors import user_schedule_event_list
 
 
+@extend_schema(tags=['user/schedule'])
 class UserScheduleEventListAPI(ScheduleEventListTemplateAPI):
     def get(self, request):
         serializer = self.InputSerializer(data=request.query_params)
@@ -27,6 +29,7 @@ class UserScheduleEventListAPI(ScheduleEventListTemplateAPI):
                                       view=self)
 
 
+@extend_schema(tags=['user/schedule'])
 class UserScheduleEventCreateAPI(ScheduleEventCreateTemplateAPI):
     def post(self, request):
         serializer = self.InputSerializer(data=request.data)
@@ -36,6 +39,7 @@ class UserScheduleEventCreateAPI(ScheduleEventCreateTemplateAPI):
         return Response(status=status.HTTP_200_OK, data=self.OutputSerializer(event).data)
 
 
+@extend_schema(tags=['user/schedule'])
 class UserScheduleEventUpdateAPI(ScheduleEventUpdateTemplateAPI):
     def post(self, request):
         serializer = self.InputSerializer(data=request.data)
@@ -45,6 +49,7 @@ class UserScheduleEventUpdateAPI(ScheduleEventUpdateTemplateAPI):
         return Response(status=status.HTTP_200_OK)
 
 
+@extend_schema(tags=['user/schedule'])
 class UserScheduleEventDeleteAPI(ScheduleEventDeleteAPI):
     def post(self, request):
         serializer = self.InputSerializer(data=request.data)
@@ -54,6 +59,7 @@ class UserScheduleEventDeleteAPI(ScheduleEventDeleteAPI):
         return Response(status=status.HTTP_200_OK)
 
 
+@extend_schema(tags=['user/schedule'])
 class UserScheduleUnsubscribeAPI(ScheduleUnsubscribeAPI):
     def post(self, request):
         serializer = self.InputSerializer(data=request.data)

@@ -16,7 +16,7 @@ from ...group.serializers import GroupUserSerializer
 
 
 # TODO check alternative solution for schedule
-@extend_schema(tags=['poll'])
+@extend_schema(tags=['poll/proposal'])
 class PollProposalListAPI(APIView):
     class Pagination(LimitOffsetPagination):
         default_limit = 10
@@ -74,7 +74,7 @@ class PollProposalListAPI(APIView):
         )
 
 
-@extend_schema(tags=['poll'])
+@extend_schema(tags=['poll/proposal'])
 class PollProposalCreateAPI(APIView):
     class InputSerializerDefault(serializers.ModelSerializer):
         attachments = serializers.ListField(child=serializers.FileField(), required=False, max_length=10)
@@ -112,7 +112,7 @@ class PollProposalCreateAPI(APIView):
         return Response(status=status.HTTP_200_OK, data=proposal.id)
 
 
-@extend_schema(tags=['poll'])
+@extend_schema(tags=['poll/proposal'])
 class PollProposalDeleteAPI(APIView):
     def post(self, request, proposal: int):
         poll_proposal_delete(user_id=request.user.id, proposal_id=proposal)

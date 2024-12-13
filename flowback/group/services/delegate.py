@@ -146,16 +146,16 @@ def group_delegate_pool_comment_update(*,
 
 
 def group_delegate_pool_comment_delete(*,
-                                       author_id: int,
+                                       fetched_by: int,
                                        delegate_pool_id: int,
                                        comment_id: int):
     delegate_pool = get_object(GroupUserDelegatePool, id=delegate_pool_id)
-    group_user = group_user_permissions(user=author_id, group=delegate_pool.group)
+    group_user = group_user_permissions(user=fetched_by, group=delegate_pool.group)
 
     force = bool(group_user_permissions(group_user=group_user, permissions=['admin', 'force_delete_comment'],
                                         raise_exception=False))
 
-    return comment_delete(fetched_by=author_id,
+    return comment_delete(fetched_by=fetched_by,
                           comment_section_id=delegate_pool.comment_section.id,
                           comment_id=comment_id,
                           force=force)

@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema
 from rest_framework import serializers, status, generics
 from flowback.common.pagination import LimitOffsetPagination, get_paginated_response
 from rest_framework.response import Response
@@ -13,6 +14,7 @@ from flowback.group.services.workgroup import work_group_create, work_group_upda
     work_group_user_join, work_group_user_leave, work_group_user_add, work_group_user_remove, work_group_user_update
 
 
+@extend_schema(tags=['group'])
 class GroupListApi(APIView):
     class Pagination(LimitOffsetPagination):
         default_limit = 1
@@ -60,6 +62,7 @@ class GroupListApi(APIView):
         )
 
 
+@extend_schema(tags=['group'])
 class GroupFolderListApi(APIView):  #use serializers.Serializers
     class Pagination(LimitOffsetPagination):
         default_limit = 20
@@ -80,6 +83,7 @@ class GroupFolderListApi(APIView):  #use serializers.Serializers
         )
 
 
+@extend_schema(tags=['group'])
 class GroupDetailApi(APIView):
     class OutputSerializer(serializers.ModelSerializer):
         member_count = serializers.IntegerField()
@@ -108,6 +112,7 @@ class GroupDetailApi(APIView):
         return Response(serializer.data)
 
 
+@extend_schema(tags=['group'])
 class GroupCreateApi(APIView):
     class InputSerializer(serializers.ModelSerializer):
         image = serializers.ImageField(required=False)
@@ -133,6 +138,7 @@ class GroupCreateApi(APIView):
         return Response(status=status.HTTP_200_OK, data=group.id)
 
 
+@extend_schema(tags=['group'])
 class GroupUpdateApi(APIView):
     class InputSerializer(serializers.Serializer):
         name = serializers.CharField(required=False)
@@ -153,6 +159,7 @@ class GroupUpdateApi(APIView):
         return Response(status=status.HTTP_200_OK)
 
 
+@extend_schema(tags=['group'])
 class GroupDeleteApi(APIView):
     def post(self, request, group: int):
         group_delete(user=request.user.id, group=group)
@@ -170,6 +177,7 @@ class GroupNotificationSubscribeApi(APIView):
         return Response(status=status.HTTP_200_OK)
 
 
+@extend_schema(tags=['group'])
 class GroupMailApi(APIView):
     class InputSerializer(serializers.Serializer):
         title = serializers.CharField()
@@ -185,6 +193,7 @@ class GroupMailApi(APIView):
         return Response(status=status.HTTP_200_OK)
 
 
+@extend_schema(tags=['group/workgroup'])
 class WorkGroupListAPI(APIView):
     class Pagination(LimitOffsetPagination):
         pass
@@ -214,6 +223,7 @@ class WorkGroupListAPI(APIView):
                                       view=self)
 
 
+@extend_schema(tags=['group/workgroup'])
 class WorkGroupUserListAPI(APIView):
     class Pagination(LimitOffsetPagination):
         max_limit = 100
@@ -249,7 +259,7 @@ class WorkGroupUserListAPI(APIView):
                                       request=request,
                                       view=self)
 
-
+@extend_schema(tags=['group/workgroup'])
 class WorkGroupUserJoinRequestListAPI(APIView):
     class Pagination(LimitOffsetPagination):
         max_limit = 100
@@ -281,6 +291,7 @@ class WorkGroupUserJoinRequestListAPI(APIView):
                                       view=self)
 
 
+@extend_schema(tags=['group/workgroup'])
 class WorkGroupCreateAPI(APIView):
     class InputSerializer(serializers.Serializer):
         name = serializers.CharField()
@@ -295,6 +306,7 @@ class WorkGroupCreateAPI(APIView):
         return Response(status=status.HTTP_201_CREATED, data=work_group.id)
 
 
+@extend_schema(tags=['group/workgroup'])
 class WorkGroupUpdateAPI(APIView):
     class InputSerializer(serializers.Serializer):
         name = serializers.CharField()
@@ -309,6 +321,7 @@ class WorkGroupUpdateAPI(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+@extend_schema(tags=['group/workgroup'])
 class WorkGroupDeleteAPI(APIView):
     def post(self, request, work_group_id: int):
         work_group_delete(user_id=request.user.id, work_group_id=work_group_id)
@@ -316,6 +329,7 @@ class WorkGroupDeleteAPI(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+@extend_schema(tags=['group/workgroup'])
 class WorkGroupUserJoinAPI(APIView):
     def post(self, request, work_group_id: int):
         work_group_user_join(user_id=request.user.id, work_group_id=work_group_id)
@@ -323,6 +337,7 @@ class WorkGroupUserJoinAPI(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+@extend_schema(tags=['group/workgroup'])
 class WorkGroupUserLeaveAPI(APIView):
     def post(self, request, work_group_id: int):
         work_group_user_leave(user_id=request.user.id, work_group_id=work_group_id)
@@ -330,6 +345,7 @@ class WorkGroupUserLeaveAPI(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+@extend_schema(tags=['group/workgroup'])
 class WorkGroupUserAddAPI(APIView):
     class InputSerializer(serializers.Serializer):
         target_group_user_id = serializers.IntegerField()
@@ -346,6 +362,7 @@ class WorkGroupUserAddAPI(APIView):
         return Response(status=status.HTTP_200_OK, data=work_group_user.id)
 
 
+@extend_schema(tags=['group/workgroup'])
 class WorkGroupUserUpdateAPI(APIView):
     class InputSerializer(serializers.Serializer):
         target_group_user_id = serializers.IntegerField()
@@ -363,6 +380,7 @@ class WorkGroupUserUpdateAPI(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+@extend_schema(tags=['group/workgroup'])
 class WorkGroupUserRemoveAPI(APIView):
     class InputSerializer(serializers.Serializer):
         target_group_user_id = serializers.IntegerField()

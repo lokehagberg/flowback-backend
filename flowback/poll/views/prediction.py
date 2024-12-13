@@ -17,7 +17,7 @@ from ..services.prediction import (poll_prediction_statement_create,
                                    poll_prediction_statement_vote_delete)
 
 
-@extend_schema(tags=['poll'])
+@extend_schema(tags=['poll/prediction'])
 class PollPredictionStatementListAPI(APIView):
     class Pagination(LimitOffsetPagination):
         max_limit = 100
@@ -71,7 +71,7 @@ class PollPredictionStatementListAPI(APIView):
         )
 
 
-@extend_schema(tags=['poll'])
+@extend_schema(tags=['poll/prediction'])
 class PollPredictionBetListAPI(APIView):
     class Pagination(LimitOffsetPagination):
         max_limit = 100
@@ -110,7 +110,7 @@ class PollPredictionBetListAPI(APIView):
         )
 
 
-@extend_schema(tags=['poll'])
+@extend_schema(tags=['poll/prediction'])
 class PollPredictionStatementCreateAPI(APIView):
     class InputSerializer(serializers.Serializer):
         class SegmentSerializer(serializers.Serializer):
@@ -134,7 +134,7 @@ class PollPredictionStatementCreateAPI(APIView):
         return Response(created_id, status=status.HTTP_201_CREATED)
 
 
-@extend_schema(tags=['poll'])
+@extend_schema(tags=['poll/prediction'])
 class PollPredictionStatementDeleteAPI(APIView):
     def post(self, request, prediction_statement_id: int):
         poll_prediction_statement_delete(user=request.user,
@@ -143,7 +143,7 @@ class PollPredictionStatementDeleteAPI(APIView):
         return Response(status=status.HTTP_200_OK)
 
 
-@extend_schema(tags=['poll'])
+@extend_schema(tags=['poll/prediction'])
 class PollPredictionBetCreateAPI(APIView):
     class InputSerializer(serializers.Serializer):
         score = serializers.IntegerField()
@@ -159,7 +159,7 @@ class PollPredictionBetCreateAPI(APIView):
         return Response(created_id, status=status.HTTP_201_CREATED)
 
 
-@extend_schema(tags=['poll'])
+@extend_schema(tags=['poll/prediction'])
 class PollPredictionBetUpdateAPI(APIView):
     class InputSerializer(serializers.Serializer):
         score = serializers.IntegerField()
@@ -174,7 +174,7 @@ class PollPredictionBetUpdateAPI(APIView):
         return Response(status=status.HTTP_200_OK)
 
 
-@extend_schema(tags=['poll'])
+@extend_schema(tags=['poll/prediction'])
 class PollPredictionBetDeleteAPI(APIView):
     def post(self, request, prediction_statement_id: int):
         poll_prediction_bet_delete(user=request.user, prediction_statement_id=prediction_statement_id)
@@ -182,7 +182,7 @@ class PollPredictionBetDeleteAPI(APIView):
         return Response(status=status.HTTP_200_OK)
 
 
-@extend_schema(tags=['poll'])
+@extend_schema(tags=['poll/prediction'])
 class PollPredictionStatementVoteCreateAPI(APIView):
     class InputSerializer(serializers.Serializer):
         vote = serializers.BooleanField()
@@ -197,7 +197,7 @@ class PollPredictionStatementVoteCreateAPI(APIView):
         return Response(status=status.HTTP_201_CREATED)
 
 
-@extend_schema(tags=['poll'])
+@extend_schema(tags=['poll/prediction'])
 class PollPredictionStatementVoteUpdateAPI(APIView):
     class InputSerializer(serializers.Serializer):
         vote = serializers.BooleanField()
@@ -212,7 +212,7 @@ class PollPredictionStatementVoteUpdateAPI(APIView):
         return Response(status=status.HTTP_200_OK)
 
 
-@extend_schema(tags=['poll'])
+@extend_schema(tags=['poll/prediction'])
 class PollPredictionStatementVoteDeleteAPI(APIView):
     def post(self, request, prediction_statement_id: int):
         poll_prediction_statement_vote_delete(user=request.user,

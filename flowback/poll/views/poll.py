@@ -1,33 +1,21 @@
 from django.shortcuts import render
-from drf_spectacular.utils import extend_schema, OpenApiParameter
+from drf_spectacular.utils import extend_schema
 
 # Create your views here.
 from rest_framework import serializers, status
-from rest_framework.exceptions import ValidationError
 from rest_framework.views import APIView, Response
 
 from flowback.common.pagination import LimitOffsetPagination, get_paginated_response
-from flowback.common.services import get_object
-from flowback.group.serializers import GroupUserSerializer
-from flowback.poll.models import Poll, PollProposal, PollVotingTypeRanking, PollVotingTypeForAgainst
-from flowback.poll.selectors.poll import poll_list, poll_phase_template_list
-from flowback.poll.selectors.prediction import poll_prediction_statement_list, poll_prediction_bet_list
-from flowback.poll.selectors.proposal import poll_proposal_list, poll_user_schedule_list
-from flowback.poll.selectors.vote import poll_vote_list, poll_delegates_list, delegate_poll_vote_list
-from flowback.poll.selectors.comment import poll_comment_list
 
-from flowback.poll.services.comment import poll_comment_create, poll_comment_update, poll_comment_delete
+from flowback.group.serializers import GroupUserSerializer
+from flowback.poll.models import Poll, PollProposal
+from flowback.poll.selectors.poll import poll_list, poll_phase_template_list
+from flowback.poll.selectors.proposal import poll_user_schedule_list
+from flowback.poll.selectors.vote import poll_delegates_list
+
 from flowback.poll.services.poll import poll_create, poll_update, poll_delete, poll_refresh_cheap, poll_notification, \
     poll_notification_subscribe, poll_fast_forward, poll_phase_template_create, poll_phase_template_update, \
     poll_phase_template_delete
-from flowback.poll.services.prediction import poll_prediction_statement_create, poll_prediction_statement_delete, \
-    poll_prediction_bet_create, poll_prediction_bet_update, poll_prediction_bet_delete, \
-    poll_prediction_statement_vote_create, \
-    poll_prediction_statement_vote_update, poll_prediction_statement_vote_delete
-from flowback.poll.services.proposal import poll_proposal_create, poll_proposal_delete
-from flowback.poll.services.vote import poll_proposal_vote_update, poll_proposal_delegate_vote_update
-
-from flowback.comment.views import CommentListAPI, CommentCreateAPI, CommentUpdateAPI, CommentDeleteAPI
 
 
 @extend_schema(tags=['home', 'poll'])
@@ -38,11 +26,8 @@ class PollListApi(APIView):
     class FilterSerializer(serializers.Serializer):
         id = serializers.IntegerField(required=False)
         id__in = serializers.CharField(required=False)
-        order_by = serializers.ChoiceField(choices=['start_date_asc',
-                                                    'start_date_desc',
-                                                    'end_date_asc',
-                                                    'end_date_desc'],
-                                           default='start_date_desc')
+        order_by = serializers.CharField(default='start_date_desc',
+                                         required=False)  # TODO add desc, add a way to limit order_by fields to two.
         pinned = serializers.BooleanField(required=False, default=None, allow_null=True)
 
         title = serializers.CharField(required=False)

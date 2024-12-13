@@ -1,9 +1,12 @@
+import math
+
 from django.shortcuts import render
 
 # Create your views here.
 from rest_framework.views import APIView
 from rest_framework import serializers
 
+from backend.settings import FLOWBACK_KANBAN_LANES, FLOWBACK_KANBAN_PRIORITY_LIMIT
 from flowback.common.pagination import LimitOffsetPagination
 from flowback.files.serializers import FileSerializer
 from flowback.group.serializers import WorkGroupSerializer
@@ -23,8 +26,8 @@ class KanbanEntryListApi(APIView):
         assignee = serializers.IntegerField(required=False)
         title__icontains = serializers.CharField(required=False)
         description__icontains = serializers.CharField(required=False)
-        priority = serializers.ChoiceField((1, 2, 3, 4, 5), required=False)
-        tag = serializers.ChoiceField((1, 2, 3, 4, 5), required=False)
+        priority = serializers.ChoiceField(range(1, FLOWBACK_KANBAN_PRIORITY_LIMIT + 1), required=False)
+        lane = serializers.ChoiceField(range(1, len(FLOWBACK_KANBAN_LANES) + 1), required=False)
 
     class OutputSerializer(serializers.Serializer):
         class UserSerializer(serializers.Serializer):
@@ -43,7 +46,7 @@ class KanbanEntryListApi(APIView):
         description = serializers.CharField(allow_null=True, allow_blank=True)
         attachments = FileSerializer(many=True, source="attachments.filesegment_set", allow_null=True)
         work_group = WorkGroupSerializer()
-        tag = serializers.IntegerField()
+        lane = serializers.IntegerField()
         category = serializers.CharField(allow_null=True)
 
 
@@ -55,8 +58,9 @@ class KanbanEntryCreateAPI(APIView):
         end_date = serializers.DateTimeField(required=False, allow_null=True)
         attachments = serializers.ListField(child=serializers.FileField(), required=False, max_length=10)
         description = serializers.CharField(required=False)
-        priority = serializers.ChoiceField((1, 2, 3, 4, 5), default=3)
-        tag = serializers.ChoiceField((1, 2, 3, 4, 5))
+        priority = serializers.ChoiceField(range(1, FLOWBACK_KANBAN_PRIORITY_LIMIT + 1),
+                                           default=math.floor(FLOWBACK_KANBAN_PRIORITY_LIMIT / 2))
+        lane = serializers.ChoiceField(range(1, len(FLOWBACK_KANBAN_LANES) + 1))
 
 
 class KanbanEntryUpdateAPI(APIView):
@@ -66,8 +70,10 @@ class KanbanEntryUpdateAPI(APIView):
         title = serializers.CharField(required=False)
         description = serializers.CharField(required=False, allow_null=True, allow_blank=True)
         end_date = serializers.DateTimeField(required=False)
-        priority = serializers.ChoiceField((1, 2, 3, 4, 5), required=False)
-        tag = serializers.ChoiceField((1, 2, 3, 4, 5), required=False)
+        priority = serializers.ChoiceField(range(1, FLOWBACK_KANBAN_PRIORITY_LIMIT + 1),
+                                           default=math.floor(FLOWBACK_KANBAN_PRIORITY_LIMIT / 2),
+                                           required=False)
+        lane = serializers.ChoiceField(range(1, len(FLOWBACK_KANBAN_LANES) + 1), required=False)
 
 
 class KanbanEntryDeleteAPI(APIView):

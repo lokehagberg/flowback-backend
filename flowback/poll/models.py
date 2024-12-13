@@ -7,7 +7,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from rest_framework.exceptions import ValidationError
 
-from backend.settings import SCORE_VOTE_CEILING, SCORE_VOTE_FLOOR, DEBUG
+from backend.settings import FLOWBACK_SCORE_VOTE_CEILING, FLOWBACK_SCORE_VOTE_FLOOR, DEBUG
 from flowback.files.models import FileCollection
 from flowback.prediction.models import (PredictionBet,
                                         PredictionStatement,
@@ -326,11 +326,11 @@ class PollVotingTypeCardinal(BaseModel):
     score = models.IntegerField(null=True, blank=True)
 
     def clean(self):
-        if SCORE_VOTE_CEILING is not None and self.raw_score >= SCORE_VOTE_CEILING:
-            raise ValidationError(f'Voting scores exceeds ceiling bounds (currently set at {SCORE_VOTE_CEILING})')
+        if FLOWBACK_SCORE_VOTE_CEILING is not None and self.raw_score >= FLOWBACK_SCORE_VOTE_CEILING:
+            raise ValidationError(f'Voting scores exceeds ceiling bounds (currently set at {FLOWBACK_SCORE_VOTE_CEILING})')
 
-        if SCORE_VOTE_FLOOR is not None and self.raw_score <= SCORE_VOTE_FLOOR:
-            raise ValidationError(f'Voting scores exceeds floor bounds (currently set at {SCORE_VOTE_FLOOR})')
+        if FLOWBACK_SCORE_VOTE_FLOOR is not None and self.raw_score <= FLOWBACK_SCORE_VOTE_FLOOR:
+            raise ValidationError(f'Voting scores exceeds floor bounds (currently set at {FLOWBACK_SCORE_VOTE_FLOOR})')
 
     class Meta:
         unique_together = (('author', 'proposal'), ('author_delegate', 'proposal'))

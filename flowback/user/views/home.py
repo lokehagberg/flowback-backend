@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema
 from rest_framework import serializers
 from rest_framework.views import APIView
 
@@ -6,6 +7,7 @@ from flowback.group.serializers import GroupUserSerializer
 from flowback.user.selectors import user_home_feed
 
 
+@extend_schema(tags=['user'])
 class UserHomeFeedAPI(APIView):
     class Pagination(LimitOffsetPagination):
         default_limit = 25

@@ -40,6 +40,8 @@ class ScheduleEventListTemplateAPI(APIView):
         assignees = GroupUserSerializer(many=True,
                                         allow_null=True,
                                         help_text="A list of Group Users")
+        meeting_link = serializers.URLField(allow_null=True,
+                                            help_text="URL link to meeting, can be any URL.")
 
 
 class ScheduleEventCreateTemplateAPI(APIView):
@@ -53,6 +55,8 @@ class ScheduleEventCreateTemplateAPI(APIView):
         assignee_ids = serializers.ListField(child=serializers.IntegerField(),
                                              required=False,
                                              help_text="List of group user IDs (Only available for group schedules)")
+        meeting_link = serializers.URLField(required=False,
+                                            help_text="URL link to meeting, can be any URL.")
 
     class OutputSerializer(serializers.Serializer):
         id = serializers.IntegerField()
@@ -68,6 +72,8 @@ class ScheduleEventUpdateTemplateAPI(APIView):
         assignee_ids = serializers.ListField(child=serializers.IntegerField(),
                                              required=False,
                                              help_text="List of group user IDs (Only available for group schedules)")
+        meeting_link = serializers.URLField(required=False,
+                                            help_text="URL link to meeting, can be any URL.")
 
 
 class ScheduleEventDeleteAPI(APIView):

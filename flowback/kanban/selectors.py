@@ -20,7 +20,7 @@ class BaseKanbanEntryFilter(django_filters.FilterSet):
         fields = dict(title=['icontains'],
                       description=['icontains'],
                       end_date=['gt', 'lt'],
-                      tag=['exact'],)
+                      lane=['exact'],)
 
 
 # TODO due for rework

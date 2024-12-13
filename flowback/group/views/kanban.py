@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema
 from rest_framework.response import Response
 from rest_framework import status, serializers
 
@@ -8,6 +9,7 @@ from flowback.group.services.kanban import group_kanban_entry_create, group_kanb
 from flowback.kanban.views import KanbanEntryListApi, KanbanEntryCreateAPI, KanbanEntryUpdateAPI, KanbanEntryDeleteAPI
 
 
+@extend_schema(tags=['group/kanban'])
 class GroupKanbanEntryListAPI(KanbanEntryListApi):
     class OutputSerializer(KanbanEntryListApi.OutputSerializer):
         work_group_ids = serializers.CharField(required=False)
@@ -25,6 +27,7 @@ class GroupKanbanEntryListAPI(KanbanEntryListApi):
                                       view=self)
 
 
+@extend_schema(tags=['group/kanban'])
 class GroupKanbanEntryCreateAPI(KanbanEntryCreateAPI):
     def post(self, request, group_id: int):
         serializer = self.InputSerializer(data=request.data)
@@ -36,6 +39,7 @@ class GroupKanbanEntryCreateAPI(KanbanEntryCreateAPI):
         return Response(status=status.HTTP_200_OK, data=kanban.id)
 
 
+@extend_schema(tags=['group/kanban'])
 class GroupKanbanEntryUpdateAPI(KanbanEntryUpdateAPI):
     def post(self, request, group_id: int):
         serializer = self.InputSerializer(data=request.data)
@@ -48,6 +52,7 @@ class GroupKanbanEntryUpdateAPI(KanbanEntryUpdateAPI):
         return Response(status=status.HTTP_200_OK)
 
 
+@extend_schema(tags=['group/kanban'])
 class GroupKanbanEntryDeleteAPI(KanbanEntryDeleteAPI):
     def post(self, request, group_id: int):
         serializer = self.InputSerializer(data=request.data)

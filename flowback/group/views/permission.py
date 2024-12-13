@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema
 from rest_framework.response import Response
 from rest_framework import serializers, status
 from rest_framework.views import APIView
@@ -10,6 +11,7 @@ from flowback.group.services.permission import (group_permission_create,
                                                 group_permission_delete)
 
 
+@extend_schema(tags=['group/permission'])
 class GroupPermissionListApi(APIView):
     class Pagination(LimitOffsetPagination):
         default_limit = 1
@@ -70,6 +72,7 @@ class GroupPermissionListApi(APIView):
         )
 
 
+@extend_schema(tags=['group/permission'])
 class GroupPermissionCreateApi(APIView):
     class InputSerializer(serializers.ModelSerializer):
         class Meta:
@@ -111,6 +114,7 @@ class GroupPermissionCreateApi(APIView):
         return Response(status=status.HTTP_200_OK)
 
 
+@extend_schema(tags=['group/permission'])
 class GroupPermissionUpdateApi(APIView):
     class InputSerializer(serializers.Serializer):
         permission_id = serializers.IntegerField()
@@ -156,6 +160,7 @@ class GroupPermissionUpdateApi(APIView):
         return Response(status=status.HTTP_200_OK)
 
 
+@extend_schema(tags=['group/permission'])
 class GroupPermissionDeleteApi(APIView):
     class InputSerializer(serializers.Serializer):
         permission_id = serializers.IntegerField()

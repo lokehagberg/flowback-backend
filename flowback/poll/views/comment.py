@@ -15,31 +15,31 @@ from flowback.comment.views import (CommentListAPI,
                                     CommentAncestorListAPI)
 
 
-@extend_schema(tags=['poll'])
+@extend_schema(tags=['poll/comment'])
 class PollCommentListAPI(CommentListAPI):
     lazy_action = poll_comment_list
 
 
-@extend_schema(tags=['poll'])
+@extend_schema(tags=['poll/comment'])
 class PollCommentAncestorListAPI(CommentAncestorListAPI):
     lazy_action = poll_comment_delete
 
 
-@extend_schema(tags=['poll'])
+@extend_schema(tags=['poll/comment'])
 class PollCommentCreateAPI(CommentCreateAPI):
     lazy_action = poll_comment_create
 
 
-@extend_schema(tags=['poll'])
+@extend_schema(tags=['poll/comment'])
 class PollCommentUpdateAPI(CommentUpdateAPI):
     lazy_action = poll_comment_update
 
 
-@extend_schema(tags=['poll'])
+@extend_schema(tags=['poll/comment'])
 class PollCommentDeleteAPI(CommentDeleteAPI):
     lazy_action = poll_comment_delete
 
 
-@extend_schema(tags=['poll'])
+@extend_schema(tags=['poll/comment'])
 class PollCommentVoteAPI(CommentVoteAPI):
     lazy_action = poll_comment_vote

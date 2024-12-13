@@ -214,10 +214,10 @@ def poll_fast_forward(*, user_id: int, poll_id: int, phase: str):
     time_table = [label[2] for label in poll.time_table]
     print(time_table)
 
-    if phases.index(phase) <= phases.index(poll.current_phase):
+    if not poll.current_phase == 'waiting' and phases.index(phase) <= phases.index(poll.current_phase):
         raise ValidationError('Unable to fast forward poll to the same/previous phase')
 
-    time_difference = poll.get_phase_start_date(phase) - poll.get_phase_start_date(poll.current_phase)
+    time_difference = poll.get_phase_start_date(phase) - timezone.now()
 
     # Save new times to dict
     for phase in time_table:

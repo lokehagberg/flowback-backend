@@ -1,14 +1,16 @@
+import math
 import random
 
 import factory
 
+from backend.settings import FLOWBACK_KANBAN_LANES, FLOWBACK_KANBAN_PRIORITY_LIMIT
 from flowback.common.tests import fake
-from flowback.kanban.models import KanbanEntry
+from flowback.kanban.models import KanbanEntry, Kanban
 
 
-class KanbanFactory(factory.Factory):
+class KanbanFactory(factory.django.DjangoModelFactory):
     class Meta:
-        model = KanbanEntry
+        model = Kanban
 
     name = factory.lazy_attribute(lambda _: fake.name())
     origin_type = 'test'
@@ -20,4 +22,5 @@ class KanbanEntryFactory(factory.django.DjangoModelFactory):
         model = KanbanEntry
 
     description = factory.lazy_attribute(lambda _: fake.sentence())
-    tag = factory.LazyAttribute(lambda _: random.randint(1, 5))
+    priority = factory.LazyAttribute(lambda _: random.randint(1, math.floor(FLOWBACK_KANBAN_PRIORITY_LIMIT / 2)))
+    lane = factory.LazyAttribute(lambda _: random.randint(1, len(FLOWBACK_KANBAN_LANES)))

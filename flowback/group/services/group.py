@@ -18,7 +18,7 @@ group_notification = NotificationManager(sender_type='group', possible_categorie
 def group_create(*,
                  user: int,
                  name: str,
-                 description: str,
+                 description: str = None,
                  hide_poll_users: bool,
                  public: bool,
                  direct_join: bool,

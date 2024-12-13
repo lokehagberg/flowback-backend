@@ -14,7 +14,7 @@ from ..services.poll import poll_refresh_cheap
 from ..services.vote import poll_proposal_vote_update, poll_proposal_delegate_vote_update
 
 
-@extend_schema(tags=['poll'])
+@extend_schema(tags=['poll/vote'])
 class PollProposalVoteListAPI(APIView):
     class Pagination(LimitOffsetPagination):
         default_limit = 10
@@ -174,7 +174,7 @@ class DelegatePollVoteListAPI(APIView):
 
 
 # TODO change serializer based upon poll type
-@extend_schema(tags=['poll'])
+@extend_schema(tags=['poll/vote'])
 class PollProposalVoteUpdateAPI(APIView):
     # For Ranking, Schedule
     class InputSerializerDefault(serializers.Serializer):
@@ -202,7 +202,7 @@ class PollProposalVoteUpdateAPI(APIView):
 
 
 # TODO change serializer based upon poll type
-@extend_schema(tags=['poll'])
+@extend_schema(tags=['poll/vote'])
 class PollProposalDelegateVoteUpdateAPI(APIView):
     # For Ranking, Schedule
     class InputSerializerDefault(serializers.Serializer):

@@ -37,7 +37,8 @@ def create_event(*,
                  origin_id: int,
                  description: str = None,
                  work_group_id: int = None,
-                 assignee_ids: list[int] = None) -> ScheduleEvent:
+                 assignee_ids: list[int] = None,
+                 meeting_link: str = None) -> ScheduleEvent:
     schedule = Schedule.objects.get(id=schedule_id)
 
     # Simple hack to allow assignees for schedules, needs refactor in future
@@ -54,7 +55,8 @@ def create_event(*,
                           end_date=end_date,
                           origin_name=origin_name,
                           work_group_id=work_group_id,
-                          origin_id=origin_id)
+                          origin_id=origin_id,
+                          meeting_link=meeting_link)
     event.full_clean()
     event.save()
 
@@ -70,7 +72,7 @@ def create_event(*,
 def update_event(*, event_id: int, data) -> ScheduleEvent:
     event = ScheduleEvent.objects.get(id=event_id)
 
-    non_side_effect_fields = ['title', 'description', 'start_date', 'end_date']
+    non_side_effect_fields = ['title', 'description', 'start_date', 'end_date', 'meeting_link']
     event, has_updated = model_update(instance=event,
                                       fields=non_side_effect_fields,
                                       data=data)
@@ -157,12 +159,13 @@ class ScheduleManager:
                      schedule_id: int,
                      title: str,
                      start_date: timezone.datetime,
-                     end_date: timezone.datetime,
+                     end_date: timezone.datetime = None,
                      origin_name: str,
                      origin_id: int,
                      description: str = None,
                      work_group_id: int = None,
-                     assignee_ids: list[int] = None) -> ScheduleEvent:
+                     assignee_ids: list[int] = None,
+                     meeting_link: str = None) -> ScheduleEvent:
 
         self.validate_origin_name(origin_name=origin_name)
 
@@ -174,7 +177,8 @@ class ScheduleManager:
                             origin_id=origin_id,
                             work_group_id=work_group_id,
                             description=description,
-                            assignee_ids=assignee_ids)
+                            assignee_ids=assignee_ids,
+                            meeting_link=meeting_link)
 
     def update_event(self, *, schedule_origin_id: int, event_id: int, data):
         get_object(ScheduleEvent, id=event_id,

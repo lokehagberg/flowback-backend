@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema
 from rest_framework import serializers, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -7,6 +8,7 @@ from flowback.user.models import Report
 from flowback.user.services import report_create
 
 
+@extend_schema(tags=['user'])
 class ReportCreateAPI(APIView):
     class InputSerializer(serializers.ModelSerializer):
         class Meta:

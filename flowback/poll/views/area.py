@@ -9,7 +9,7 @@ from flowback.poll.selectors.area import poll_area_statement_list
 from flowback.poll.services.area import poll_area_statement_create, poll_area_statement_vote_update
 
 
-@extend_schema(tags=['poll'])
+@extend_schema(tags=['poll/area'])
 class PollAreaStatementListAPI(APIView):
     class Pagination(LimitOffsetPagination):
         default_limit = 25
@@ -43,7 +43,7 @@ class PollAreaStatementListAPI(APIView):
                                       view=self)
 
 
-@extend_schema(tags=['poll'])
+@extend_schema(tags=['poll/area'])
 class PollAreaVoteAPI(APIView):
     class InputSerializer(serializers.Serializer):
         tag = serializers.IntegerField()
