@@ -1,13 +1,13 @@
 from django.db.models import Sum, Q, Count, F, OuterRef, Subquery
 from rest_framework.exceptions import ValidationError
 
-from backend.settings import SCORE_VOTE_CEILING, SCORE_VOTE_FLOOR
+from backend.settings import FLOWBACK_SCORE_VOTE_CEILING, FLOWBACK_SCORE_VOTE_FLOOR
 from flowback.common.services import get_object
 from flowback.group.models import GroupUserDelegatePool, GroupUser
 from flowback.poll.models import Poll, PollProposal, PollVoting, PollVotingTypeRanking, PollDelegateVoting, \
     PollVotingTypeForAgainst, PollVotingTypeCardinal
 from flowback.group.selectors import group_user_permissions
-from flowback.group.services import group_schedule
+from flowback.group.services.schedule import group_schedule
 from django.utils import timezone
 
 from flowback.schedule.services import create_event
@@ -19,7 +19,7 @@ def poll_proposal_vote_update(*, user_id: int, poll_id: int, data: dict) -> None
                                         group=poll.created_by.group.id,
                                         permissions=['allow_vote', 'admin'])
 
-    poll.check_phase('vote', 'dynamic', 'schedule')
+    poll.check_phase('delegate_vote', 'vote', 'dynamic', 'schedule')
 
     if poll.poll_type == Poll.PollType.RANKING:
         if not data['proposals']:
@@ -41,11 +41,11 @@ def poll_proposal_vote_update(*, user_id: int, poll_id: int, data: dict) -> None
 
     elif poll.poll_type == Poll.PollType.CARDINAL:
 
-        if SCORE_VOTE_CEILING is not None and any([score >= SCORE_VOTE_CEILING for score in data['score']]):
-            raise ValidationError(f'Voting scores exceeds ceiling bounds (currently set at {SCORE_VOTE_CEILING})')
+        if FLOWBACK_SCORE_VOTE_CEILING is not None and any([score > FLOWBACK_SCORE_VOTE_CEILING for score in data['scores']]):
+            raise ValidationError(f'Voting scores exceeds ceiling bounds (currently set at {FLOWBACK_SCORE_VOTE_CEILING})')
 
-        if SCORE_VOTE_FLOOR is not None and any([score <= SCORE_VOTE_FLOOR for score in data['score']]):
-            raise ValidationError(f'Voting scores exceeds floor bounds (currently set at {SCORE_VOTE_FLOOR})')
+        if FLOWBACK_SCORE_VOTE_FLOOR is not None and any([score < FLOWBACK_SCORE_VOTE_FLOOR for score in data['scores']]):
+            raise ValidationError(f'Voting scores exceeds floor bounds (currently set at {FLOWBACK_SCORE_VOTE_FLOOR})')
 
         # Delete votes if no polls are registered
         if not data['proposals']:
@@ -132,6 +132,12 @@ def poll_proposal_delegate_vote_update(*, user_id: int, poll_id: int, data) -> N
         proposals = poll.pollproposal_set.filter(id__in=data['proposals']).all()
         if len(proposals) != len(data['proposals']):
             raise ValidationError('Not all proposals are available to vote for')
+
+        if FLOWBACK_SCORE_VOTE_CEILING is not None and any([score > FLOWBACK_SCORE_VOTE_CEILING for score in data['scores']]):
+            raise ValidationError(f'Voting scores exceeds ceiling bounds (currently set at {FLOWBACK_SCORE_VOTE_CEILING})')
+
+        if FLOWBACK_SCORE_VOTE_FLOOR is not None and any([score < FLOWBACK_SCORE_VOTE_FLOOR for score in data['scores']]):
+            raise ValidationError(f'Voting scores exceeds floor bounds (currently set at {FLOWBACK_SCORE_VOTE_FLOOR})')
 
         pool_vote, created = PollDelegateVoting.objects.get_or_create(created_by=delegate_pool, poll=poll)
         poll_vote_cardinal = [PollVotingTypeCardinal(author_delegate=pool_vote,
@@ -285,7 +291,8 @@ def poll_proposal_vote_count(*, poll_id: int) -> None:
 
     if poll.finished and not poll.result:
         if poll.poll_type == Poll.PollType.SCHEDULE:
-            winning_proposal = PollProposal.objects.filter(poll_id=poll_id).order_by('-score').first()
+            winning_proposal = PollProposal.objects.filter(
+                poll_id=poll_id).order_by('-score', '-pollproposaltypeschedule__event__start_date').first()
             if winning_proposal:
                 event = winning_proposal.pollproposaltypeschedule.event
                 create_event(schedule_id=group.schedule_id,

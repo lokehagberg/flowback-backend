@@ -7,14 +7,14 @@ from rest_framework.views import APIView, Response
 from flowback.common.pagination import LimitOffsetPagination, get_paginated_response
 from flowback.common.services import get_object
 
-from flowback.poll.models import Poll, PollVotingTypeRanking, PollVotingTypeForAgainst
+from flowback.poll.models import Poll, PollVotingTypeRanking, PollVotingTypeForAgainst, PollVotingTypeCardinal
 
 from ..selectors.vote import poll_vote_list, delegate_poll_vote_list
 from ..services.poll import poll_refresh_cheap
 from ..services.vote import poll_proposal_vote_update, poll_proposal_delegate_vote_update
 
 
-@extend_schema(tags=['poll'])
+@extend_schema(tags=['poll/vote'])
 class PollProposalVoteListAPI(APIView):
     class Pagination(LimitOffsetPagination):
         default_limit = 10
@@ -35,11 +35,12 @@ class PollProposalVoteListAPI(APIView):
 
     class OutputSerializerTypeCardinal(serializers.ModelSerializer):
         class Meta:
-            model = PollVotingTypeRanking
+            model = PollVotingTypeCardinal
             fields = ('author',
                       'author_delegate',
                       'proposal',
-                      'score')
+                      'score',
+                      'raw_score')
 
     class OutputSerializerTypeForAgainst(serializers.ModelSerializer):
         class Meta:
@@ -109,7 +110,8 @@ class DelegatePollVoteListAPI(APIView):
             proposal_title = serializers.CharField(source='proposal.title')
             proposal_created_by_id = serializers.IntegerField(source='proposal.created_by.user_id')
             proposal_created_by_name = serializers.CharField(source='proposal.created_by.user.username')
-            score = serializers.IntegerField()
+            score = serializers.IntegerField(allow_null=True)
+            raw_score = serializers.IntegerField()
 
             class Meta:
                 ordering = ['priority']
@@ -172,7 +174,7 @@ class DelegatePollVoteListAPI(APIView):
 
 
 # TODO change serializer based upon poll type
-@extend_schema(tags=['poll'])
+@extend_schema(tags=['poll/vote'])
 class PollProposalVoteUpdateAPI(APIView):
     # For Ranking, Schedule
     class InputSerializerDefault(serializers.Serializer):
@@ -200,11 +202,14 @@ class PollProposalVoteUpdateAPI(APIView):
 
 
 # TODO change serializer based upon poll type
-@extend_schema(tags=['poll'])
+@extend_schema(tags=['poll/vote'])
 class PollProposalDelegateVoteUpdateAPI(APIView):
     # For Ranking, Schedule
     class InputSerializerDefault(serializers.Serializer):
         votes = serializers.ListField(child=serializers.IntegerField())
+
+    class InputSerializerRanking(serializers.Serializer):
+        proposals = serializers.ListField(child=serializers.IntegerField())
 
     class InputSerializerCardinal(serializers.Serializer):
         proposals = serializers.ListField(child=serializers.IntegerField())
@@ -213,8 +218,10 @@ class PollProposalDelegateVoteUpdateAPI(APIView):
     def post(self, request, poll: int):
         poll = get_object(Poll, id=poll)
 
-        if poll.poll_type in (Poll.PollType.SCHEDULE, Poll.PollType.RANKING):
+        if poll.poll_type == Poll.PollType.SCHEDULE:
             input_serializer = self.InputSerializerDefault
+        elif poll.poll_type == Poll.PollType.RANKING:
+            input_serializer = self.InputSerializerRanking
         elif poll.poll_type == Poll.PollType.CARDINAL:
             input_serializer = self.InputSerializerCardinal
         else:

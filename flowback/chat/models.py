@@ -1,40 +1,52 @@
 from django.db import models
-from django.core.exceptions import ValidationError
-import pgtrigger
 
 from flowback.common.models import BaseModel
-from flowback.user.models import User
-from flowback.group.models import GroupUser
+from flowback.files.models import FileCollection
 
 
-class GroupMessage(BaseModel):
-    group_user = models.ForeignKey(GroupUser, on_delete=models.CASCADE)
-    message = models.TextField()
+class MessageChannel(BaseModel):
+    origin_name = models.CharField(max_length=255)
+    title = models.CharField(max_length=255, null=True, blank=True)
+    users = models.ManyToManyField('user.User', through='chat.MessageChannelParticipant')
 
 
-class GroupMessageUserData(BaseModel):
-    group_user = models.OneToOneField(GroupUser, on_delete=models.CASCADE)
-    timestamp = models.DateTimeField()
+# Allows for "channels" inside a group
+class MessageChannelTopic(BaseModel):
+    channel = models.ForeignKey(MessageChannel, on_delete=models.CASCADE)
+    name = models.CharField(max_length=255)
+    hidden = models.BooleanField(default=False)
 
 
-class DirectMessage(BaseModel):
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='directmessage_user')
-    target = models.ForeignKey(User, on_delete=models.CASCADE, related_name='directmessage_target')
-    message = models.TextField()
-
-    def clean(self):
-        if self.user == self.target:
-            raise ValidationError("user and target cannot be the same")
-
-
-class DirectMessageUserData(BaseModel):
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='directmessageuserdata_user')
-    target = models.ForeignKey(User, on_delete=models.CASCADE, related_name='directmessageuserdata_target')
-    timestamp = models.DateTimeField()
-
-    def clean(self):
-        if self.user == self.target:
-            raise ValidationError("user and target cannot be the same")
+class MessageChannelParticipant(BaseModel):
+    user = models.ForeignKey('user.User', on_delete=models.CASCADE)
+    channel = models.ForeignKey(MessageChannel, on_delete=models.CASCADE)
+    closed_at = models.DateTimeField(null=True, blank=True)
+    timestamp = models.DateTimeField(auto_now=True)
+    active = models.BooleanField(default=True)
 
     class Meta:
-        unique_together = 'user', 'target'
+        unique_together = ('user', 'channel')
+
+
+# For image attachments
+class MessageFileCollection(BaseModel):
+    user = models.ForeignKey('user.User', on_delete=models.CASCADE)
+    channel = models.ForeignKey(MessageChannel, on_delete=models.CASCADE)
+    file_collection = models.ForeignKey(FileCollection, on_delete=models.CASCADE)
+
+    @property
+    def attachments_upload_to(self):
+        return 'message'
+
+
+class Message(BaseModel):
+    user = models.ForeignKey('user.User', on_delete=models.CASCADE)
+    channel = models.ForeignKey(MessageChannel, on_delete=models.CASCADE)
+    topic = models.ForeignKey(MessageChannelTopic, on_delete=models.CASCADE, null=True, blank=True)
+    message = models.TextField(max_length=2000)
+    attachments = models.ForeignKey(MessageFileCollection,
+                                    on_delete=models.SET_NULL,
+                                    null=True,
+                                    blank=True)  # TODO instead of MessageFileCollection, use FileCollection directly
+    parent = models.ForeignKey('self', null=True, blank=True, on_delete=models.SET_NULL, related_name='message_parent')
+    active = models.BooleanField(default=True)

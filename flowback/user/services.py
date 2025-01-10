@@ -1,7 +1,9 @@
+import operator
 import uuid
+from functools import reduce
 
 from django.core.mail import send_mail
-from django.db.models import Q
+from django.db.models import Q, Count
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.password_validation import validate_password
 from django.utils import timezone
@@ -9,11 +11,13 @@ from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
 from backend.settings import DEFAULT_FROM_EMAIL, FLOWBACK_URL
+from flowback.chat.models import MessageChannel
+from flowback.chat.services import message_channel_create, message_channel_join
 from flowback.common.services import model_update, get_object
 from flowback.kanban.services import KanbanManager
 from flowback.schedule.models import ScheduleEvent
 from flowback.schedule.services import ScheduleManager, unsubscribe_schedule
-from flowback.user.models import User, OnboardUser, PasswordReset
+from flowback.user.models import User, OnboardUser, PasswordReset, Report
 
 user_schedule = ScheduleManager(schedule_origin_name='user')
 user_kanban = KanbanManager(origin_type='user')
@@ -100,7 +104,7 @@ def user_forgot_password_verify(*, verification_code: str, password: str):
 
 def user_update(*, user: User, data) -> User:
     non_side_effects_fields = ['username', 'profile_image', 'banner_image', 'bio', 'website', 'email_notifications',
-                               'dark_theme']
+                               'dark_theme', 'contact_email', 'contact_phone', 'user_config']
 
     user, has_updated = model_update(instance=user,
                                      fields=non_side_effects_fields,
@@ -167,20 +171,22 @@ def user_schedule_unsubscribe(*,
 
 def user_kanban_entry_create(*,
                              user_id: int,
-                             assignee_id: int,
+                             assignee_id: int = None,
                              title: str,
-                             description: str,
+                             description: str = None,
+                             attachments: list = None,
                              priority: int,
-                             tag: int,
+                             lane: int,
                              end_date: timezone.datetime = None):
     return user_kanban.kanban_entry_create(origin_id=user_id,
                                            created_by_id=user_id,
                                            assignee_id=assignee_id,
                                            title=title,
                                            description=description,
+                                           attachments=attachments,
                                            priority=priority,
                                            end_date=end_date,
-                                           tag=tag)
+                                           lane=lane)
 
 
 def user_kanban_entry_update(*, user_id: int, entry_id: int, data):
@@ -192,3 +198,50 @@ def user_kanban_entry_update(*, user_id: int, entry_id: int, data):
 def user_kanban_entry_delete(*, user_id: int, entry_id: int):
     return user_kanban.kanban_entry_delete(origin_id=user_id,
                                            entry_id=entry_id)
+
+
+def user_get_chat_channel(user_id: int, target_user_ids: int | list[int]):
+    if isinstance(target_user_ids, int):
+        target_user_ids = [target_user_ids]
+
+    if user_id not in target_user_ids:
+        target_user_ids.append(user_id)
+
+    target_users = User.objects.filter(id__in=target_user_ids, is_active=True)
+
+    if not len(target_users) == len(target_user_ids):
+        raise ValidationError("Not every user requested do exist")
+
+    try:
+        # Find a channel where all users are in the same chat
+        channel = MessageChannel.objects.annotate(count=Count('users')).filter(
+            count=target_users.count())
+
+        for user in target_users.all():
+            channel = channel.filter(users=user.id)
+
+        channel = channel.first()
+
+        if not channel:
+            raise MessageChannel.DoesNotExist
+
+    except MessageChannel.DoesNotExist:
+        title = f"{', '.join([u.username for u in target_users])}"
+        channel = message_channel_create(origin_name=User.message_channel_origin,
+                                         title=title if len(target_users) > 1 else None)
+
+        # In the future, make this a bulk_create statement
+        for u in target_users:
+            message_channel_join(user_id=u.id, channel_id=channel.id)
+
+    return channel
+
+
+def report_create(*, user_id: int, title: str, description: str):
+    user = get_object(User, id=user_id)
+
+    report = Report(user=user, title=title, description=description)
+    report.full_clean()
+    report.save()
+
+    return report

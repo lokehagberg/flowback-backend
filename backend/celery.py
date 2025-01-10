@@ -4,7 +4,7 @@ from pathlib import Path
 from celery import Celery
 import environ
 
-env = environ.Env(RABBITMQ_BROKER_URL=str)
+env = environ.Env(RABBITMQ_BROKER_URL=(str, 'amqp://flowback:flowback@localhost:5672/flowback'))
 BASE_DIR = Path(__file__).resolve().parent.parent
 env.read_env(os.path.join(BASE_DIR, ".env"))
 

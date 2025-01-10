@@ -11,8 +11,13 @@ from flowback.poll.services.poll import poll_refresh_cheap
 from flowback.schedule.models import ScheduleEvent
 
 
-def poll_proposal_create(*, user_id: int, poll_id: int,
-                         title: str = None, description: str = None, attachments=None, **data) -> PollProposal:
+def poll_proposal_create(*, user_id: int,
+                         poll_id: int,
+                         title: str = None,
+                         description: str = None,
+                         attachments=None,
+                         blockchain_id: int = None,
+                         **data) -> PollProposal:
     poll = get_object(Poll, id=poll_id)
     group_user = group_user_permissions(user=user_id, group=poll.created_by.group.id,
                                         permissions=['create_proposal', 'admin'])
@@ -25,7 +30,11 @@ def poll_proposal_create(*, user_id: int, poll_id: int,
     if poll.poll_type == Poll.PollType.SCHEDULE and group_user.user.id != poll.created_by.user.id:
         raise ValidationError('Only poll author can create proposals for schedule polls')
 
-    proposal = PollProposal(created_by=group_user, poll=poll, title=title, description=description)
+    proposal = PollProposal(created_by=group_user,
+                            poll=poll,
+                            title=title,
+                            description=description,
+                            blockchain_id=blockchain_id)
     proposal.full_clean()
 
     collection = None
@@ -52,7 +61,13 @@ def poll_proposal_create(*, user_id: int, poll_id: int,
         schedule_proposal = PollProposalTypeSchedule(proposal=proposal,
                                                      event=event)
 
-        schedule_proposal.full_clean()
+        try:
+            schedule_proposal.full_clean()
+
+        except ValidationError as e:
+            proposal.delete()
+            raise e
+
         schedule_proposal.save()
 
     return proposal
@@ -60,7 +75,7 @@ def poll_proposal_create(*, user_id: int, poll_id: int,
 
 def poll_proposal_delete(*, user_id: int, proposal_id: int) -> None:
     proposal = get_object(PollProposal, id=proposal_id)
-    group_user = group_user_permissions(group=proposal.created_by.group, user=user_id)
+    group_user = group_user_permissions(user=user_id, group=proposal.created_by.group)
     poll_refresh_cheap(poll_id=proposal.poll.id)  # TODO get celery
 
     if proposal.created_by == group_user and group_user.check_permission(delete_proposal=True):

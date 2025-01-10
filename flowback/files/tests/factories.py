@@ -1,5 +1,5 @@
 import factory.django
-from flowback.common.tests import faker
+from flowback.common.tests import fake
 from django.core.files.uploadedfile import SimpleUploadedFile
 
 from ..models import FileCollection, FileSegment

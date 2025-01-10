@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.response import Response
 
@@ -8,6 +9,7 @@ from flowback.user.services import user_kanban_entry_create, user_kanban_entry_u
 from flowback.kanban.views import KanbanEntryListApi, KanbanEntryCreateAPI, KanbanEntryUpdateAPI, KanbanEntryDeleteAPI
 
 
+@extend_schema(tags=['user/kanban'])
 class UserKanbanEntryListAPI(KanbanEntryListApi):
     def get(self, request):
         serializer = self.FilterSerializer(data=request.data)
@@ -21,6 +23,7 @@ class UserKanbanEntryListAPI(KanbanEntryListApi):
                                       view=self)
 
 
+@extend_schema(tags=['user/kanban'])
 class UserKanbanEntryCreateAPI(KanbanEntryCreateAPI):
     def post(self, request):
         serializer = self.InputSerializer(data=request.data)
@@ -31,6 +34,7 @@ class UserKanbanEntryCreateAPI(KanbanEntryCreateAPI):
         return Response(data=kanban.id, status=status.HTTP_201_CREATED)
 
 
+@extend_schema(tags=['user/kanban'])
 class UserKanbanEntryUpdateAPI(KanbanEntryUpdateAPI):
     def post(self, request):
         serializer = self.InputSerializer(data=request.data)
@@ -43,6 +47,7 @@ class UserKanbanEntryUpdateAPI(KanbanEntryUpdateAPI):
         return Response(status=status.HTTP_200_OK)
 
 
+@extend_schema(tags=['user/kanban'])
 class UserKanbanEntryDeleteAPI(KanbanEntryDeleteAPI):
     def post(self, request):
         serializer = self.InputSerializer(data=request.data)

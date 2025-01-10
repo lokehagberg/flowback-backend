@@ -1,4 +1,5 @@
 import json
+from pprint import pprint
 
 from rest_framework.test import APIRequestFactory, force_authenticate, APITransactionTestCase
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -12,7 +13,6 @@ from ...poll.views.comment import PollCommentCreateAPI, PollCommentListAPI
 
 
 class PollCommentTest(APITransactionTestCase):
-    reset_sequences = True
 
     def setUp(self):
         self.collection = FileCollectionFactory()
@@ -34,7 +34,7 @@ class PollCommentTest(APITransactionTestCase):
 
         request = factory.post('', data=data)
         force_authenticate(request, user=self.poll.created_by.user)
-        response = view(request, poll=self.poll.id)
+        response = view(request, poll_id=self.poll.id)
 
         comment_id = int(json.loads(response.rendered_content))
         comment = Comment.objects.get(id=comment_id)
@@ -51,7 +51,7 @@ class PollCommentTest(APITransactionTestCase):
 
         request = factory.post('', data=data)
         force_authenticate(request, user=self.poll.created_by.user)
-        response = view(request, poll=self.poll.id)
+        response = view(request, poll_id=self.poll.id)
 
         comment_id = int(json.loads(response.rendered_content))
         comment = Comment.objects.get(id=comment_id)
@@ -63,7 +63,7 @@ class PollCommentTest(APITransactionTestCase):
 
         request_ex = factory.post('', data=data_ex)
         force_authenticate(request_ex, user=self.poll.created_by.user)
-        response_ex = view(request_ex, poll=self.poll.id)
+        response_ex = view(request_ex, poll_id=self.poll.id)
 
         comment_id_ex = int(json.loads(response_ex.rendered_content))
         comment_ex = Comment.objects.get(id=comment_id_ex)
@@ -73,15 +73,19 @@ class PollCommentTest(APITransactionTestCase):
         self.assertEqual(all('test' not in x.file for x in files_ex.all()), True)
         self.assertEqual(files.count(), len(data['attachments']))
 
+        return comment_id_ex
+
     def test_poll_comment_list(self):
         factory = APIRequestFactory()
         view = PollCommentListAPI.as_view()
 
+        target = self.test_poll_comment_create_with_attachments()
+
         request = factory.get('')
         force_authenticate(request, user=self.poll.created_by.user)
-        response = view(request, poll=self.poll.id)
+        response = view(request, poll_id=self.poll.id)
 
-        data = json.loads(response.rendered_content)
-        print(self.poll_comment_three.attachments.filesegment_set.first().__dict__)
-        print(FileSegment.objects.first().__dict__)
-        print(data)
+        self.assertEqual(response.status_code, 200)
+        pprint([i['attachments'] for i in response.data['results'] if i['id'] == target])
+        self.assertEqual(len([i['attachments'] for i in response.data['results'] if i['id'] == target][0]), 2)
+

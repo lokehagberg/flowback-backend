@@ -1,13 +1,17 @@
+from drf_spectacular.utils import extend_schema
 from rest_framework import serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from flowback.common.pagination import LimitOffsetPagination, get_paginated_response
 
 from flowback.group.models import GroupTags
-from flowback.group.selectors import group_tags_list
-from flowback.group.services import group_tag_create, group_tag_update, group_tag_delete
+from flowback.group.selectors import group_tags_list, group_tags_interval_mean_absolute_correctness
+from flowback.group.services.tag import (group_tag_create,
+                                         group_tag_update,
+                                         group_tag_delete)
 
 
+@extend_schema(tags=['group/tag'])
 class GroupTagsListApi(APIView):
     class Pagination(LimitOffsetPagination):
         default_limit = 1
@@ -40,6 +44,15 @@ class GroupTagsListApi(APIView):
         )
 
 
+# TODO make this a part of GroupTagsListAPI
+@extend_schema(tags=['group/tag'])
+class GroupTagIntervalMeanAbsoluteCorrectnessAPI(APIView):
+    def get(self, request, tag_id: int):
+        val = group_tags_interval_mean_absolute_correctness(tag_id=tag_id, fetched_by=request.user)
+        return Response(status=status.HTTP_200_OK, data=val)
+
+
+@extend_schema(tags=['group/tag'])
 class GroupTagsCreateApi(APIView):
     class InputSerializer(serializers.ModelSerializer):
         class Meta:
@@ -55,6 +68,7 @@ class GroupTagsCreateApi(APIView):
         return Response(status=status.HTTP_200_OK)
 
 
+@extend_schema(tags=['group/tag'])
 class GroupTagsUpdateApi(APIView):
     class InputSerializer(serializers.Serializer):
         tag = serializers.IntegerField()
@@ -71,6 +85,7 @@ class GroupTagsUpdateApi(APIView):
         return Response(status=status.HTTP_200_OK)
 
 
+@extend_schema(tags=['group/tag'])
 class GroupTagsDeleteApi(APIView):
     class InputSerializer(serializers.Serializer):
         tag = serializers.IntegerField()

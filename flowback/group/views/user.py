@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema
 from rest_framework import serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -7,10 +8,11 @@ from flowback.group.models import GroupUser
 from flowback.group.selectors import group_user_list, group_user_invite_list
 from flowback.group.serializers import GroupUserSerializer
 
-from flowback.group.services import group_join, group_user_update, group_leave, group_invite, group_invite_accept, \
-    group_invite_reject
+from flowback.group.services.group import group_user_update, group_join, group_leave
+from flowback.group.services.invite import group_invite, group_invite_accept, group_invite_reject
 
 
+@extend_schema(tags=['group'])
 class GroupUserListApi(APIView):
     class Pagination(LimitOffsetPagination):
         default_limit = 20
@@ -26,6 +28,7 @@ class GroupUserListApi(APIView):
 
     class OutputSerializer(GroupUserSerializer):
         is_delegate = serializers.BooleanField(source='delegate')
+        work_groups = serializers.ListField(allow_null=True, child=serializers.CharField())
 
     def get(self, request, group: int):
         filter_serializer = self.FilterSerializer(data=request.query_params)
@@ -44,6 +47,7 @@ class GroupUserListApi(APIView):
         )
 
 
+@extend_schema(tags=['group'])
 class GroupInviteListApi(APIView):
     class Pagination(LimitOffsetPagination):
         default_limit = 20
@@ -79,6 +83,7 @@ class GroupInviteListApi(APIView):
         )
 
 
+@extend_schema(tags=['group'])
 class GroupJoinApi(APIView):
     def post(self, request, group: int):
         data = group_join(user=request.user.id, group=group)
@@ -90,13 +95,14 @@ class GroupJoinApi(APIView):
             return Response(status=status.HTTP_200_OK, data='invite')
 
 
+@extend_schema(tags=['group'])
 class GroupLeaveApi(APIView):
     def post(self, request, group: int):
         group_leave(user=request.user.id, group=group)
-
         return Response(status=status.HTTP_200_OK)
 
 
+@extend_schema(tags=['group'])
 class GroupUserUpdateApi(APIView):
     class InputSerializer(serializers.Serializer):
         user = serializers.IntegerField(required=False)
@@ -119,6 +125,7 @@ class GroupUserUpdateApi(APIView):
         return Response(status=status.HTTP_200_OK)
 
 
+@extend_schema(tags=['group'])
 class GroupInviteApi(APIView):
     class InputSerializer(serializers.Serializer):
         to = serializers.IntegerField()
@@ -132,6 +139,7 @@ class GroupInviteApi(APIView):
         return Response(status=status.HTTP_200_OK)
 
 
+@extend_schema(tags=['group'])
 class GroupInviteAcceptApi(APIView):
     class InputSerializer(serializers.Serializer):
         to = serializers.IntegerField(required=False)
@@ -144,6 +152,7 @@ class GroupInviteAcceptApi(APIView):
         return Response(status=status.HTTP_200_OK)
 
 
+@extend_schema(tags=['group'])
 class GroupInviteRejectApi(APIView):
     class InputSerializer(serializers.Serializer):
         to = serializers.IntegerField(required=False)

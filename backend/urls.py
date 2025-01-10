@@ -5,14 +5,16 @@ from drf_spectacular.views import SpectacularRedocView, SpectacularAPIView
 from rest_framework import permissions
 from rest_framework.schemas import get_schema_view
 
-from backend.settings import DEBUG, MEDIA_URL, MEDIA_ROOT, URL_SUBPATH
+from backend.settings import DEBUG, MEDIA_URL, MEDIA_ROOT, URL_SUBPATH, INTEGRATIONS
 from flowback.poll.views.poll import PollUserScheduleListAPI, PollListApi
 from flowback.user.urls import user_patterns
 from flowback.group.urls import group_patterns
 from flowback.poll.urls import group_poll_patterns, poll_patterns
 from flowback.chat.urls import chat_patterns
 from flowback.notification.urls import notification_patterns
+from flowback.server.urls import server_patterns
 from django.conf.urls.static import static
+
 
 api_urlpatterns = [
     path('', include((user_patterns, 'user'))),
@@ -21,6 +23,7 @@ api_urlpatterns = [
     path('group/<int:group_id>/poll/', include((group_poll_patterns, 'group_poll'))),
     path('group/poll/', include((poll_patterns, 'poll'))),
     path('notification/', include((notification_patterns, 'notification'))),
+    path('server/', include((server_patterns, 'server'))),
 
     path('home/polls', PollListApi.as_view(), name='home_polls'),
     path('poll/user/schedule', PollUserScheduleListAPI.as_view(), name='poll_user_schedule'),
@@ -28,19 +31,21 @@ api_urlpatterns = [
     path('schema/redoc/', SpectacularRedocView.as_view(url_name='api:schema'), name='redoc'),
 ]
 
-try:
-    from flowback_addon.urls import addon_patterns
-    api_urlpatterns.append(path('', include((addon_patterns, 'addon'))))
+if INTEGRATIONS:
+    try:
+        from flowback_addon.urls import addon_patterns
+        api_urlpatterns.append(path('', include((addon_patterns, 'addon'))))
 
-except ModuleNotFoundError:
-    pass
+    except ModuleNotFoundError:
+        pass
 
-except Exception as e:
-    raise e
+    except Exception as e:
+        raise e
 
 urlpatterns = [
     path(f'{URL_SUBPATH}/' if URL_SUBPATH else '', include((api_urlpatterns, 'api'))),
-    path('admin/', admin.site.urls, name='admin')
+    path('admin/', admin.site.urls, name='admin'),
+    path('openid/', include('oidc_provider.urls', namespace='oidc_provider')),
 ]
 
 if DEBUG:

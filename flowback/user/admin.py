@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
-from flowback.user.models import User
+from flowback.user.models import User, Report
 
 
 @admin.register(User)
@@ -24,3 +24,22 @@ class UserAdmin(BaseUserAdmin):
     search_fields = ('email',)
     ordering = ('email',)
     filter_horizontal = ()
+
+
+@admin.register(Report)
+class ReportAdmin(admin.ModelAdmin):
+    readonly_fields = ['created_at']
+
+    list_display = ('user', 'title', 'created_at')
+    list_filter = ('user', 'title', 'description', 'created_at')
+
+    fieldsets = [
+        (None, {'fields': ['user', 'title', 'description', 'created_at']}),
+    ]
+
+    add_fieldsets = [
+        (None, {'fields': ['user', 'title', 'description']}),
+    ]
+
+    search_fields = ('user__username', 'user__email', 'title', 'description')
+    ordering = ('created_at',)

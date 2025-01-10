@@ -2,190 +2,175 @@ from rest_framework import serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from flowback.chat.selectors import group_message_list, group_message_preview, direct_message_list, \
-    direct_message_preview
-from flowback.chat.models import GroupMessage, DirectMessage
-from flowback.chat.services import direct_chat_timestamp, group_chat_timestamp
+from .selectors import message_list, message_channel_preview_list, message_channel_topic_list, \
+    message_channel_participant_list
+from .serializers import MessageSerializer, BasicMessageSerializer
+from .services import message_channel_userdata_update, message_channel_leave, message_files_upload
 from flowback.common.pagination import get_paginated_response, LimitOffsetPagination
+from ..user.serializers import BasicUserSerializer
 
 
-class GroupMessageListApi(APIView):
+class MessageListAPI(APIView):
     class Pagination(LimitOffsetPagination):
         default_limit = 50
+        max_limit = 50
 
     class FilterSerializer(serializers.Serializer):
+        order_by = serializers.ChoiceField(required=False, choices=['created_at_asc', 'created_at_desc',
+                                                                    'total_replies_asc', 'total_replies_desc'])
         id = serializers.IntegerField(required=False)
-        user = serializers.IntegerField(required=False)
+        user_ids = serializers.CharField(required=False)
+        message__icontains = serializers.CharField(required=False)
+        parent_id = serializers.IntegerField(required=False)
+        topic_id = serializers.IntegerField(required=False)
+        topic_name = serializers.CharField(required=False)
+        has_attachments = serializers.BooleanField(required=False, allow_null=True, default=None)
+        created_at__gte = serializers.DateTimeField(required=False)
+        created_at__lte = serializers.DateTimeField(required=False)
+
+    OutputSerializer = MessageSerializer
+
+    def get(self, request, channel_id: int):
+        serializer = self.FilterSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+
+        messages = message_list(user=request.user, channel_id=channel_id, filters=serializer.validated_data)
+
+        return get_paginated_response(pagination_class=self.Pagination,
+                                      serializer_class=self.OutputSerializer,
+                                      queryset=messages,
+                                      request=request,
+                                      view=self)
+
+
+class MessageChannelPreviewAPI(APIView):
+    class Pagination(LimitOffsetPagination):
+        default_limit = 50
+        max_limit = 50
+
+    class FilterSerializer(serializers.Serializer):
+        order_by = serializers.ChoiceField(required=False, choices=['created_at_asc', 'created_at_desc'])
+        origin_name = serializers.CharField(required=False)
         username__icontains = serializers.CharField(required=False)
-        message = serializers.CharField(required=False)
-        created_at__lt = serializers.DateTimeField(required=False)
-        created_at__gt = serializers.DateTimeField(required=False)
-        order_by = serializers.CharField(required=False)
-
-    class OutputSerializer(serializers.ModelSerializer):
-        user_id = serializers.IntegerField(source='group_user.user_id')
-        username = serializers.CharField(source='group_user.user.username')
-        profile_image = serializers.ImageField(source='group_user.user.profile_image')
-
-        class Meta:
-            model = GroupMessage
-            fields = 'username', 'user_id', 'profile_image', 'message', 'created_at'
-
-    def get(self, request, group: int):
-        filter_serializer = self.FilterSerializer(data=request.query_params)
-        filter_serializer.is_valid(raise_exception=True)
-
-        messages = group_message_list(user=request.user.id,
-                                      group=group,
-                                      filters=filter_serializer.validated_data)
-
-        return get_paginated_response(
-            pagination_class=self.Pagination,
-            serializer_class=self.OutputSerializer,
-            queryset=messages,
-            request=request,
-            view=self
-        )
-
-
-class GroupMessagePreviewApi(APIView):
-    class Pagination(LimitOffsetPagination):
-        default_limit = 50
-        max_limit = 1000
-
-    class FilterSerializer(serializers.Serializer):
         id = serializers.IntegerField(required=False)
-        group = serializers.IntegerField(required=False)
-        group_name__icontains = serializers.CharField(required=False)
-        message__icontains = serializers.CharField(required=False)
-        created_at__lt = serializers.DateTimeField(required=False)
-        created_at__gt = serializers.DateTimeField(required=False)
+        user_id = serializers.IntegerField(required=False)
+        created_at__gte = serializers.DateTimeField(required=False)
+        created_at__lte = serializers.DateTimeField(required=False)
+        channel_id = serializers.IntegerField(required=False)
+        topic_id = serializers.IntegerField(required=False)
+        topic_name = serializers.CharField(required=False)
 
-    class OutputSerializer(serializers.ModelSerializer):
-        group_id = serializers.IntegerField(source='group_user.group_id')
-        user_id = serializers.IntegerField(source='group_user.user_id')
-        username = serializers.CharField(source='group_user.user.username')
-        profile_image = serializers.ImageField(source='group_user.user.profile_image')
-        timestamp = serializers.DateTimeField()
-
-        class Meta:
-            model = GroupMessage
-            fields = 'group_id', 'username', 'user_id', 'profile_image', 'message', 'created_at', 'timestamp'
+    class OutputSerializer(BasicMessageSerializer):
+        timestamp = serializers.DateTimeField(allow_null=True)
 
     def get(self, request):
-        messages = group_message_preview(user=request.user.id)
+        serializer = self.FilterSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
 
-        return get_paginated_response(
-            pagination_class=self.Pagination,
-            serializer_class=self.OutputSerializer,
-            queryset=messages,
-            request=request,
-            view=self
-        )
+        messages = message_channel_preview_list(user=request.user, filters=serializer.validated_data)
+
+        return get_paginated_response(pagination_class=self.Pagination,
+                                      serializer_class=self.OutputSerializer,
+                                      queryset=messages,
+                                      request=request,
+                                      view=self)
 
 
-class DirectMessageListApi(APIView):
+class MessageChannelTopicListAPI(APIView):
     class Pagination(LimitOffsetPagination):
+        default_limit = 50
+        max_limit = 100
+
+    class FilterSerializer(serializers.Serializer):
+        id = serializers.IntegerField()
+        topic_id = serializers.IntegerField()
+        name = serializers.CharField()
+        name__icontains = serializers.CharField()
+
+    class OutputSerializer(serializers.Serializer):
+        id = serializers.IntegerField()
+        name = serializers.CharField()
+
+    def get(self, request, channel_id: int):
+        serializer = self.FilterSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+
+        topics = message_channel_topic_list(user=request.user, channel_id=channel_id, filters=serializer.validated_data)
+
+        return get_paginated_response(pagination_class=self.Pagination,
+                                      serializer_class=self.OutputSerializer,
+                                      queryset=topics,
+                                      request=request,
+                                      view=self)
+
+
+class MessageChannelParticipantListAPI(APIView):
+    class Pagination(LimitOffsetPagination):
+        max_limit = 100
         default_limit = 50
 
     class FilterSerializer(serializers.Serializer):
+        username__icontains = serializers.CharField(required=False)
         id = serializers.IntegerField(required=False)
-        target = serializers.IntegerField(required=False)
-        order_by = serializers.CharField(required=False)
-        created_at__lt = serializers.DateTimeField(required=False)
-        created_at__gt = serializers.DateTimeField(required=False)
+        user_id = serializers.IntegerField(required=False)
 
-    class OutputSerializer(serializers.ModelSerializer):
-        username = serializers.CharField(source='user.username')
-        profile_image = serializers.ImageField(source='user.profile_image')
+    class OutputSerializer(serializers.Serializer):
+        id = serializers.IntegerField()
+        user = BasicUserSerializer()
 
-        class Meta:
-            model = GroupMessage
-            fields = 'username', 'profile_image', 'message', 'created_at'
+    def get(self, request, channel_id: int):
+        serializer = self.FilterSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
 
-    def get(self, request, target: int):
-        filter_serializer = self.FilterSerializer(data=request.query_params)
-        filter_serializer.is_valid(raise_exception=True)
+        participants = message_channel_participant_list(user=request.user,
+                                                        channel_id=channel_id,
+                                                        filters=serializer.validated_data)
 
-        messages = direct_message_list(user=request.user.id,
-                                       target=target,
-                                       filters=filter_serializer.validated_data)
-
-        return get_paginated_response(
-            pagination_class=self.Pagination,
-            serializer_class=self.OutputSerializer,
-            queryset=messages,
-            request=request,
-            view=self
-        )
+        return get_paginated_response(pagination_class=self.Pagination,
+                                      serializer_class=self.OutputSerializer,
+                                      queryset=participants,
+                                      request=request,
+                                      view=self)
 
 
-class DirectMessagePreviewApi(APIView):
-    class Pagination(LimitOffsetPagination):
-        default_limit = 50
-        max_limit = 1000
-
-    class FilterSerializer(serializers.Serializer):
-        id = serializers.IntegerField(required=False)
-        target = serializers.IntegerField(required=False)
-        message__icontains = serializers.CharField(required=False)
-        created_at__lt = serializers.DateTimeField(required=False)
-        created_at__gt = serializers.DateTimeField(required=False)
-
-    class OutputSerializer(serializers.ModelSerializer):
-        username = serializers.CharField(source='user.username')
-        user_id = serializers.IntegerField(source='user.id')
-        target_username = serializers.CharField(source='target.username')
-        target_id = serializers.IntegerField(source='target.id')
-        profile_image = serializers.ImageField(source='user.profile_image')
-        timestamp = serializers.DateTimeField()
-
-        class Meta:
-            model = DirectMessage
-            fields = ('username', 'user_id', 'target_username', 'target_id',
-                      'profile_image', 'message', 'created_at', 'timestamp')
-
-    def get(self, request):
-        filter_serializer = self.FilterSerializer(data=request.query_params)
-        filter_serializer.is_valid(raise_exception=True)
-
-        messages = direct_message_preview(user=request.user.id,
-                                          filters=filter_serializer.validated_data)
-
-        return get_paginated_response(
-            pagination_class=self.Pagination,
-            serializer_class=self.OutputSerializer,
-            queryset=messages,
-            request=request,
-            view=self
-        )
-
-
-class DirectMessageTimestampApi(APIView):
+class MessageFileCollectionUploadAPI(APIView):
     class InputSerializer(serializers.Serializer):
-        timestamp = serializers.DateTimeField()
+        files = serializers.ListField(child=serializers.FileField())
 
-    def post(self, request, target: int):
+    class OutputSerializer(serializers.Serializer):
+        id = serializers.IntegerField()
+
+    def post(self, request, channel_id: int):
         serializer = self.InputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        direct_chat_timestamp(user_id=request.user.id, target=target, **serializer.validated_data)
-        return Response(status=status.HTTP_200_OK)
+        file_collection = message_files_upload(user_id=request.user.id, channel_id=channel_id,
+                                               **serializer.validated_data)
+        return Response(status=status.HTTP_201_CREATED, data=self.OutputSerializer(file_collection).data)
 
 
-class GroupMessageTimestampApi(APIView):
+class MessageChannelUserDataUpdateAPI(APIView):
     class InputSerializer(serializers.Serializer):
-        timestamp = serializers.DateTimeField()
+        channel_id = serializers.IntegerField()
+        timestamp = serializers.DateTimeField(required=False)
+        closed_at = serializers.DateTimeField(required=False)
 
-    def post(self, request, group: int):
+    def post(self, request):
         serializer = self.InputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        group_chat_timestamp(user_id=request.user.id, group_id=group, **serializer.validated_data)
+        message_channel_userdata_update(user_id=request.user.id, **serializer.validated_data)
+
         return Response(status=status.HTTP_200_OK)
 
 
+class MessageChannelLeaveAPI(APIView):
+    class InputSerializer(serializers.Serializer):
+        channel_id = serializers.IntegerField()
 
+    def post(self, request):
+        serializer = self.InputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        message_channel_leave(user_id=request.user.id, **serializer.validated_data)
 
-
-
+        return Response(status=status.HTTP_200_OK)

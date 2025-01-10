@@ -1,7 +1,8 @@
 from django.urls import path
 from rest_framework.authtoken import views
 
-from backend.settings import DISABLE_DEFAULT_USER_REGISTRATION
+from backend.settings import FLOWBACK_DISABLE_DEFAULT_USER_REGISTRATION
+from flowback.user.views.report import ReportCreateAPI
 from flowback.user.views.user import (UserCreateApi,
                                       UserCreateVerifyApi,
                                       UserListApi,
@@ -9,7 +10,7 @@ from flowback.user.views.user import (UserCreateApi,
                                       UserUpdateApi,
                                       UserDeleteAPI,
                                       UserForgotPasswordApi,
-                                      UserForgotPasswordVerifyApi)
+                                      UserForgotPasswordVerifyApi, UserGetChatChannelAPI)
 from flowback.user.views.schedule import (UserScheduleEventListAPI,
                                           UserScheduleEventCreateAPI,
                                           UserScheduleEventUpdateAPI,
@@ -18,6 +19,7 @@ from flowback.user.views.kanban import (UserKanbanEntryListAPI,
                                         UserKanbanEntryCreateAPI,
                                         UserKanbanEntryUpdateAPI,
                                         UserKanbanEntryDeleteAPI)
+from flowback.user.views.home import UserHomeFeedAPI
 
 user_patterns = [
     path('login', views.obtain_auth_token, name='login'),
@@ -39,9 +41,13 @@ user_patterns = [
     path('user/kanban/entry/create', UserKanbanEntryCreateAPI.as_view(), name='user_kanban_entry_create'),
     path('user/kanban/entry/update', UserKanbanEntryUpdateAPI.as_view(), name='user_kanban_entry_update'),
     path('user/kanban/entry/delete', UserKanbanEntryDeleteAPI.as_view(), name='user_kanban_entry_delete'),
+
+    path('user/home', UserHomeFeedAPI.as_view(), name='user_home_feed'),
+    path('user/chat', UserGetChatChannelAPI.as_view(), name='user_get_chat_channel'),
+    path('report/create', ReportCreateAPI.as_view(), name='report_create'),
 ]
 
-if not DISABLE_DEFAULT_USER_REGISTRATION:
+if not FLOWBACK_DISABLE_DEFAULT_USER_REGISTRATION:
     user_patterns += [
         path('register', UserCreateApi.as_view(), name='register'),
         path('register/verify', UserCreateVerifyApi.as_view(), name='register_verify'),

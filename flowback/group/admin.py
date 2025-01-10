@@ -1,5 +1,7 @@
 from django.contrib import admin
-from .models import Group, GroupPermissions, GroupTags, GroupUser, GroupUserInvite, GroupUserDelegatePool, GroupUserDelegate, GroupUserDelegator, GroupFolder
+from .models import Group, GroupPermissions, GroupTags, GroupUser, GroupUserInvite, GroupUserDelegatePool, \
+    GroupUserDelegate, GroupUserDelegator, GroupFolder
+
 
 @admin.register(GroupFolder)
 class GroupFolderAdmin(admin.ModelAdmin):
@@ -10,20 +12,48 @@ class GroupFolderAdmin(admin.ModelAdmin):
 class GroupAdmin(admin.ModelAdmin):
     list_display = ('created_by', 'active', 'direct_join',
                     'public', 'default_permission', 'name',
-                    'description', 'image', 'cover_image',
+                    'description', 'image', 'cover_image', 'poll_phase_minimum_space',
                     'hide_poll_users', 'schedule', 'kanban', 'jitsi_room', 'group_folder')
-    
+
 
 @admin.register(GroupPermissions)
 class GroupPermissionsAdmin(admin.ModelAdmin):
-    list_display = ('role_name', 'author', 'invite_user',
-                    'create_poll', 'allow_vote', 'kick_members',
-                    'ban_members', 'force_delete_poll', 'force_delete_proposal',
+    list_display = ('id',
+                    'role_name',
+                    'invite_user',
+                    'create_poll',
+                    'poll_fast_forward',
+                    'poll_quorum',
+                    'allow_vote',
+                    'allow_delegate',
+                    'send_group_email',
+                    'kick_members',
+                    'ban_members',
+
+                    'create_proposal',
+                    'update_proposal',
+                    'delete_proposal',
+
+                    'prediction_statement_create',
+                    'prediction_statement_delete',
+
+                    'prediction_bet_create',
+                    'prediction_bet_update',
+                    'prediction_bet_delete',
+
+                    'create_kanban_task',
+                    'update_kanban_task',
+                    'delete_kanban_task',
+
+                    'force_delete_poll',
+                    'force_delete_proposal',
                     'force_delete_comment')
+
 
 @admin.register(GroupTags)
 class GroupTagsAdmin(admin.ModelAdmin):
     list_display = ('name', 'group', 'active')
+
 
 @admin.register(GroupUser)
 class GroupUserAdmin(admin.ModelAdmin):
@@ -34,9 +64,11 @@ class GroupUserAdmin(admin.ModelAdmin):
 class GroupUserInviteAdmin(admin.ModelAdmin):
     list_display = ('user', 'group', 'external')
 
+
 @admin.register(GroupUserDelegatePool)
 class GroupUserDelegatePoolAdmin(admin.ModelAdmin):
     list_display = ('group',)
+
 
 @admin.register(GroupUserDelegate)
 class GroupUserDelegateAdmin(admin.ModelAdmin):

@@ -1,7 +1,7 @@
 import factory
 
 from flowback.comment.tests.factories import CommentSectionFactory
-from flowback.common.tests import faker
+from flowback.common.tests import fake
 
 from flowback.group.models import (Group,
                                    GroupUser,
@@ -11,7 +11,9 @@ from flowback.group.models import (Group,
                                    GroupUserInvite,
                                    GroupUserDelegate,
                                    GroupUserDelegatePool,
-                                   GroupUserDelegator)
+                                   GroupUserDelegator, GroupThreadVote, WorkGroup, WorkGroupUser,
+                                   WorkGroupUserJoinRequest)
+from flowback.kanban.models import KanbanEntry
 from flowback.user.tests.factories import UserFactory
 
 
@@ -20,8 +22,8 @@ class GroupFactory(factory.django.DjangoModelFactory):
         model = Group
 
     created_by = factory.SubFactory(UserFactory)
-    name = factory.LazyAttribute(lambda _: faker.unique.first_name().lower())
-    description = factory.LazyAttribute(lambda _: faker.bs())
+    name = factory.LazyAttribute(lambda _: fake.unique.first_name().lower())
+    description = factory.LazyAttribute(lambda _: fake.bs())
 
 
 class GroupUserFactory(factory.django.DjangoModelFactory):
@@ -33,11 +35,35 @@ class GroupUserFactory(factory.django.DjangoModelFactory):
     is_admin = factory.LazyAttribute(lambda o: o.group.created_by == o.user)
 
 
+class WorkGroupFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = WorkGroup
+
+    name = factory.LazyAttribute(lambda _: fake.unique.first_name())
+    group = factory.SubFactory(GroupFactory)
+
+
+class WorkGroupUserFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = WorkGroupUser
+
+    group_user = factory.SubFactory(GroupUserFactory)
+    work_group = factory.SubFactory(WorkGroupFactory, group=factory.SelfAttribute('..group_user.group'))
+
+
+class WorkGroupJoinRequestFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = WorkGroupUserJoinRequest
+
+    group_user = factory.SubFactory(GroupUserFactory)
+    work_group = factory.SubFactory(WorkGroupFactory, group=factory.SelfAttribute('..group_user.group'))
+
+
 class GroupTagsFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = GroupTags
 
-    name = factory.LazyAttribute(lambda _: faker.unique.first_name().lower())
+    name = factory.LazyAttribute(lambda _: fake.unique.first_name().lower())
     group = factory.SubFactory(GroupFactory)
 
 
@@ -46,15 +72,24 @@ class GroupThreadFactory(factory.django.DjangoModelFactory):
         model = GroupThread
 
     created_by = factory.SubFactory(GroupUserFactory)
-    title = factory.LazyAttribute(lambda _: faker.unique.sentence(nb_words=10).lower())
+    title = factory.LazyAttribute(lambda _: fake.unique.sentence(nb_words=10).lower())
     comment_section = factory.SubFactory(CommentSectionFactory)
+
+
+class GroupThreadVoteFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = GroupThreadVote
+
+    created_by = factory.SubFactory(GroupUserFactory)
+    thread = factory.SubFactory(GroupThreadFactory, created_by=factory.SelfAttribute('..created_by'))
+    vote = factory.LazyAttribute(lambda _: fake.boolean())
 
 
 class GroupPermissionsFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = GroupPermissions
 
-    role_name = factory.LazyAttribute(lambda _: faker.unique.first_name())
+    role_name = factory.LazyAttribute(lambda _: fake.unique.first_name())
     author = factory.SubFactory(GroupFactory)
 
 

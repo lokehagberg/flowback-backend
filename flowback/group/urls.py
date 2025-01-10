@@ -1,7 +1,10 @@
 from django.urls import path
 
-from .views.group import GroupFolderListApi, GroupListApi, GroupDetailApi, GroupCreateApi, GroupUpdateApi, GroupDeleteApi, GroupMailApi, \
-    GroupNotificationSubscribeApi
+from .views.group import GroupFolderListApi, GroupListApi, GroupDetailApi, GroupCreateApi, GroupUpdateApi, \
+    GroupDeleteApi, GroupMailApi, \
+    GroupNotificationSubscribeApi, WorkGroupListAPI, WorkGroupUserListAPI, WorkGroupUserJoinRequestListAPI, \
+    WorkGroupCreateAPI, WorkGroupUpdateAPI, WorkGroupDeleteAPI, WorkGroupUserJoinAPI, WorkGroupUserLeaveAPI, \
+    WorkGroupUserAddAPI, WorkGroupUserUpdateAPI, WorkGroupUserRemoveAPI
 from .views.user import (GroupUserListApi,
                          GroupUserUpdateApi,
                          GroupJoinApi,
@@ -16,7 +19,7 @@ from .views.permission import (GroupPermissionListApi,
 from .views.tag import (GroupTagsListApi,
                         GroupTagsCreateApi,
                         GroupTagsUpdateApi,
-                        GroupTagsDeleteApi)
+                        GroupTagsDeleteApi, GroupTagIntervalMeanAbsoluteCorrectnessAPI)
 from .views.delegate import (GroupUserDelegateListApi,
                              GroupUserDelegateApi,
                              GroupUserDelegateUpdateApi,
@@ -39,7 +42,12 @@ from .views.thread import (GroupThreadListAPI,
                            GroupThreadCommentListAPI,
                            GroupThreadCommentCreateAPI,
                            GroupThreadCommentUpdateAPI,
-                           GroupThreadCommentDeleteAPI)
+                           GroupThreadCommentDeleteAPI, GroupThreadNotificationSubscribeAPI, GroupThreadCommentVoteAPI,
+                           GroupThreadCommentAncestorListAPI, GroupThreadVoteUpdateAPI)
+from .views.comment import (GroupDelegatePoolCommentListAPI,
+                            GroupDelegatePoolCommentCreateAPI,
+                            GroupDelegatePoolCommentUpdateAPI,
+                            GroupDelegatePoolCommentDeleteAPI, GroupDelegatePoolCommentVoteAPI)
 
 group_patterns = [
     path('folders', GroupFolderListApi.as_view(), name='group_folder_list'),
@@ -61,6 +69,20 @@ group_patterns = [
     path('<int:group>/invite/accept', GroupInviteAcceptApi.as_view(), name='group_invite_accept'),
     path('<int:group>/invite/reject', GroupInviteRejectApi.as_view(), name='group_invite_reject'),
 
+    path('<int:group_id>/list', WorkGroupListAPI.as_view(), name='work_group_list'),
+    path('workgroup/<int:work_group_id>/list', WorkGroupUserListAPI.as_view(), name='work_group_user_list'),
+    path('workgroup/<int:work_group_id>/joinrequest/list',
+         WorkGroupUserJoinRequestListAPI.as_view(),
+         name='work_group_user_list'),
+    path('<int:group_id>/workgroup/create', WorkGroupCreateAPI.as_view(), name='work_group_create'),
+    path('workgroup/<int:work_group_id>/update', WorkGroupUpdateAPI.as_view(), name='work_group_update'),
+    path('workgroup/<int:work_group_id>/delete', WorkGroupDeleteAPI.as_view(), name='work_group_delete'),
+    path('workgroup/<int:work_group_id>/join', WorkGroupUserJoinAPI.as_view(), name='work_group_join'),
+    path('workgroup/<int:work_group_id>/leave', WorkGroupUserLeaveAPI.as_view(), name='work_group_leave'),
+    path('workgroup/<int:work_group_id>/user/add', WorkGroupUserAddAPI.as_view(), name='work_group_user_add'),
+    path('workgroup/<int:work_group_id>/user/update', WorkGroupUserUpdateAPI.as_view(), name='work_group_user_update'),
+    path('workgroup/<int:work_group_id>/user/remove', WorkGroupUserRemoveAPI.as_view(), name='work_group_user_remove'),
+
     path('<int:group>/permissions', GroupPermissionListApi.as_view(), name='group_permissions'),
     path('<int:group>/permission/create', GroupPermissionCreateApi.as_view(), name='group_permission_create'),
     path('<int:group>/permission/update', GroupPermissionUpdateApi.as_view(), name='group_permission_update'),
@@ -70,6 +92,7 @@ group_patterns = [
     path('<int:group>/tag/create', GroupTagsCreateApi.as_view(), name='group_tags_create'),
     path('<int:group>/tag/update', GroupTagsUpdateApi.as_view(), name='group_tags_update'),
     path('<int:group>/tag/delete', GroupTagsDeleteApi.as_view(), name='group_tags_delete'),
+    path('tag/<int:tag_id>/imac', GroupTagIntervalMeanAbsoluteCorrectnessAPI.as_view(), name='group_tag_imac'),
 
     path('<int:group>/delegates', GroupUserDelegateListApi.as_view(), name='group_user_delegates'),
     path('<int:group>/delegate/create', GroupUserDelegateApi.as_view(), name='group_user_delegate'),
@@ -82,6 +105,22 @@ group_patterns = [
     path('<int:group>/delegate/pool/delete',
          GroupUserDelegatePoolDeleteApi.as_view(),
          name='group_user_delegate_pool_delete'),
+
+    path('delegate/pool/<int:delegate_pool_id>/comment/list',
+         GroupDelegatePoolCommentListAPI.as_view(),
+         name='group_user_delegate_pool_list'),
+    path('delegate/pool/<int:delegate_pool_id>/comment/create',
+         GroupDelegatePoolCommentCreateAPI.as_view(),
+         name='group_user_delegate_pool_create'),
+    path('delegate/pool/<int:delegate_pool_id>/comment/<int:comment_id>/update',
+         GroupDelegatePoolCommentUpdateAPI.as_view(),
+         name='group_user_delegate_pool_update'),
+    path('delegate/pool/<int:delegate_pool_id>/comment/<int:comment_id>/delete',
+         GroupDelegatePoolCommentDeleteAPI.as_view(),
+         name='group_user_delegate_pool_delete'),
+    path('delegate/pool/<int:delegate_pool_id>/comment/<int:comment_id>/vote',
+         GroupDelegatePoolCommentVoteAPI.as_view(),
+         name='group_user_delegate_pool_vote'),
 
     path('<int:group_id>/schedule', GroupScheduleEventListAPI.as_view(), name='group_schedule'),
     path('<int:group_id>/schedule/create', GroupScheduleEventCreateAPI.as_view(), name='group_schedule_create'),
@@ -98,9 +137,16 @@ group_patterns = [
     path('<int:group_id>/thread/create', GroupThreadCreateAPI.as_view(), name='group_thread_create'),
     path('thread/<int:thread_id>/update', GroupThreadUpdateAPI.as_view(), name='group_thread_update'),
     path('thread/<int:thread_id>/delete', GroupThreadDeleteAPI.as_view(), name='group_thread_delete'),
+    path('thread/<int:thread_id>/vote', GroupThreadVoteUpdateAPI.as_view(), name='group_thread_vote_update'),
+    path('thread/<int:thread_id>/subscribe',
+         GroupThreadNotificationSubscribeAPI.as_view(),
+         name='group_thread_subscribe'),
     path('thread/<int:thread_id>/comment/list',
          GroupThreadCommentListAPI.as_view(),
-         name='group_thread_comment'),
+         name='group_thread_comment_list'),
+    path('thread/<int:thread_id>/comment/<int:comment_id>/ancestor',
+         GroupThreadCommentAncestorListAPI.as_view(),
+         name='group_thread_comment_ancestor_list'),
     path('thread/<int:thread_id>/comment/create',
          GroupThreadCommentCreateAPI.as_view(),
          name='group_thread_comment_create'),
@@ -110,4 +156,7 @@ group_patterns = [
     path('thread/<int:thread_id>/comment/<int:comment_id>/delete',
          GroupThreadCommentDeleteAPI.as_view(),
          name='group_thread_comment_delete'),
+    path('thread/<int:thread_id>/comment/<int:comment_id>/vote',
+         GroupThreadCommentVoteAPI.as_view(),
+         name='group_thread_comment_vote'),
 ]

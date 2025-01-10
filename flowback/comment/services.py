@@ -1,32 +1,19 @@
 from rest_framework.exceptions import ValidationError
 
-from flowback.comment.models import CommentSection, Comment
+from flowback.comment.models import Comment, CommentVote
 from flowback.common.services import model_update, get_object
 from flowback.files.services import upload_collection
 from flowback.user.models import User
 
 
-def comment_section_create(*, active: bool = True) -> CommentSection:
-    comments = CommentSection(active=active)
-    comments.full_clean()
-    comments.save()
-
-    return comments
-
-
-def comment_section_delete(*, comments_id: int):
-    CommentSection.objects.get(comments_id=comments_id).delete()
-
-
 def comment_create(*,
                    author_id: int,
                    comment_section_id: int,
-                   message: str,
+                   message: str = None,
                    parent_id: int,
                    attachments: list = None,
                    attachment_upload_to="",
                    attachment_upload_to_include_timestamp=True) -> Comment:
-
     if attachments:
         collection = upload_collection(user_id=author_id,
                                        file=attachments,
@@ -51,7 +38,7 @@ def comment_create(*,
     return comment
 
 
-def comment_update(*, fetched_by: int, comment_section_id: int,  comment_id: int, data) -> Comment:
+def comment_update(*, fetched_by: int, comment_section_id: int, comment_id: int, data) -> Comment:
     comment = get_object(Comment, comment_section_id=comment_section_id, id=comment_id)
 
     if not comment.active:
@@ -69,9 +56,9 @@ def comment_update(*, fetched_by: int, comment_section_id: int,  comment_id: int
     return comment
 
 
-def comment_delete(*, fetched_by: int, comment_section_id: int, comment_id: int):
+def comment_delete(*, fetched_by: int, comment_section_id: int, comment_id: int, force: bool = False):
     comment = get_object(Comment, comment_section_id=comment_section_id, id=comment_id)
-    if fetched_by != comment.author_id:
+    if (fetched_by != comment.author_id) and not force:
         raise ValidationError("Comment doesn't belong to User")
 
     if not comment.active:
@@ -83,3 +70,20 @@ def comment_delete(*, fetched_by: int, comment_section_id: int, comment_id: int)
     comment.active = False
     comment.message = '[Deleted]'
     comment.save()
+
+
+def comment_vote(*, fetched_by: int, comment_section_id: int, comment_id: int, vote: bool = None):
+    comment = Comment.objects.get(comment_section_id=comment_section_id, id=comment_id)
+    user = User.objects.get(id=fetched_by)
+
+    if comment.author == user:
+        raise ValidationError("Can't vote on a comment that belongs to yourself")
+
+    if vote is None:
+        try:
+            return CommentVote.objects.get(created_by=user, comment=comment).delete()
+
+        except CommentVote.DoesNotExist:
+            raise ValidationError("User haven't voted on this comment")
+
+    CommentVote.objects.update_or_create(defaults=dict(vote=vote), created_by=user, comment=comment)

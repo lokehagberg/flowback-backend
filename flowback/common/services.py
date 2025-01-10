@@ -6,6 +6,7 @@ from django.shortcuts import get_object_or_404
 from flowback.common.types import DjangoModelType
 
 
+# Quicker model update than other methods
 def model_update(
     *,
     instance: DjangoModelType,
@@ -29,6 +30,8 @@ def model_update(
     return instance, has_updated
 
 
+# Generic function to get any object
+# TODO Redundant unless response type-hinting is possible
 def get_object(model_or_queryset,
                error_message: str = None,
                reverse: bool = False,

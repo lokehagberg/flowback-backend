@@ -1,14 +1,15 @@
 from flowback.comment.models import Comment
 from flowback.common.services import get_object
 from flowback.group.selectors import group_user_permissions
-from flowback.poll.models import Poll
-from flowback.comment.services import comment_create, comment_update, comment_delete
+from flowback.poll.models import Poll, PollDelegateVoting
+from flowback.comment.services import comment_create, comment_update, comment_delete, comment_vote
 from flowback.poll.services.poll import poll_notification
 
 
-def poll_comment_create(*, author_id: int, poll_id: int, message: str, attachments: list = None, parent_id: int = None) -> Comment:
+def poll_comment_create(*, author_id: int, poll_id: int, message: str = None, attachments: list = None,
+                        parent_id: int = None) -> Comment:
     poll = get_object(Poll, id=poll_id)
-    group_user = group_user_permissions(group=poll.created_by.group.id, user=author_id)
+    group_user = group_user_permissions(user=author_id, group=poll.created_by.group.id)
 
     comment = comment_create(author_id=author_id,
                              comment_section_id=poll.comment_section.id,
@@ -38,7 +39,7 @@ def poll_comment_create(*, author_id: int, poll_id: int, message: str, attachmen
 
 def poll_comment_update(*, fetched_by: int, poll_id: int, comment_id: int, data) -> Comment:
     poll = get_object(Poll, id=poll_id)
-    group_user_permissions(group=poll.created_by.group.id, user=fetched_by)
+    group_user_permissions(user=fetched_by, group=poll.created_by.group.id)
 
     return comment_update(fetched_by=fetched_by,
                           comment_section_id=poll.comment_section.id,
@@ -49,11 +50,22 @@ def poll_comment_update(*, fetched_by: int, poll_id: int, comment_id: int, data)
 def poll_comment_delete(*, fetched_by: int, poll_id: int, comment_id: int):
     poll = get_object(Poll, id=poll_id)
 
-    if not group_user_permissions(group=poll.created_by.group.id,
-                                  user=fetched_by,
-                                  permissions=['admin', 'force_delete_comment']):
-        group_user_permissions(group=poll.created_by.group.id, user=fetched_by)
+    force = bool(group_user_permissions(user=fetched_by,
+                                        group=poll.created_by.group,
+                                        permissions=['admin', 'force_delete_comment'],
+                                        raise_exception=False))
 
     return comment_delete(fetched_by=fetched_by,
                           comment_section_id=poll.comment_section.id,
-                          comment_id=comment_id)
+                          comment_id=comment_id,
+                          force=force)
+
+
+def poll_comment_vote(*, fetched_by: int, poll_id: int, comment_id: int, vote: bool = None):
+    poll = Poll.objects.get(id=poll_id)
+    group_user_permissions(user=fetched_by, group=poll.created_by.group)
+
+    return comment_vote(fetched_by=fetched_by,
+                        comment_section_id=poll.comment_section_id,
+                        comment_id=comment_id,
+                        vote=vote)

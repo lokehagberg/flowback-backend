@@ -1,19 +1,13 @@
 from django.test import TestCase
-from rest_framework.exceptions import ValidationError
-from django.core.exceptions import ValidationError as DjangoValidationError
 
 from flowback.common.services import get_object
-from flowback.group.models import Group, GroupUser, GroupUserDelegator, GroupUserDelegate
-from flowback.group.services import (group_user_delegate,
-                                     group_user_delegate_update,
-                                     group_user_delegate_remove,
-                                     group_create,
-                                     group_tag_create,
-                                     group_user_update,
-                                     group_join,
-                                     group_leave)
+from flowback.group.models import GroupUser, GroupUserDelegator
+from flowback.group.services.delegate import (group_user_delegate,
+                                              group_user_delegate_update,
+                                              group_user_delegate_remove)
+from flowback.group.services.tag import group_tag_create
+from flowback.group.services.group import group_create, group_join, group_user_update
 
-from flowback.group.selectors import group_user_permissions
 from flowback.user.models import User
 
 
