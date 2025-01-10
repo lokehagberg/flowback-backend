@@ -83,6 +83,7 @@ class UserListApi(APIView):
     class FilterSerializer(serializers.Serializer):
         id = serializers.IntegerField(required=False)
         username = serializers.CharField(required=False)
+        username__icontains = serializers.CharField(required=False)
 
     class OutputSerializer(serializers.ModelSerializer):
         class Meta:

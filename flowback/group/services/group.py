@@ -30,6 +30,10 @@ def group_create(*,
     if not (env('FLOWBACK_ALLOW_GROUP_CREATION') or (user.is_staff or user.is_superuser)):
         raise ValidationError('Permission denied')
 
+    # TODO Fullclean MUST work!
+    if direct_join and not public:
+        raise ValidationError('Private groups are unable to allow Direct Join')
+
     # Create Group
     group = Group(created_by=user, name=name, description=description, image=image,
                   cover_image=cover_image, hide_poll_users=hide_poll_users, public=public, direct_join=direct_join,

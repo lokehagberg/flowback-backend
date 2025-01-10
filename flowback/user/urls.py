@@ -19,7 +19,7 @@ from flowback.user.views.kanban import (UserKanbanEntryListAPI,
                                         UserKanbanEntryCreateAPI,
                                         UserKanbanEntryUpdateAPI,
                                         UserKanbanEntryDeleteAPI)
-from .views.home import UserHomeFeedAPI
+from flowback.user.views.home import UserHomeFeedAPI
 
 user_patterns = [
     path('login', views.obtain_auth_token, name='login'),

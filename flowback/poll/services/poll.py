@@ -1,18 +1,15 @@
 from rest_framework.exceptions import ValidationError
 from flowback.common.services import get_object, model_update
 from flowback.files.services import upload_collection
-from flowback.group.models import GroupTags
-from flowback.group.services.schedule import group_schedule
 from flowback.group.services.group import group_notification
 from flowback.notification.services import NotificationManager
-from flowback.poll.models import Poll, PollProposal, PollPhaseTemplate
+from flowback.poll.models import Poll, PollPhaseTemplate
 from flowback.group.selectors import group_user_permissions
 from django.utils import timezone
 from datetime import datetime
 
 from flowback.poll.services.vote import poll_proposal_vote_count
 from flowback.poll.tasks import poll_area_vote_count, poll_prediction_bet_count
-from flowback.user.models import User
 
 poll_notification = NotificationManager(sender_type='poll', possible_categories=['timeline',
                                                                                  'poll',
@@ -30,7 +27,7 @@ def poll_notification_subscribe(*, user_id: int, poll_id: int, categories: list[
 def poll_create(*, user_id: int,
                 group_id: int,
                 title: str,
-                description: str,
+                description: str = None,
                 blockchain_id: int = None,
                 start_date: datetime,
                 proposal_end_date: datetime = None,
@@ -44,7 +41,7 @@ def poll_create(*, user_id: int,
                 allow_fast_forward: bool = False,
                 public: bool,
                 tag: int = None,
-                pinned: bool,
+                pinned: bool = None,
                 dynamic: bool,
                 attachments: list = None,
                 quorum: int = None

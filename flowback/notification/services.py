@@ -86,10 +86,8 @@ def notification_delete(*, category: str, sender_type: str, sender_id: int,
     notifications.delete()
 
 
-def notification_mark_read(*, fetched_by: int, notification_ids: list[int], read: bool) -> Notification:
-    notifications = Notification.objects.filter(user_id=fetched_by, id__in=notification_ids).update(read=read)
-    return notifications
-
+def notification_mark_read(*, fetched_by: int, notification_ids: list[int], read: bool) -> None:
+    Notification.objects.filter(user_id=fetched_by, id__in=notification_ids).update(read=read)
 
 def notification_channel_subscribe(*,
                                    user_id: int,
@@ -132,8 +130,9 @@ class NotificationManager:
         create = 'create'
         update = 'update'
         delete = 'delete'
+        info = 'info'
 
-    def __init__(self, sender_type: str, possible_categories: list[str]):
+    def __init__(self, sender_type: str, possible_categories: list[str] = None):
         self.sender_type = sender_type
         self.possible_categories = possible_categories
 
@@ -144,17 +143,18 @@ class NotificationManager:
         elif isinstance(category, str):
             categories = [category]
 
-        for category in categories:
-            if category not in self.possible_categories:
-                failed_categories.append(category)
+        if self.possible_categories:
+            for category in categories:
+                if category not in self.possible_categories:
+                    failed_categories.append(category)
 
-        if failed_categories:
-            message = f'Category {", ".join(failed_categories)} is not in possible_categories, ' \
-                      f'choices are: {", ".join(self.possible_categories)}'
-            if validation:
-                raise ValidationError(message)
-            else:
-                raise Exception(message)
+            if failed_categories:
+                message = f'Category {", ".join(failed_categories)} is not in possible_categories, ' \
+                          f'choices are: {", ".join(self.possible_categories)}'
+                if validation:
+                    raise ValidationError(message)
+                else:
+                    raise Exception(message)
 
         return categories
 

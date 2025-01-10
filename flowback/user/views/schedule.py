@@ -17,7 +17,7 @@ from flowback.user.selectors import user_schedule_event_list
 @extend_schema(tags=['user/schedule'])
 class UserScheduleEventListAPI(ScheduleEventListTemplateAPI):
     def get(self, request):
-        serializer = self.InputSerializer(data=request.query_params)
+        serializer = self.FilterSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
 
         events = user_schedule_event_list(fetched_by=request.user, filters=serializer.validated_data)

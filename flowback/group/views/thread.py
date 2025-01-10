@@ -31,6 +31,8 @@ class GroupThreadListAPI(APIView):
         id = serializers.IntegerField(required=False)
         id_list = serializers.CharField(required=False)
         title = serializers.CharField(required=False)
+        title__icontains = serializers.CharField(required=False)
+        description = serializers.CharField(required=False)
         user_vote = serializers.BooleanField(required=False, allow_null=True, default=None)
 
     class OutputSerializer(serializers.Serializer):

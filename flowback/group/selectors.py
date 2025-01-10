@@ -322,14 +322,14 @@ class BaseGroupThreadFilter(django_filters.FilterSet):
     order_by = django_filters.OrderingFilter(
         fields=(('created_at', 'created_at_asc'),
                 ('-created_at', 'created_at_desc'),
-                ('pinned', 'pinned')))
+                ('-pinned', 'pinned')))
     user_vote = django_filters.BooleanFilter()
     id_list = NumberInFilter(field_name='id')
 
     class Meta:
         model = GroupThread
         fields = dict(id=['exact'],
-                      title=['icontains'],
+                      title=['exact', 'icontains'],
                       description=['icontains'])
 
 

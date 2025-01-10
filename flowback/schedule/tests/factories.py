@@ -24,3 +24,5 @@ class ScheduleEventFactory(factory.django.DjangoModelFactory):
     description = factory.LazyAttribute(lambda _: fake.unique.paragraph())
     start_date = factory.LazyAttribute(lambda _: timezone.now())
     end_date = factory.LazyAttribute(lambda _: timezone.now() + timezone.timedelta(hours=1))
+    origin_name = "test"
+    origin_id = 1

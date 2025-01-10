@@ -245,9 +245,17 @@ class WorkGroupUser(BaseModel):
     group_user = models.ForeignKey(GroupUser, on_delete=models.CASCADE)
     is_moderator = models.BooleanField(default=False)
 
+    @classmethod
+    def post_save(cls, instance, **kwargs):
+        invite = WorkGroupUserJoinRequest.objects.filter(work_group=instance.work_group, group_user=instance.group_user)
+        if invite.exists():
+            invite.delete()
+
     class Meta:
         constraints = [models.UniqueConstraint(name='WorkGroupUser_group_user_and_work_group_is_unique',
                                                fields=['work_group', 'group_user'])]
+
+post_save.connect(WorkGroupUser.post_save, sender=WorkGroupUser)
 
 
 class WorkGroupUserJoinRequest(BaseModel):

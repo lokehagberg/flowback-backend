@@ -1,4 +1,10 @@
+import json
+from datetime import datetime
+from os import remove
+
+from charset_normalizer.constant import FREQUENCIES
 from django.utils import timezone
+from django_celery_beat.models import IntervalSchedule, CrontabSchedule, PeriodicTask
 from rest_framework.exceptions import ValidationError
 
 from flowback.common.services import model_update, get_object
@@ -31,14 +37,16 @@ def delete_schedule(*, schedule_id: int):
 def create_event(*,
                  schedule_id: int,
                  title: str,
-                 start_date: timezone.datetime,
-                 end_date: timezone.datetime,
+                 start_date: datetime,
+                 end_date: datetime,
                  origin_name: str,
                  origin_id: int,
                  description: str = None,
                  work_group_id: int = None,
                  assignee_ids: list[int] = None,
-                 meeting_link: str = None) -> ScheduleEvent:
+                 meeting_link: str = None,
+                 repeat_frequency: int = None,
+                 reminders: list[int] = None) -> ScheduleEvent:
     schedule = Schedule.objects.get(id=schedule_id)
 
     # Simple hack to allow assignees for schedules, needs refactor in future
@@ -56,9 +64,14 @@ def create_event(*,
                           origin_name=origin_name,
                           work_group_id=work_group_id,
                           origin_id=origin_id,
-                          meeting_link=meeting_link)
+                          meeting_link=meeting_link,
+                          repeat_frequency=repeat_frequency,
+                          reminders=reminders)
+
     event.full_clean()
     event.save()
+
+    # TODO notify user on one-shot events
 
     if assignee_ids and schedule.origin_name == "group":
         event.assignees.add(*assignee_ids)
@@ -103,7 +116,9 @@ def delete_event(*, event_id: int):
 def subscribe_schedule(*, schedule_id: int, target_id: int) -> ScheduleSubscription:
     subscription = ScheduleSubscription(schedule_id=schedule_id, target_id=target_id)
     subscription.full_clean()
-    return subscription.save()
+    subscription.save()
+
+    return subscription
 
 
 def unsubscribe_schedule(*, schedule_id: int, target_id: int):

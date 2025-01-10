@@ -82,21 +82,15 @@ def work_group_user_add(*, user_id: int,
                                                                                work_group=work_group)
 
         if work_group_user_join_request.exists():
-            if not (work_group_user_is_moderator or group_user.is_admin):
-                raise PermissionDenied("Needs either work group moderator or group admin.")
+            work_group_user = WorkGroupUser(group_user=target_group_user,
+                                            work_group=work_group,
+                                            is_moderator=is_moderator
+                                            if work_group_user_is_moderator or group_user.is_admin
+                                            else False)
+            work_group_user.full_clean()
+            work_group_user.save()
 
-        work_group_user = WorkGroupUser(group_user=target_group_user,
-                                        work_group=work_group,
-                                        is_moderator=is_moderator
-                                        if work_group_user_is_moderator or group_user.is_admin
-                                        else False)
-        work_group_user.full_clean()
-        work_group_user.save()
-
-        if work_group_user_join_request.exists():
-            work_group_user_join_request.delete()
-
-        return work_group_user
+            return work_group_user
 
     raise PermissionDenied()
 

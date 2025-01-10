@@ -15,7 +15,7 @@ from flowback.group.views.group import WorkGroupCreateAPI, WorkGroupUpdateAPI, \
 from flowback.user.tests.factories import UserFactory
 
 
-class GroupTest(APITransactionTestCase):
+class WorkGroupTest(APITransactionTestCase):
     reset_sequences = True
 
     def setUp(self):
@@ -201,12 +201,11 @@ class GroupTest(APITransactionTestCase):
         group_user = GroupUserFactory(group=self.group_user_creator_one.group)
         work_group = WorkGroupFactory(group=self.group_user_creator_one.group, direct_join=True)
 
-        response = generate_request(api=WorkGroupUserAddAPI,
+        response = generate_request(api=WorkGroupUserJoinAPI,
                                     url_params=dict(work_group_id=work_group.id),
-                                    data=dict(target_group_user_id=group_user.id, is_moderator=False),
-                                    user=self.group_user_creator_one.user)
+                                    user=group_user.user)
 
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertTrue(WorkGroupUser.objects.filter(group_user=group_user, work_group=work_group).exists())
 
 
