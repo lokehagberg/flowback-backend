@@ -26,7 +26,7 @@ class BaseMessageFilter(django_filters.FilterSet):
 
 def message_list(*, user: User, channel_id: int, filters=None):
     filters = filters or {}
-    participant = get_object(MessageChannelParticipant, channel_id=channel_id, user=user)
+    participant = get_object(MessageChannelParticipant, channel_id=channel_id, user=user, active=True)
 
     qs = Message.objects.filter(channel=participant.channel).all()
 
@@ -42,7 +42,7 @@ class BaseTopicFilter(django_filters.FilterSet):
 
 def message_channel_topic_list(*, user: User, channel_id: int, filters=None):
     filters = filters or {}
-    participant = get_object(MessageChannelParticipant, channel_id=channel_id, user=user)
+    participant = get_object(MessageChannelParticipant, channel_id=channel_id, user=user, active=True)
 
     qs = MessageChannelTopic.objects.filter(channel=participant.channel).all()
     return BaseTopicFilter(filters, qs).qs
@@ -65,25 +65,12 @@ class BaseMessageChannelPreviewFilter(django_filters.FilterSet):
                       topic_id=['exact'])
 
 
-def message_channel_preview_list_(*, user: User, filters=None):
-    filters = filters or {}
-
-    timestamp = MessageChannelParticipant.objects.filter(user=user, channel=OuterRef('channel_id')).values('timestamp')
-    qs = Message.objects.filter(Q(Q(channel__messagechannelparticipant__closed_at__isnull=True)
-                                  | Q(channel__messagechannelparticipant__closed_at__gt=F('created_at'))),
-                                Q(Q(topic__isnull=True)
-                                  | Q(topic__hidden=False)),
-                                channel__messagechannelparticipant__user=user,
-                                active=True).annotate(timestamp=Subquery(timestamp)
-                                                      ).distinct('channel').all()
-
-    return BaseMessageChannelPreviewFilter(filters, qs).qs
-
-
 def message_channel_preview_list(*, user: User, filters=None):
     filters = filters or {}
 
-    timestamp = MessageChannelParticipant.objects.filter(user=user, channel=OuterRef('channel_id')).values('timestamp')
+    timestamp = MessageChannelParticipant.objects.filter(user=user,
+                                                         channel=OuterRef('channel_id'),
+                                                         active=True).values('timestamp')
 
     message_qs = Message.objects.filter(Q(Q(channel__messagechannelparticipant__closed_at__isnull=True)
                                           | Q(channel__messagechannelparticipant__closed_at__gt=F('created_at'))),
@@ -104,18 +91,20 @@ class MessageChannelParticipantFilter(django_filters.FilterSet):
     class Meta:
         model = MessageChannelParticipant
         fields = dict(id=['exact'],
-                      user_id=['exact'])
+                      user_id=['exact'],
+                      active=['exact'])
 
 
 def message_channel_participant_list(*, user: User, channel_id: int, filters=None):
     filters = filters or {}
 
     try:
-        participant = MessageChannelParticipant.objects.get(user=user, channel_id=channel_id, active=True)
+        participant = MessageChannelParticipant.objects.get(user=user, channel_id=channel_id)
 
     except MessageChannelParticipant.DoesNotExist:
         raise PermissionDenied("User is not a participant of this channel")
 
-    qs = MessageChannelParticipant.objects.filter(channel=participant.channel, active=True).all()
+    qs = MessageChannelParticipant.objects.filter(channel=participant.channel
+                                                  ).all().order_by('active', '-user__username')
 
     return BaseMessageChannelPreviewFilter(filters, qs).qs

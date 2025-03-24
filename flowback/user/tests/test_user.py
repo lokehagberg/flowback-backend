@@ -1,18 +1,20 @@
 import json
+import math
 
 from rest_framework import status
 from rest_framework.test import APITransactionTestCase, APIRequestFactory, force_authenticate
 
 from flowback.chat.models import MessageChannel, MessageChannelParticipant
 from flowback.chat.tests.factories import MessageChannelFactory
+from flowback.comment.tests.factories import CommentFactory
 from flowback.common.tests import generate_request
-from flowback.group.tests.factories import GroupThreadFactory, GroupUserFactory
+from flowback.group.tests.factories import GroupThreadFactory, GroupUserFactory, GroupFactory
 from flowback.poll.tests.factories import PollFactory
-from flowback.user.models import User
+from flowback.user.models import User, UserChatInvite
 from flowback.user.services import user_create, user_create_verify
 from flowback.user.tests.factories import UserFactory
 from flowback.user.views.home import UserHomeFeedAPI
-from flowback.user.views.user import UserDeleteAPI, UserGetChatChannelAPI, UserUpdateApi
+from flowback.user.views.user import UserDeleteAPI, UserGetChatChannelAPI, UserUpdateApi, UserChatInviteAPI, UserGetApi
 
 
 class UserTest(APITransactionTestCase):
@@ -57,6 +59,41 @@ class UserTest(APITransactionTestCase):
 
         self.assertEqual(User.objects.get(id=user.id).contact_phone, "+46701234567")
 
+    def test_user_get(self):
+        user = UserFactory(public_status=User.PublicStatus.PRIVATE,
+                           dark_theme=True)
+        user_two = UserFactory(public_status=User.PublicStatus.PUBLIC,
+                               bio='test_bio',
+                               dark_theme=True)
+        user_three = UserFactory(public_status=User.PublicStatus.GROUP_ONLY,
+                                 bio='test_bio',
+                                 dark_theme=True)
+
+        group = GroupFactory(created_by=user_three)
+        GroupUserFactory(group=group, user=user_two)
+        GroupUserFactory(group=group, user=user)
+
+        response = generate_request(UserGetApi, user=user)
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data['dark_theme'], True)
+
+        response = generate_request(UserGetApi, user=user, data=dict(user_id=user_two.id))
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertNotIn('dark_theme', response.data.keys())
+        self.assertIn('bio', response.data.keys())
+
+        response = generate_request(UserGetApi, user=user, data=dict(user_id=user_three.id))
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertNotIn('dark_theme', response.data.keys())
+        self.assertIn('bio', response.data.keys())
+
+        response = generate_request(UserGetApi, user=user_three, data=dict(user_id=user.id))
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertNotIn('dark_theme', response.data.keys())
+        self.assertNotIn('bio', response.data.keys())
+        self.assertIn('username', response.data.keys())
+
+
     def test_user_home_feed(self):
         group_user, group_user_three = GroupUserFactory.create_batch(size=2, group__public=False)
         group_user_two = GroupUserFactory(group__public=True)
@@ -67,7 +104,12 @@ class UserTest(APITransactionTestCase):
         PollFactory.create_batch(size=5, created_by=group_user_two)
         GroupThreadFactory.create_batch(size=5, created_by=group_user_two)
 
-        PollFactory.create_batch(size=5, created_by=group_user_three)
+        polls = PollFactory.create_batch(size=5, created_by=group_user_three)
+        poll_with_comments = polls[0] # Testing total comments aggregate
+        CommentFactory.create_batch(size=5,
+                                    author=group_user_three.user,
+                                    comment_section=poll_with_comments.comment_section)
+
         GroupThreadFactory.create_batch(size=5, created_by=group_user_three)
 
         response = generate_request(api=UserHomeFeedAPI, user=group_user.user)
@@ -78,6 +120,15 @@ class UserTest(APITransactionTestCase):
 
         self.assertEqual(response.status_code, 200, response.data)
         self.assertEqual(response.data['count'], 17)
+
+        # Test total_comments
+        # response = generate_request(api=UserHomeFeedAPI,
+        #                             user=group_user_three.user,
+        #                             data=dict(related_model="poll", id=poll_with_comments.id))
+        #
+        # self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        # self.assertEqual(response.data['count'], 1)
+        # self.assertEqual(response.data['results'][0]['total_comments'], 5)
 
     def test_user_get_chat_channel(self):
         participants = UserFactory.create_batch(25)
@@ -98,4 +149,62 @@ class UserTest(APITransactionTestCase):
         self.assertTrue(MessageChannel.objects.filter(id=response.data['id']).exists())
 
         # Count all participants + the user itself
-        self.assertEqual(MessageChannelParticipant.objects.filter(channel_id=response.data['id']).count(), 26)
+        self.assertEqual(MessageChannelParticipant.objects.filter(channel_id=response.data['id'],
+                                                                  active=False).count(), 25)
+        self.assertEqual(MessageChannelParticipant.objects.filter(channel_id=response.data['id'],
+                                                                  active=True).count(), 1)
+
+    def user_get_chat_channel_invite(self, participants: int = 1):
+        participants = UserFactory.create_batch(participants)
+
+        if len(participants) <= 0:
+            raise Exception("Can't run test with no participants")
+
+        response = generate_request(api=UserGetChatChannelAPI,
+                                    data=dict(target_user_ids=[u.id for u in participants]),
+                                    user=self.user_one)
+
+        channel_id = response.data['id']
+        self.assertEqual(UserChatInvite.objects.all().count(), len(participants))
+        self.assertEqual(MessageChannelParticipant.objects.filter(channel_id=channel_id, active=True).count(),
+                         1)
+
+        self.assertEqual(MessageChannelParticipant.objects.filter(channel_id=channel_id, active=False).count(),
+                         len(participants))
+
+        acceptors = 0
+        for i, user in enumerate(participants):
+            accept = True if i <= math.floor(len(participants) / 2) else False
+            acceptors += int(accept)
+
+            response = generate_request(api=UserChatInviteAPI,
+                                        data=dict(invite_id=UserChatInvite.objects.get(user=user).id,
+                                                  accept=accept),
+                                        user=user)
+
+            self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+
+        self.assertEqual(MessageChannelParticipant.objects.filter(channel_id=channel_id, active=True).count(),
+                         acceptors + 1)
+
+        self.assertEqual(UserChatInvite.objects.filter(rejected=True).count(),
+                         len(participants) - acceptors)
+
+        self.assertEqual(UserChatInvite.objects.filter(rejected=False).count(), acceptors)
+
+        self.assertEqual(UserChatInvite.objects.filter(rejected=None).count(), 0)
+
+        response = generate_request(api=UserGetChatChannelAPI,
+                                    data=dict(target_user_ids=[u.id for u in participants]),
+                                    user=self.user_one)
+
+        self.assertEqual(response.data['id'], channel_id, "Channel ID should not have changed")
+
+        self.assertEqual(UserChatInvite.objects.all().count(), len(participants))
+        self.assertEqual(UserChatInvite.objects.filter(rejected=True).count(), 0)
+
+    def test_user_get_chat_channel_invite_duo(self):
+        self.user_get_chat_channel_invite(participants=1)
+
+    def test_user_get_chat_channel_invite_group(self):
+        self.user_get_chat_channel_invite(participants=25)

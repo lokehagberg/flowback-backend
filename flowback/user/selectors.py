@@ -1,15 +1,16 @@
 import django_filters
 from django.db import models
-from django.db.models import OuterRef, Q, Exists
+from django.db.models import OuterRef, Q, Exists, Subquery, Count, F
 from django_filters import FilterSet
 from rest_framework.exceptions import ValidationError
 
+from flowback.comment.models import Comment
 from flowback.common.services import get_object
 from flowback.group.models import Group, GroupUser, GroupThread
-from flowback.poll.models import Poll
+from flowback.poll.models import Poll, PollPredictionStatement
 from flowback.schedule.selectors import schedule_event_list
 from flowback.kanban.selectors import kanban_entry_list
-from flowback.user.models import User
+from flowback.user.models import User, UserChatInvite
 from backend.settings import env
 
 
@@ -21,8 +22,33 @@ class UserFilter(FilterSet):
                   }
 
 
-def get_user(user: int):
-    return get_object(User, id=user)
+def get_user(fetched_by: User, user_id: int = None):
+    def user_to_dict(u, fields):
+        return {field: getattr(user, field, None) for field in fields}
+
+    if user_id:
+        user = User.objects.get(id=user_id)
+
+    else:
+        user = fetched_by
+
+    share_groups = User.objects.filter(group__groupuser__user__in=[fetched_by, user]).exists()
+
+    if fetched_by == user:
+        return user
+
+    elif (user.public_status == User.PublicStatus.PUBLIC
+          or (share_groups and user.public_status == User.PublicStatus.GROUP_ONLY)):
+        return user_to_dict(user, ('id', 'username',
+                           'profile_image', 'banner_image',
+                           'public_status', 'chat_status',
+                           'bio', 'website', 'contact_email', 'contact_phone',
+                           'public_status'))
+
+    else:
+        return user_to_dict(user, ('id', 'username', 'profile_image',
+                                   'banner_image', 'public_status', 'chat_status'))
+
 
 
 def user_schedule_event_list(*, fetched_by: User, filters=None):
@@ -57,6 +83,7 @@ class UserHomeFeedFilter(django_filters.FilterSet):
     group_joined = django_filters.BooleanFilter(lookup_expr='exact')
 
 
+# TODO add relevant Count (proposal, prediction, comments) to the home feed if possible
 def user_home_feed(*, fetched_by: User, filters=None):
     filters = filters or {}
     joined_groups = Group.objects.filter(id=OuterRef('created_by__group_id'), groupuser__user__in=[fetched_by])
@@ -92,3 +119,23 @@ def user_home_feed(*, fetched_by: User, filters=None):
     qs = thread_qs.union(poll_qs).order_by('-created_at')
 
     return qs
+
+
+class UserChatInviteFilter(django_filters.FilterSet):
+    user_id = django_filters.NumberFilter(field_name="user_id", lookup_expr="exact")
+    message_channel_id = django_filters.NumberFilter(field_name="message_channel_id", lookup_expr="exact")
+    rejected = django_filters.BooleanFilter(field_name="rejected", lookup_expr="exact")
+    rejected__isnull = django_filters.BooleanFilter(field_name="rejected", lookup_expr="isnull")
+
+
+    class Meta:
+        model = UserChatInvite
+        fields = ['user_id', 'message_channel_id', 'rejected', 'rejected__isnull']
+
+
+def user_chat_invite_list(*, fetched_by: User, filters=None):
+    filters = filters or {}
+
+    qs = UserChatInvite.objects.filter(user=fetched_by).all()
+
+    return UserChatInviteFilter(filters, qs).qs

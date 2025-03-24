@@ -7,7 +7,6 @@ from flowback.group.selectors import group_user_permissions
 from flowback.poll.models import PollProposal, Poll, PollProposalTypeSchedule
 
 # TODO proposal can be created without schedule, dangerous
-from flowback.poll.services.poll import poll_refresh_cheap
 from flowback.schedule.models import ScheduleEvent
 
 
@@ -76,7 +75,6 @@ def poll_proposal_create(*, user_id: int,
 def poll_proposal_delete(*, user_id: int, proposal_id: int) -> None:
     proposal = get_object(PollProposal, id=proposal_id)
     group_user = group_user_permissions(user=user_id, group=proposal.created_by.group)
-    poll_refresh_cheap(poll_id=proposal.poll.id)  # TODO get celery
 
     if proposal.created_by == group_user and group_user.check_permission(delete_proposal=True):
         proposal.poll.check_phase('proposal', 'dynamic')

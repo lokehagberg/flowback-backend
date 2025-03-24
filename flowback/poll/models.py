@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
 from django.db.models import Q, F, Count
@@ -68,6 +70,14 @@ class Poll(BaseModel):
     -1 - Failed Quorum
     """
     status = models.IntegerField(default=0)
+
+    """
+    Prediction Status Code
+    0 - Idle
+    1 - Finished
+    2 - Calculating Combined Bets
+    """
+    status_prediction = models.IntegerField(default=0)
     result = models.BooleanField(default=False)
 
     # Comment section
@@ -180,7 +190,7 @@ class Poll(BaseModel):
 
         return 'waiting'
 
-    def get_phase_start_date(self, phase: str, field_name=False) -> str:
+    def get_phase(self, phase: str, field_name=False) -> datetime | str:
         time_table = self.time_table
 
         for x in reversed(range(len(time_table))):
@@ -262,7 +272,8 @@ class PollProposalTypeSchedule(BaseModel):
 
     def clean(self):
         if PollProposalTypeSchedule.objects.filter(event__start_date=self.event.start_date,
-                                                   event__end_date=self.event.end_date).exists():
+                                                   event__end_date=self.event.end_date,
+                                                   proposal__poll=self.proposal.poll).exists():
             raise ValidationError('Proposal event with same start_date and end_date already exists')
 
     class Meta:

@@ -3,7 +3,7 @@ from .factories import PollFactory, PollProposalFactory
 from .utils import generate_poll_phase_kwargs
 from ..models import PollDelegateVoting, PollVotingTypeCardinal, Poll, PollProposal, PollVoting, \
     PollVotingTypeForAgainst
-from ..services.vote import poll_proposal_vote_count
+from ..tasks import poll_proposal_vote_count
 from ..views.vote import (PollProposalDelegateVoteUpdateAPI,
                           PollProposalVoteUpdateAPI,
                           PollProposalVoteListAPI,

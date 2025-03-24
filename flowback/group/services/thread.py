@@ -4,8 +4,9 @@ from flowback.comment.models import Comment
 from flowback.comment.services import comment_create, comment_update, comment_delete, comment_vote
 from flowback.common.services import get_object, model_update
 from flowback.files.services import upload_collection
-from flowback.group.models import GroupThread, GroupThreadVote
+from flowback.group.models import GroupThread, GroupThreadVote, WorkGroupUser
 from flowback.group.selectors import group_user_permissions
+from flowback.group.services.group import group_notification
 from flowback.notification.services import NotificationManager
 
 group_thread_notification = NotificationManager(sender_type='group_thread', possible_categories=['comment'])
@@ -16,14 +17,12 @@ def group_thread_create(user_id: int,
                         pinned: bool,
                         title: str,
                         description: str = None,
-                        attachments: list = None):
-    group_user = group_user_permissions(user=user_id, group=group_id)
+                        attachments: list = None,
+                        work_group_id: int = None):
+    group_user = group_user_permissions(user=user_id, group=group_id, work_group=work_group_id)
 
     if pinned:
         group_user_permissions(user=user_id, group=group_user.group, permissions=['admin'])
-
-    else:
-        group_user_permissions(user=user_id, group=group_user.group)
 
     if attachments:
         attachments = upload_collection(user_id=user_id,
@@ -34,10 +33,24 @@ def group_thread_create(user_id: int,
                          title=title,
                          description=description,
                          pinned=pinned,
-                         attachments=attachments)
+                         attachments=attachments,
+                         work_group_id=work_group_id)
 
     thread.full_clean()
     thread.save()
+
+    # Notify users when thread is created
+    target_user_ids = None
+    if work_group_id:
+        target_user_ids = WorkGroupUser.objects.filter(id=work_group_id).values_list('group_user__user_id',
+                                                                                     flat=True)
+
+    group_notification.create(sender_id=group_id,
+                              action=group_thread_notification.Action.create,
+                              category="thread",
+                              message=f'User "{group_user.user.username}" created thread "{title}"',
+                              related_id=thread.id,
+                              target_user_ids=target_user_ids)
 
     return thread
 
@@ -116,7 +129,7 @@ def group_thread_comment_create(author_id: int,
 
 def group_thread_notification_subscribe(user_id: int, thread_id: int, categories: list[str]):
     thread = get_object(GroupThread, id=thread_id)
-    group_user_permissions(user=user_id, group=thread.created_by.group)
+    group_user_permissions(user=user_id, group=thread.created_by.group, work_group=thread.work_group)
 
     group_thread_notification.channel_subscribe(user_id=user_id,
                                          sender_id=thread.id,
@@ -127,38 +140,30 @@ def group_thread_notification_subscribe(user_id: int, thread_id: int, categories
 
 def group_thread_comment_update(fetched_by: int, thread_id: int, comment_id: int, data):
     thread = get_object(GroupThread, id=thread_id)
-    comment = get_object(Comment, id=comment_id)
-
-    group_user = group_user_permissions(user=fetched_by, group=thread.created_by.group)
-
-    if comment.author.id != fetched_by and not group_user.is_admin:
-        raise ValidationError('Comment is not owned by user.')
+    group_user_permissions(user=fetched_by, group=thread.created_by.group)
 
     return comment_update(fetched_by=fetched_by,
                           comment_section_id=thread.comment_section_id,
                           comment_id=comment_id,
+                          attachment_upload_to="group/thread/attachments",
                           data=data)
 
 
 def group_thread_comment_delete(fetched_by: int, thread_id: int, comment_id: int):
     thread = get_object(GroupThread, id=thread_id)
-    comment = get_object(Comment, id=comment_id)
-
     group_user = group_user_permissions(user=fetched_by, group=thread.created_by.group)
-
-    if comment.author.id != fetched_by and not group_user.is_admin:
-        raise ValidationError('Comment is not owned by user.')
 
     return comment_delete(fetched_by=fetched_by,
                           comment_section_id=thread.comment_section_id,
-                          comment_id=comment_id)
+                          comment_id=comment_id,
+                          force=group_user.is_admin or group_user.user.is_superuser)
 
 
-def group_thread_comment_vote(*, user: int, thread_id: int, comment_id: int, vote: bool = None):
+def group_thread_comment_vote(*, fetched_by: int, thread_id: int, comment_id: int, vote: bool = None):
     group_thread = GroupThread.objects.get(id=thread_id)
-    group_user_permissions(user=user, group=group_thread.created_by.group)
+    group_user_permissions(user=fetched_by, group=group_thread.created_by.group)
 
-    return comment_vote(fetched_by=user,
+    return comment_vote(fetched_by=fetched_by,
                         comment_section_id=group_thread.comment_section.id,
                         comment_id=comment_id,
                         vote=vote)

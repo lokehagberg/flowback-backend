@@ -23,6 +23,8 @@
       <excludeFolder url="file://$MODULE_DIR$/flowback_addon/mautic" />
       <excludeFolder url="file://$MODULE_DIR$/static" />
       <excludeFolder url="file://$MODULE_DIR$/flowback_addon/membership" />
+      <excludeFolder url="file://$MODULE_DIR$/data" />
+      <excludeFolder url="file://$MODULE_DIR$/flowback_addon/nextcloud" />
     </content>
     <orderEntry type="jdk" jdkName="Python 3.12 (backend)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />

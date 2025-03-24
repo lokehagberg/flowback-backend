@@ -113,10 +113,12 @@ class MessageChannelParticipantListAPI(APIView):
         username__icontains = serializers.CharField(required=False)
         id = serializers.IntegerField(required=False)
         user_id = serializers.IntegerField(required=False)
+        active = serializers.BooleanField(required=False)
 
     class OutputSerializer(serializers.Serializer):
         id = serializers.IntegerField()
         user = BasicUserSerializer()
+        active = serializers.BooleanField()
 
     def get(self, request, channel_id: int):
         serializer = self.FilterSerializer(data=request.query_params)

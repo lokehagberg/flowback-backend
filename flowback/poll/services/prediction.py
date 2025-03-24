@@ -102,7 +102,15 @@ def poll_prediction_bet_create(user: Union[int, User],
 
 
 def poll_prediction_bet_update(user: Union[int, User], prediction_statement_id: int, data) -> int:
-    prediction = get_object(PollPredictionBet, prediction_statement_id=prediction_statement_id, created_by__user=user)
+    try:
+        prediction = PollPredictionBet.objects.get(prediction_statement_id=prediction_statement_id,
+                                                   created_by__user=user)
+
+    except PollPredictionBet.DoesNotExist:
+        return poll_prediction_bet_create(user=user,
+                                          prediction_statement_id=prediction_statement_id,
+                                          **data)
+
     group_user = group_user_permissions(user=user, group=prediction.prediction_statement.poll.created_by.group,
                                         permissions=['prediction_bet_update', 'admin'])
 

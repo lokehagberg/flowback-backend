@@ -8,8 +8,7 @@ from flowback.group.selectors import group_user_permissions
 from django.utils import timezone
 from datetime import datetime
 
-from flowback.poll.services.vote import poll_proposal_vote_count
-from flowback.poll.tasks import poll_area_vote_count, poll_prediction_bet_count
+from flowback.poll.tasks import poll_area_vote_count, poll_prediction_bet_count, poll_proposal_vote_count
 
 poll_notification = NotificationManager(sender_type='poll', possible_categories=['timeline',
                                                                                  'poll',
@@ -113,6 +112,7 @@ def poll_create(*, user_id: int,
 
     poll_area_vote_count.apply_async(kwargs=dict(poll_id=poll.id), eta=poll.area_vote_end_date)
     poll_prediction_bet_count.apply_async(kwargs=dict(poll_id=poll.id), eta=poll.prediction_bet_end_date)
+    poll_proposal_vote_count.apply_async(kwargs=dict(poll_id=poll.id), eta=poll.end_date)
 
     # Poll notification
     for date, name, phase in poll.labels:
@@ -195,7 +195,7 @@ def poll_delete(*, user_id: int, poll_id: int) -> None:
 
 
 def poll_fast_forward(*, user_id: int, poll_id: int, phase: str):
-    poll = get_object(Poll, id=poll_id)
+    poll = Poll.objects.get(id=poll_id)
     group_user = group_user_permissions(user=user_id, group=poll.created_by.group.id)
 
     if not poll.allow_fast_forward:
@@ -209,17 +209,16 @@ def poll_fast_forward(*, user_id: int, poll_id: int, phase: str):
 
     phases = [label[2] for label in poll.labels]
     time_table = [label[2] for label in poll.time_table]
-    print(time_table)
 
     if not poll.current_phase == 'waiting' and phases.index(phase) <= phases.index(poll.current_phase):
         raise ValidationError('Unable to fast forward poll to the same/previous phase')
 
-    time_difference = poll.get_phase_start_date(phase) - timezone.now()
+    time_difference = poll.get_phase(phase) - timezone.now()
 
     # Save new times to dict
     for phase in time_table:
-        phase_time = poll.get_phase_start_date(phase) - time_difference
-        setattr(poll, poll.get_phase_start_date(phase, field_name=True), phase_time)
+        phase_time = poll.get_phase(phase) - time_difference
+        setattr(poll, poll.get_phase(phase, field_name=True), phase_time)
 
     poll.full_clean()
     poll.save()
@@ -229,13 +228,19 @@ def poll_fast_forward(*, user_id: int, poll_id: int, phase: str):
         poll_area_vote_count.apply_async(kwargs=dict(poll_id=poll.id), eta=poll.area_vote_end_date)
 
     else:
-        poll_area_vote_count.apply_async(kwargs=dict(poll_id=poll.id))
+        poll_area_vote_count.apply_async(kwargs=dict(poll_id=poll.id), countdown=1)
 
     if poll.prediction_bet_end_date > timezone.now():
         poll_prediction_bet_count.apply_async(kwargs=dict(poll_id=poll.id), eta=poll.prediction_bet_end_date)
 
     else:
-        poll_prediction_bet_count.apply_async(kwargs=dict(poll_id=poll.id))
+        poll_prediction_bet_count.apply_async(kwargs=dict(poll_id=poll.id), countdown=1)
+
+    if poll.end_date > timezone.now():
+        poll_proposal_vote_count.apply_async(kwargs=dict(poll_id=poll.id), eta=poll.end_date)
+
+    else:
+        poll_proposal_vote_count.apply_async(kwargs=dict(poll_id=poll.id), countdown=1)
 
     poll_notification.shift(sender_id=poll_id,
                             category='timeline',
@@ -305,34 +310,3 @@ def poll_phase_template_delete(*, user_id: int, template_id: int):
     group_user_permissions(user=user_id, group=template.created_by_group_user.group, permissions=['admin'])
 
     template.delete()
-
-
-def poll_finish(*, poll_id: int) -> None:
-    poll = get_object(Poll, id=poll_id)
-
-    if poll.status:
-        raise ValidationError("Poll is already finished")
-
-    poll_proposal_vote_count(poll_id=poll_id)
-    poll.result = True
-    poll.save()
-
-
-def poll_refresh(*, poll_id: int) -> None:
-    poll = get_object(Poll, id=poll_id)
-
-    if not poll.dynamic:
-        raise ValidationError("Attempted to refresh a poll that doesn't allow live update")
-
-    if poll.status:
-        raise ValidationError("Attempted to refresh a poll that's already finished")
-
-    poll_proposal_vote_count(poll_id=poll_id)
-
-
-# TODO setup celery
-def poll_refresh_cheap(*, poll_id: int) -> None:
-    poll = get_object(Poll, id=poll_id)
-
-    if (poll.dynamic and not poll.status) or (not poll.status and timezone.now() >= poll.end_date):
-        poll_proposal_vote_count(poll_id=poll_id)

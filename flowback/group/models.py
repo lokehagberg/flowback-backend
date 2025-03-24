@@ -77,6 +77,8 @@ class Group(BaseModel):
             schedule.save()
             kanban = Kanban(name=instance.name, origin_type='group', origin_id=instance.id)
             kanban.save()
+            group_user = GroupUser(user=instance.created_by, group=instance, is_admin=True)
+            group_user.save()
 
             instance.schedule = schedule
             instance.kanban = kanban
@@ -160,6 +162,7 @@ class GroupPermissions(BaseModel):
 # Permission Tags for each group, and for user to put on delegators
 class GroupTags(BaseModel):
     name = models.TextField()
+    description = models.TextField(null=True, blank=True)
     group = models.ForeignKey('Group', on_delete=models.CASCADE)
     active = models.BooleanField(default=True)
 
@@ -238,12 +241,34 @@ class WorkGroup(BaseModel):
     name = models.CharField(max_length=255)
     direct_join = models.BooleanField(default=False)
     group = models.ForeignKey(Group, on_delete=models.CASCADE)
+    chat = models.ForeignKey(MessageChannel, on_delete=models.PROTECT)
 
+    @classmethod
+    def pre_save(cls, instance, raw, using, update_fields, *args, **kwargs):
+        if instance.pk is None:
+            # Joins the chatroom associated with the workgroup
+            message_channel = MessageChannel(origin_name='workgroup', title=instance.name)
+            message_channel.save()
+
+            instance.chat = message_channel
+
+pre_save.connect(WorkGroup.pre_save, sender=WorkGroup)
 
 class WorkGroupUser(BaseModel):
     work_group = models.ForeignKey(WorkGroup, on_delete=models.CASCADE)
     group_user = models.ForeignKey(GroupUser, on_delete=models.CASCADE)
     is_moderator = models.BooleanField(default=False)
+    chat_participant = models.ForeignKey(MessageChannelParticipant, on_delete=models.PROTECT)
+    active = models.BooleanField(default=True)
+
+    @classmethod
+    def pre_save(cls, instance, raw, using, update_fields, *args, **kwargs):
+        if instance.pk is None:
+            # Joins the chatroom associated with the workgroup
+            participant = MessageChannelParticipant(user=instance.group_user.user, channel=instance.work_group.chat)
+            participant.save()
+
+            instance.chat_participant = participant
 
     @classmethod
     def post_save(cls, instance, **kwargs):
@@ -251,11 +276,17 @@ class WorkGroupUser(BaseModel):
         if invite.exists():
             invite.delete()
 
+    @classmethod
+    def post_delete(cls, instance, *args, **kwargs):
+        instance.chat_participant.delete()  # Leave chatroom
+
     class Meta:
         constraints = [models.UniqueConstraint(name='WorkGroupUser_group_user_and_work_group_is_unique',
                                                fields=['work_group', 'group_user'])]
 
+pre_save.connect(WorkGroupUser.pre_save, sender=WorkGroupUser)
 post_save.connect(WorkGroupUser.post_save, sender=WorkGroupUser)
+post_delete.connect(WorkGroupUser.post_delete, sender=WorkGroupUser)
 
 
 class WorkGroupUserJoinRequest(BaseModel):
@@ -276,6 +307,7 @@ class GroupThread(BaseModel):
     comment_section = models.ForeignKey(CommentSection, default=comment_section_create, on_delete=models.DO_NOTHING)
     active = models.BooleanField(default=True)
     attachments = models.ForeignKey(FileCollection, on_delete=models.CASCADE, null=True, blank=True)
+    work_group = models.ForeignKey(WorkGroup, on_delete=models.SET_NULL, null=True, blank=True)
 
 
 # Likes and Dislikes for Group Thread

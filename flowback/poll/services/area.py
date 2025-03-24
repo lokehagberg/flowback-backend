@@ -52,7 +52,7 @@ def poll_area_statement_vote_update(user_id: int, poll_id: int, tag: int, vote: 
 
     poll.check_phase('area_vote', 'dynamic')
 
-    # Create or Update
+    # Delete all votes before creating a new vote
     PollAreaStatementVote.objects.filter(created_by=group_user, poll_area_statement__poll=poll).delete()
 
     PollAreaStatementVote.objects.update_or_create(created_by=group_user,

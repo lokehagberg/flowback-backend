@@ -144,25 +144,10 @@ class PollPredictionStatementDeleteAPI(APIView):
 
 
 @extend_schema(tags=['poll/prediction'])
-class PollPredictionBetCreateAPI(APIView):
-    class InputSerializer(serializers.Serializer):
-        score = serializers.IntegerField()
-        blockchain_id = serializers.IntegerField(min_value=1, required=False)
-
-    def post(self, request, prediction_statement_id: int):
-        serializer = self.InputSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-
-        created_id = poll_prediction_bet_create(user=request.user, prediction_statement_id=prediction_statement_id,
-                                                **serializer.validated_data)
-
-        return Response(created_id, status=status.HTTP_201_CREATED)
-
-
-@extend_schema(tags=['poll/prediction'])
 class PollPredictionBetUpdateAPI(APIView):
     class InputSerializer(serializers.Serializer):
         score = serializers.IntegerField()
+        blockchain_id = serializers.IntegerField(min_value=1, required=False)
 
     def post(self, request, prediction_statement_id: int):
         serializer = self.InputSerializer(data=request.data)

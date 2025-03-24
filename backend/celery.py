@@ -2,17 +2,15 @@ import os
 from pathlib import Path
 
 from celery import Celery
-import environ
+from backend.settings import CELERY_BROKER_URL
 
-env = environ.Env(RABBITMQ_BROKER_URL=(str, 'amqp://flowback:flowback@localhost:5672/flowback'))
 BASE_DIR = Path(__file__).resolve().parent.parent
-env.read_env(os.path.join(BASE_DIR, ".env"))
 
 # Set the default Django settings module for the 'celery' program.
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'backend.settings')
 
 app = Celery('backend')
-broker_url = env('RABBITMQ_BROKER_URL')
+broker_url = CELERY_BROKER_URL
 beat_scheduler = "django_celery_beat.schedulers:DatabaseScheduler"
 
 # Using a string here means the worker doesn't have to serialize

@@ -10,17 +10,17 @@ class BaseKanbanEntryFilter(django_filters.FilterSet):
     origin_type = django_filters.CharFilter(field_name='kanban__origin_type')
     origin_id = django_filters.NumberFilter(field_name='kanban_origin_id')
     created_by = django_filters.NumberFilter()
-    work_group_id = NumberInFilter(field_name='work_group_id')
+    work_group_ids = NumberInFilter(field_name='work_group_id')
     order_by = django_filters.OrderingFilter(fields=(('priority', 'priority_asc'),
                                                      ('-priority', 'priority_desc')))
     assignee = django_filters.NumberFilter()
 
     class Meta:
         model = KanbanEntry
-        fields = dict(title=['icontains'],
-                      description=['icontains'],
+        fields = dict(title=['exact', 'icontains'],
+                      description=['exact', 'icontains'],
                       end_date=['gt', 'lt'],
-                      lane=['exact'],)
+                      lane=['exact', 'icontains'],)
 
 
 # TODO due for rework

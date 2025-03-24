@@ -28,6 +28,8 @@ class NotificationListAPI(APIView):
         channel_sender_id = serializers.IntegerField(required=False)
 
         channel_sender_category = serializers.CharField(required=False)
+        order_by = serializers.ChoiceField(required=False, choices=['notification_object__timestamp_asc',
+                                                    'notification_object__timestamp_desc'])
 
     class OutputSerializer(serializers.Serializer):
         id = serializers.IntegerField()

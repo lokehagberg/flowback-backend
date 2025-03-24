@@ -1,0 +1,91 @@
+services:
+  flowback-postgresql:
+    image: postgres:16.2
+    restart: unless-stopped
+    user: postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-flowback}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-flowback}
+      POSTGRES_DB: ${POSTGRES_DB:-flowback}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready", "-U", "${POSTGRES_USER}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    env_file:
+      - path: ./.env
+        required: false
+#    ports:
+#      - "5432:5432"
+
+  flowback-redis:
+    image: redis:5
+    restart: unless-stopped
+#    ports:
+#      - "6379:6379"
+
+  flowback-backend:
+    build: .
+    command: >
+      bash -c "pip install --no-cache-dir -r requirements.txt
+      && python manage.py migrate
+      && python manage.py runserver 0.0.0.0:${PORT:-8000}"
+    ports:
+      - ${PORT:-8000}:${PORT:-8000}
+    volumes:
+      - .:/app
+    depends_on:
+      flowback-postgresql:
+        condition: service_healthy
+    environment:
+      FLOWBACK_PSQL_NAME: ${POSTGRES_DB:-flowback}
+      FLOWBACK_PSQL_USER: ${POSTGRES_USER:-flowback}
+      FLOWBACK_PSQL_PASSWORD: ${POSTGRES_PASSWORD:-flowback}
+      FLOWBACK_PSQL_HOST: ${POSTGRES_HOST:-flowback-postgresql}
+      FLOWBACK_PSQL_PORT: ${POSTGRES_PORT:-5432}
+      FLOWBACK_REDIS_HOST: ${REDIS_HOST:-flowback-redis}
+    env_file:
+      - path: ./.env
+        required: false
+
+  flowback-celery-worker:
+    build: .
+    command: celery -A backend worker --loglevel=info
+    depends_on:
+      - flowback-backend
+      - flowback-redis
+    environment:
+      FLOWBACK_PSQL_NAME: ${POSTGRES_DB:-flowback}
+      FLOWBACK_PSQL_USER: ${POSTGRES_USER:-flowback}
+      FLOWBACK_PSQL_PASSWORD: ${POSTGRES_PASSWORD:-flowback}
+      FLOWBACK_PSQL_HOST: ${POSTGRES_HOST:-flowback-postgresql}
+      FLOWBACK_PSQL_PORT: ${POSTGRES_PORT:-5432}
+      FLOWBACK_REDIS_HOST: ${REDIS_HOST:-flowback-redis}
+    env_file:
+      - path: ./.env
+        required: false
+
+  flowback-celery-beat:
+    build: .
+    command: celery -A backend beat --loglevel=info
+    depends_on:
+      - flowback-backend
+      - flowback-redis
+    volumes:
+      - .:/app # For persisting periodic task metadata
+    environment:
+      FLOWBACK_PSQL_NAME: ${POSTGRES_DB:-flowback}
+      FLOWBACK_PSQL_USER: ${POSTGRES_USER:-flowback}
+      FLOWBACK_PSQL_PASSWORD: ${POSTGRES_PASSWORD:-flowback}
+      FLOWBACK_PSQL_HOST: ${POSTGRES_HOST:-flowback-postgresql}
+      FLOWBACK_PSQL_PORT: ${POSTGRES_PORT:-5432}
+      FLOWBACK_REDIS_HOST: ${REDIS_HOST:-flowback-redis}
+    env_file:
+      - path: ./.env
+        required: false
+
+volumes:
+  postgres_data:
+    driver: local

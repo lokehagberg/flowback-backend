@@ -94,7 +94,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def get_participating_channels(self):
-        return list(MessageChannelParticipant.objects.filter(user=self.user).values_list('channel_id', flat=True))
+        return list(MessageChannelParticipant.objects.filter(user=self.user,
+                                                             active=True).values_list('channel_id',
+                                                                                      flat=True))
 
     @staticmethod
     def generate_status_message(message: str, method: str = None, **kwargs):

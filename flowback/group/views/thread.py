@@ -8,6 +8,7 @@ from flowback.comment.views import CommentListAPI, CommentCreateAPI, CommentUpda
     CommentAncestorListAPI
 from flowback.files.serializers import FileSerializer
 from flowback.group.selectors import group_thread_list, group_thread_comment_list, group_thread_comment_ancestor_list
+from flowback.group.serializers import WorkGroupSerializer
 from flowback.group.services.thread import (group_thread_create,
                                             group_thread_update,
                                             group_thread_delete,
@@ -34,6 +35,7 @@ class GroupThreadListAPI(APIView):
         title__icontains = serializers.CharField(required=False)
         description = serializers.CharField(required=False)
         user_vote = serializers.BooleanField(required=False, allow_null=True, default=None)
+        work_group_ids = serializers.CharField(required=False)
 
     class OutputSerializer(serializers.Serializer):
         created_by = BasicUserSerializer(source='created_by.user')
@@ -45,6 +47,7 @@ class GroupThreadListAPI(APIView):
         attachments = FileSerializer(many=True, source='attachments.filesegment_set', allow_null=True)
         score = serializers.IntegerField(default=0)
         user_vote = serializers.BooleanField(allow_null=True)
+        work_group = WorkGroupSerializer()
 
     def get(self, request, group_id: int):
         serializer = self.FilterSerializer(data=request.query_params)
@@ -65,6 +68,7 @@ class GroupThreadCreateAPI(APIView):
         description = serializers.CharField(required=False)
         pinned = serializers.BooleanField(default=False)
         attachments = serializers.ListField(child=serializers.FileField(), required=False, max_length=10)
+        work_group_id = serializers.IntegerField(required=False)
 
     def post(self, request, group_id: int):
         serializer = self.InputSerializer(data=request.data)

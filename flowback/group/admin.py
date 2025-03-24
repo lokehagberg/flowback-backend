@@ -15,6 +15,8 @@ class GroupAdmin(admin.ModelAdmin):
                     'description', 'image', 'cover_image', 'poll_phase_minimum_space',
                     'hide_poll_users', 'schedule', 'kanban', 'jitsi_room', 'group_folder')
 
+    exclude = ('chat', 'kanban', 'schedule')
+
 
 @admin.register(GroupPermissions)
 class GroupPermissionsAdmin(admin.ModelAdmin):

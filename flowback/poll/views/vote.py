@@ -10,7 +10,6 @@ from flowback.common.services import get_object
 from flowback.poll.models import Poll, PollVotingTypeRanking, PollVotingTypeForAgainst, PollVotingTypeCardinal
 
 from ..selectors.vote import poll_vote_list, delegate_poll_vote_list
-from ..services.poll import poll_refresh_cheap
 from ..services.vote import poll_proposal_vote_update, poll_proposal_delegate_vote_update
 
 
@@ -56,7 +55,6 @@ class PollProposalVoteListAPI(APIView):
         filter_serializer = self.FilterSerializer(data=request.query_params)
         filter_serializer.is_valid(raise_exception=True)
         delegates = filter_serializer.validated_data.pop('delegates')
-        poll_refresh_cheap(poll_id=poll.id)  # TODO get celery
 
         votes = poll_vote_list(fetched_by=request.user, poll_id=poll.id,
                                delegates=delegates,
@@ -196,7 +194,6 @@ class PollProposalVoteUpdateAPI(APIView):
 
         serializer = input_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        poll_refresh_cheap(poll_id=poll.id)  # TODO get celery
         poll_proposal_vote_update(user_id=request.user.id, poll_id=poll.id, data=serializer.validated_data)
         return Response(status=status.HTTP_200_OK)
 
@@ -229,6 +226,5 @@ class PollProposalDelegateVoteUpdateAPI(APIView):
 
         serializer = input_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        poll_refresh_cheap(poll_id=poll.id)  # TODO get celery
         poll_proposal_delegate_vote_update(user_id=request.user.id, poll_id=poll.id, data=serializer.validated_data)
         return Response(status=status.HTTP_200_OK)
