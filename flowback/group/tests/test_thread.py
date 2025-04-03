@@ -37,7 +37,7 @@ class TestGroupThread(APITestCase):
         GroupThreadVoteFactory.create(created_by=self.group_user, thread=self.threads[5], vote=False)
 
         response = generate_request(api=GroupThreadListAPI,
-                                    url_params=dict(group_id=self.group_user.group.id),
+                                    data=dict(group_ids=str(self.group_user.group.id)),
                                     user=user)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)

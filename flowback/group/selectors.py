@@ -112,7 +112,6 @@ def group_user_permissions(*,
         if work_group_moderator_check and not work_group_user.is_moderator:
             raise PermissionDenied("Requires work group moderator permission")
 
-
     return group_user
 
 
@@ -191,8 +190,8 @@ def group_user_list(*, group: int, fetched_by: User, filters=None):
                                            groupuserdelegate__group=OuterRef('group')
                                            )
     qs = GroupUser.objects.filter(group_id=group,
-                                  active=True
-                                  ).annotate(delegate=Exists(is_delegate),
+                                  active=True,
+                                  ).annotate(delegate_pool_id=F('groupuserdelegate__pool_id'),
                                              work_groups=ArrayAgg('workgroupuser__work_group__name')).all()
     return BaseGroupUserFilter(filters, qs).qs
 
@@ -322,6 +321,7 @@ class BaseGroupThreadFilter(django_filters.FilterSet):
                 ('-pinned', 'pinned')))
     user_vote = django_filters.BooleanFilter()
     id_list = NumberInFilter(field_name='id')
+    group_ids = NumberInFilter(field_name='created_by__group_id')
     work_group_ids = NumberInFilter(field_name='work_group_id')
 
     class Meta:
@@ -331,28 +331,51 @@ class BaseGroupThreadFilter(django_filters.FilterSet):
                       description=['icontains'])
 
 
-def group_thread_list(*, group_id: int, fetched_by: User, filters=None):
+def group_thread_list(*, fetched_by: User, filters=None):
     filters = filters or {}
-    group_user = group_user_permissions(user=fetched_by, group=group_id)
 
-    sq_user_vote = GroupThreadVote.objects.filter(thread_id=OuterRef('id'), created_by=group_user).values('vote')
+    threads = GroupThread.objects.filter(
+        Q(Q(work_group__isnull=True)  # All threads without workgroup
+          | Q(work_group__isnull=False) & Q(  # All threads with workgroup
+            Q(work_group__workgroupuser__group_user__user=fetched_by))  # Check if groupuser is member in workgroup
+          | Q(Q(created_by__group__groupuser__user=fetched_by) & Q(
+            created_by__group__groupuser__is_admin=True)))  # Check if groupuser is admin in group
+    ).values('id')
 
-    if not group_user_permissions(group_user=group_user, permissions=['admin'], raise_exception=False):
-        threads = GroupThread.objects.filter(Q(created_by__group_id=group_id, work_group__isnull=True)
-                                         | Q(work_group__isnull=False) &
-                                           Q(work_group__workgroupuser__group_user__in=[group_user]))
-
-    else:
-        threads = GroupThread.objects.filter(created_by__group_id=group_id)
+    threads = GroupThread.objects.filter(id__in=[t['id'] for t in threads])  # TODO make this one query
 
     comment_qs = Coalesce(Subquery(
-                       Comment.objects.filter(comment_section_id=OuterRef('comment_section_id'), active=True).values(
-                           'comment_section_id').annotate(total=Count('*')).values('total')[:1]), 0)
+        Comment.objects.filter(comment_section_id=OuterRef('comment_section_id'), active=True).values(
+            'comment_section_id').annotate(total=Count('*')).values('total')[:1]), 0)
 
-    qs = (threads.annotate(total_comments=comment_qs,
-                           user_vote=Subquery(sq_user_vote),
-                           score=Count('groupthreadvote', filter=Q(groupthreadvote__vote=True)) -
-                                 Count('groupthreadvote', filter=Q(groupthreadvote__vote=False))).all())
+    user_vote_qs = GroupThreadVote.objects.filter(thread_id=OuterRef('id'), created_by__user=fetched_by).values('vote')
+
+    positive_votes_qs = (
+        GroupThreadVote.objects.filter(
+            thread_id=OuterRef('pk'),
+            vote=True
+        )
+        .values('thread_id')
+        .annotate(positive_count=Count('id'))
+        .values('positive_count')
+    )
+
+    negative_votes_qs = (
+        GroupThreadVote.objects.filter(
+            thread_id=OuterRef('pk'),
+            vote=False
+        )
+        .values('thread_id')
+        .annotate(negative_count=Count('id'))
+        .values('negative_count')
+    )
+
+    qs = threads.annotate(total_comments=comment_qs,
+                          user_vote=Subquery(user_vote_qs),
+                          score=Coalesce(Subquery(positive_votes_qs,
+                                                  output_field=models.IntegerField()), 0) -
+                                Coalesce(Subquery(negative_votes_qs,
+                                                  output_field=models.IntegerField()), 0)).all()
 
     return BaseGroupThreadFilter(filters, qs).qs
 
@@ -400,14 +423,24 @@ def work_group_list(*, group_id: int, fetched_by: User, filters=None):
     group_user = group_user_permissions(user=fetched_by, group=group_id)
 
     qs = WorkGroup.objects.filter(group_id=group_id).annotate(
-        joined=Q(workgroupuser__group_user__in=[group_user]),
-        requested_access=Q(workgroupuserjoinrequest__group_user__in=[group_user]),
+        joined=Exists(
+            WorkGroupUser.objects.filter(
+                work_group=OuterRef('pk'),
+                group_user=group_user
+            )
+        ),
+        requested_access=Exists(
+            WorkGroupUserJoinRequest.objects.filter(
+                work_group=OuterRef('pk'),
+                group_user=group_user
+            )
+        ),
         member_count=Coalesce(Subquery(
             WorkGroupUser.objects.filter(work_group=OuterRef('pk'))
             .values('work_group')
             .annotate(count=Count('id'))
             .values('count')[:1]), 0)
-    ).distinct()
+    )
 
     return BaseWorkGroupFilter(filters, qs).qs
 
@@ -464,7 +497,7 @@ def work_group_user_join_request_list(*, work_group_id: int, fetched_by: User, f
                                                                 is_moderator=True).exists()
 
     if group_user_is_admin or work_group_user_is_moderator:
-        qs = WorkGroupUserJoinRequest.objects.filter(id=work_group_id)
+        qs = WorkGroupUserJoinRequest.objects.filter(work_group_id=work_group_id)
 
         return BaseWorkGroupFilter(filters, qs).qs
 

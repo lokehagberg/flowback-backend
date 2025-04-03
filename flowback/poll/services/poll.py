@@ -43,7 +43,8 @@ def poll_create(*, user_id: int,
                 pinned: bool = None,
                 dynamic: bool,
                 attachments: list = None,
-                quorum: int = None
+                quorum: int = None,
+                work_group_id: int = None
                 ) -> Poll:
     group_user = group_user_permissions(user=user_id, group=group_id, permissions=['create_poll', 'admin'])
 
@@ -72,6 +73,9 @@ def poll_create(*, user_id: int,
                   end_date]):
         raise ValidationError('Missing required parameter(s) for generic poll')
 
+    elif work_group_id != None:
+        raise ValidationError("Work groups are only assignable to date polls")
+    
     collection = None
     if attachments:
         collection = upload_collection(user_id=user_id,
@@ -97,6 +101,7 @@ def poll_create(*, user_id: int,
                 pinned=pinned,
                 dynamic=dynamic,
                 quorum=quorum,
+                work_group_id=work_group_id,
                 attachments=collection)
 
     poll.full_clean()

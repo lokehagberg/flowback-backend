@@ -1,10 +1,10 @@
-from django.db.models import Q, OuterRef, Subquery, Case, When, F
+from django.db.models import Q, OuterRef, Subquery, Case, When, F, Count
 import django_filters
 from rest_framework.exceptions import PermissionDenied
 
 from .models import MessageChannel, Message, MessageChannelParticipant, MessageChannelTopic
 from flowback.user.models import User
-from ..common.filters import NumberInFilter, ExistsFilter
+from ..common.filters import NumberInFilter, ExistsFilter, StringInFilter
 from ..common.services import get_object
 
 
@@ -26,7 +26,7 @@ class BaseMessageFilter(django_filters.FilterSet):
 
 def message_list(*, user: User, channel_id: int, filters=None):
     filters = filters or {}
-    participant = get_object(MessageChannelParticipant, channel_id=channel_id, user=user, active=True)
+    participant = get_object(MessageChannelParticipant, channel_id=channel_id, user=user)
 
     qs = Message.objects.filter(channel=participant.channel).all()
 
@@ -42,7 +42,7 @@ class BaseTopicFilter(django_filters.FilterSet):
 
 def message_channel_topic_list(*, user: User, channel_id: int, filters=None):
     filters = filters or {}
-    participant = get_object(MessageChannelParticipant, channel_id=channel_id, user=user, active=True)
+    participant = get_object(MessageChannelParticipant, channel_id=channel_id, user=user)
 
     qs = MessageChannelTopic.objects.filter(channel=participant.channel).all()
     return BaseTopicFilter(filters, qs).qs
@@ -53,7 +53,7 @@ class BaseMessageChannelPreviewFilter(django_filters.FilterSet):
                                                      ('-created_at', 'created_at_desc')))
 
     username__icontains = django_filters.CharFilter(field_name='target__username', lookup_expr='icontains')
-    origin_name = django_filters.CharFilter(field_name='channel__origin_name', lookup_expr='exact')
+    origin_names = StringInFilter(field_name='channel__origin_name')
     topic_name = django_filters.CharFilter(field_name='topic__name', lookup_expr='exact')
 
     class Meta:
@@ -69,20 +69,21 @@ def message_channel_preview_list(*, user: User, filters=None):
     filters = filters or {}
 
     timestamp = MessageChannelParticipant.objects.filter(user=user,
-                                                         channel=OuterRef('channel_id'),
-                                                         active=True).values('timestamp')
+                                                         channel_id=OuterRef('channel_id')).values('timestamp')
 
     message_qs = Message.objects.filter(Q(Q(channel__messagechannelparticipant__closed_at__isnull=True)
                                           | Q(channel__messagechannelparticipant__closed_at__gt=F('created_at'))),
                                         Q(Q(topic__isnull=True)
                                           | Q(topic__hidden=False)),
                                         channel__messagechannelparticipant__user=user,
-                                        active=True).annotate(timestamp=Subquery(timestamp)
-                                                              ).distinct('channel').all()
+                                        active=True).distinct('channel').all()
 
     qs = Message.objects.filter(id__in=message_qs)
 
-    return BaseMessageChannelPreviewFilter(filters, qs).qs
+    final_qs = BaseMessageChannelPreviewFilter(filters, qs).qs.annotate(timestamp=Subquery(timestamp),
+                                                                        participants=Count('channel__messagechannelparticipant'))
+
+    return final_qs
 
 
 class MessageChannelParticipantFilter(django_filters.FilterSet):

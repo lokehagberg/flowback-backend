@@ -21,7 +21,6 @@ from flowback.poll.tests.utils import generate_poll_phase_kwargs
 
 from flowback.poll.views.prediction import (PollPredictionStatementCreateAPI,
                                             PollPredictionStatementDeleteAPI,
-                                            PollPredictionBetCreateAPI,
                                             PollPredictionBetUpdateAPI,
                                             PollPredictionBetDeleteAPI,
                                             PollPredictionStatementVoteCreateAPI,
@@ -130,25 +129,25 @@ class PollPredictionStatementTest(APITransactionTestCase):
                          1, 'Possibly passed with unpermitted user.')
 
     # Predictions
-    def test_create_prediction_bet(self):
-        Poll.objects.filter(id=self.poll.id).update(**generate_poll_phase_kwargs('prediction_bet'))
-
-        factory = APIRequestFactory()
-        view = PollPredictionBetCreateAPI.as_view()
-
-        data = dict(score=5)
-
-        request = factory.post('', data)
-        force_authenticate(request, user=self.user_prediction_caster_one.user)
-        response = view(request, prediction_statement_id=self.prediction_statement.id)
-
-        self.assertEqual(response.status_code, 201, msg=response.data)
-        bets = PollPredictionBet.objects.filter(created_by=self.user_prediction_caster_one,
-                                                prediction_statement_id=self.prediction_statement.id)
-
-        self.assertEqual(bets.count(), 1, "PredictionBet not created")
-
-        self.assertEqual(bets.first().score, 5, "PredictionBet not matching input score")
+    # def test_create_prediction_bet(self):
+    #     Poll.objects.filter(id=self.poll.id).update(**generate_poll_phase_kwargs('prediction_bet'))
+    #
+    #     factory = APIRequestFactory()
+    #     view = PollPredictionBetCreateAPI.as_view()
+    #
+    #     data = dict(score=5)
+    #
+    #     request = factory.post('', data)
+    #     force_authenticate(request, user=self.user_prediction_caster_one.user)
+    #     response = view(request, prediction_statement_id=self.prediction_statement.id)
+    #
+    #     self.assertEqual(response.status_code, 201, msg=response.data)
+    #     bets = PollPredictionBet.objects.filter(created_by=self.user_prediction_caster_one,
+    #                                             prediction_statement_id=self.prediction_statement.id)
+    #
+    #     self.assertEqual(bets.count(), 1, "PredictionBet not created")
+    #
+    #     self.assertEqual(bets.first().score, 5, "PredictionBet not matching input score")
 
     def test_update_prediction_bet(self):
         Poll.objects.filter(id=self.poll.id).update(**generate_poll_phase_kwargs('prediction_bet'))

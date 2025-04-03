@@ -14,9 +14,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    env_file:
-      - path: ./.env
-        required: false
 #    ports:
 #      - "5432:5432"
 
@@ -28,6 +25,7 @@ services:
 
   flowback-backend:
     build: .
+    restart: unless-stopped
     command: >
       bash -c "pip install --no-cache-dir -r requirements.txt
       && python manage.py migrate
@@ -46,12 +44,10 @@ services:
       FLOWBACK_PSQL_HOST: ${POSTGRES_HOST:-flowback-postgresql}
       FLOWBACK_PSQL_PORT: ${POSTGRES_PORT:-5432}
       FLOWBACK_REDIS_HOST: ${REDIS_HOST:-flowback-redis}
-    env_file:
-      - path: ./.env
-        required: false
 
   flowback-celery-worker:
     build: .
+    restart: unless-stopped
     command: celery -A backend worker --loglevel=info
     depends_on:
       - flowback-backend
@@ -63,12 +59,10 @@ services:
       FLOWBACK_PSQL_HOST: ${POSTGRES_HOST:-flowback-postgresql}
       FLOWBACK_PSQL_PORT: ${POSTGRES_PORT:-5432}
       FLOWBACK_REDIS_HOST: ${REDIS_HOST:-flowback-redis}
-    env_file:
-      - path: ./.env
-        required: false
 
   flowback-celery-beat:
     build: .
+    restart: unless-stopped
     command: celery -A backend beat --loglevel=info
     depends_on:
       - flowback-backend
@@ -82,9 +76,6 @@ services:
       FLOWBACK_PSQL_HOST: ${POSTGRES_HOST:-flowback-postgresql}
       FLOWBACK_PSQL_PORT: ${POSTGRES_PORT:-5432}
       FLOWBACK_REDIS_HOST: ${REDIS_HOST:-flowback-redis}
-    env_file:
-      - path: ./.env
-        required: false
 
 volumes:
   postgres_data:

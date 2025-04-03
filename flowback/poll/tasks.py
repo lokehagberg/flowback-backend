@@ -119,7 +119,7 @@ def poll_prediction_bet_count(poll_id: int):
 
         # If there's no previous bets then do nothing
         if len(previous_bets) == 0 or len(previous_bets[0]) == 0:
-            result = None if all(bets[i] is not None for bets in current_bets) else (sum(main_bets)) / len(main_bets)
+            result = None if all(bets[i] is None for bets in current_bets) else (sum(main_bets)) / len(main_bets)
             print(f"No previous bets found, returning {result}")
             statement.combined_bet = result
             statement.save()

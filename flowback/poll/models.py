@@ -16,9 +16,10 @@ from flowback.prediction.models import (PredictionBet,
                                         PredictionStatementSegment,
                                         PredictionStatementVote)
 from flowback.common.models import BaseModel
-from flowback.group.models import Group, GroupUser, GroupUserDelegatePool, GroupTags
+from flowback.group.models import Group, GroupUser, GroupUserDelegatePool, GroupTags, WorkGroup
 from flowback.comment.models import CommentSection, comment_section_create_model_default
 import pgtrigger
+
 
 from flowback.schedule.models import Schedule, ScheduleEvent
 from flowback.schedule.services import create_schedule
@@ -62,6 +63,7 @@ class Poll(BaseModel):
     end_date = models.DateTimeField()  # Result Phase, Prediction Vote afterward indefinitely
 
     blockchain_id = models.PositiveIntegerField(null=True, blank=True, default=None)
+    work_group = models.ForeignKey(WorkGroup, on_delete=models.CASCADE, null=True, blank=True)
 
     """
     Poll Status Code

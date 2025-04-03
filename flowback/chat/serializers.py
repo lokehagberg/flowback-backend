@@ -14,6 +14,7 @@ class _MessageSerializerTemplate(serializers.Serializer):
     channel_title = serializers.CharField(source="channel.title")
     topic_id = serializers.IntegerField(required=False)
     topic_name = serializers.CharField(required=False, source='topic.name')
+    type = serializers.CharField(read_only=True)
     message = serializers.CharField()
     attachments = FileSerializer(many=True, source='attachments.file_collection.filesegment_set', allow_null=True)
 

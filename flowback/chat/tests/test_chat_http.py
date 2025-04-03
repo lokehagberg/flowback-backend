@@ -1,6 +1,7 @@
 from pprint import pprint
 
 from django.test import TransactionTestCase
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIRequestFactory, force_authenticate
 
@@ -38,6 +39,7 @@ class ChatTestHTTP(TransactionTestCase):
         self.user_one = UserFactory()
         self.user_two = UserFactory()
         self.message_channel = MessageChannelFactory()
+        self.message_channel_participant_three = MessageChannelParticipantFactory(channel=self.message_channel)
         self.message_channel_participant_one = MessageChannelParticipantFactory(channel=self.message_channel)
         self.message_channel_participant_two = MessageChannelParticipantFactory(channel=self.message_channel)
         self.message_channel_topic = MessageChannelTopicFactory(channel=self.message_channel)
@@ -110,13 +112,19 @@ class ChatTestHTTP(TransactionTestCase):
     def test_message_channel_preview(self):
         # Test if there's correct amount of messages
         for i in range(10):
-            channel = MessageChannelFactory()
+            channel = MessageChannelFactory(origin_name='user')
             channel_participant_one = MessageChannelParticipantFactory(
                 channel=channel,
-                user=self.message_channel_participant_one.user)
+                user=self.message_channel_participant_one.user,
+                timestamp=timezone.now())
             channel_participant_two = MessageChannelParticipantFactory(
                 channel=channel,
-                user=self.message_channel_participant_two.user)
+                user=self.message_channel_participant_two.user,
+                timestamp=timezone.now())
+
+            [MessageFactory(user=channel_participant_one.user, channel=channel) for x in range(10)]
+            [MessageFactory(user=channel_participant_two.user, channel=channel) for x in range(10)]
+            [MessageFactory(user=channel_participant_one.user, channel=channel) for x in range(10)]
 
             channel_two = MessageChannelFactory(origin_name='user')
             channel_participant_one_one = MessageChannelParticipantFactory(
@@ -125,10 +133,10 @@ class ChatTestHTTP(TransactionTestCase):
             channel_participant_one_two = MessageChannelParticipantFactory(
                 channel=channel_two,
                 user=self.message_channel_participant_two.user)
+            channel_participant_one_three = MessageChannelParticipantFactory(
+                channel=channel_two,
+                user=self.message_channel_participant_three.user)
 
-            [MessageFactory(user=channel_participant_one.user, channel=channel) for x in range(10)]
-            [MessageFactory(user=channel_participant_two.user, channel=channel) for x in range(10)]
-            [MessageFactory(user=channel_participant_one.user, channel=channel) for x in range(10)]
             [MessageFactory(user=channel_participant_one_one.user, channel=channel_two) for x in range(10)]
             [MessageFactory(user=channel_participant_one_two.user, channel=channel_two) for x in range(10)]
             [MessageFactory(user=channel_participant_one_one.user, channel=channel_two) for x in range(10)]
@@ -136,7 +144,7 @@ class ChatTestHTTP(TransactionTestCase):
             factory = APIRequestFactory()
             request = factory.get('', data=dict(order_by='created_at_desc'))
             request_two = factory.get('', data=dict(order_by='created_at_desc', origin_name='user'))
-            request_three = factory.get('', data=dict(order_by='created_at_desc', origin_name='message'))
+            request_three = factory.get('', data=dict(order_by='created_at_desc', origin_name='group'))
             view = MessageChannelPreviewAPI.as_view()
 
             # Check if all channels are shown
@@ -144,7 +152,10 @@ class ChatTestHTTP(TransactionTestCase):
             response = view(request)
 
             if i > 0:
-                self.assertEqual(response.data.get('count'), (i + 1) * 2)
+                self.assertEqual(response.data.get('count'), 3 + i * 2, response.data)
+                self.assertTrue(response.data['results'][i]['timestamp'])
+                self.assertEqual(response.data['results'][(2 * i) + 1]['participants'], 2,
+                                 [(i['created_at'], i['participants']) for i in response.data['results']])
                 self.assertGreater(response.data['results'][i - 1]['created_at'],
                                    response.data['results'][i]['created_at'])
 
@@ -153,7 +164,10 @@ class ChatTestHTTP(TransactionTestCase):
             response = view(request_two)
 
             if i > 0:
-                self.assertEqual(response.data.get('count'), i + 1)
+                self.assertEqual(response.data.get('count'), 2 + i * 2)
+                self.assertTrue(response.data['results'][i]['timestamp'])
+                self.assertEqual(response.data['results'][2 * (i - 1)]['participants'], 3,
+                                 [(i['created_at'], i['participants']) for i in response.data['results']])
                 self.assertGreater(response.data['results'][i - 1]['created_at'],
                                    response.data['results'][i]['created_at'])
 
@@ -161,9 +175,7 @@ class ChatTestHTTP(TransactionTestCase):
             response = view(request_three)
 
             if i > 0:
-                self.assertEqual(response.data.get('count'), i + 1)
-                self.assertGreater(response.data['results'][i - 1]['created_at'],
-                                   response.data['results'][i]['created_at'])
+                self.assertEqual(response.data.get('count'), 0)
 
     def test_message_channel_participant(self):
         channel = MessageChannelFactory()

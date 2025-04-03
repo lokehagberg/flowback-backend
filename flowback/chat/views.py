@@ -50,7 +50,8 @@ class MessageChannelPreviewAPI(APIView):
 
     class FilterSerializer(serializers.Serializer):
         order_by = serializers.ChoiceField(required=False, choices=['created_at_asc', 'created_at_desc'])
-        origin_name = serializers.CharField(required=False)
+        origin_names = serializers.CharField(required=False, help_text="Comma-separated list of origins, "
+                                                                       "e.g. 'user,user_group'")
         username__icontains = serializers.CharField(required=False)
         id = serializers.IntegerField(required=False)
         user_id = serializers.IntegerField(required=False)
@@ -62,6 +63,7 @@ class MessageChannelPreviewAPI(APIView):
 
     class OutputSerializer(BasicMessageSerializer):
         timestamp = serializers.DateTimeField(allow_null=True)
+        participants = serializers.IntegerField(help_text="Number of participants in the channel")
 
     def get(self, request):
         serializer = self.FilterSerializer(data=request.query_params)

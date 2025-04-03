@@ -8,7 +8,7 @@ from flowback.group.models import GroupUser
 from flowback.group.selectors import group_user_list, group_user_invite_list
 from flowback.group.serializers import GroupUserSerializer
 
-from flowback.group.services.group import group_user_update, group_join, group_leave
+from flowback.group.services.group import group_user_update, group_join, group_leave, group_user_delete
 from flowback.group.services.invite import group_invite, group_invite_accept, group_invite_reject
 
 
@@ -27,7 +27,7 @@ class GroupUserListApi(APIView):
         permission = serializers.IntegerField(required=False)
 
     class OutputSerializer(GroupUserSerializer):
-        is_delegate = serializers.BooleanField(source='delegate')
+        delegate_pool_id = serializers.IntegerField(allow_null=True)
         work_groups = serializers.ListField(allow_null=True, child=serializers.CharField())
 
     def get(self, request, group: int):
@@ -105,21 +105,21 @@ class GroupLeaveApi(APIView):
 @extend_schema(tags=['group'])
 class GroupUserUpdateApi(APIView):
     class InputSerializer(serializers.Serializer):
-        user = serializers.IntegerField(required=False)
+        target_user_id = serializers.IntegerField()
         delegate = serializers.BooleanField(required=False, default=None, allow_null=True)
         permission = serializers.IntegerField(required=False, allow_null=True, source='permission_id')
-        is_admin = serializers.IntegerField(required=False)
+        is_admin = serializers.BooleanField(required=False)
 
     def post(self, request, group: int):
         serializer = self.InputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        user_to_update = request.user.id
-        if serializer.validated_data.get('user'):
-            user_to_update = serializer.validated_data.pop('user')
+        target_user_id = request.user.id
+        if serializer.validated_data.get('target_user_id'):
+            target_user_id = serializer.validated_data.pop('target_user_id')
 
-        group_user_update(user=user_to_update,
+        group_user_update(fetched_by=request.user,
+                          target_user_id=target_user_id,
                           group=group,
-                          fetched_by=request.user.id,
                           data=serializer.validated_data)
 
         return Response(status=status.HTTP_200_OK)
@@ -161,5 +161,18 @@ class GroupInviteRejectApi(APIView):
         serializer = self.InputSerializer(data=request.data or {})
         serializer.is_valid(raise_exception=True)
         group_invite_reject(fetched_by=request.user.id, group=group, **serializer.validated_data)
+
+        return Response(status=status.HTTP_200_OK)
+
+
+@extend_schema(tags=['group'])
+class GroupUserDeleteAPI(APIView):
+    class InputSerializer(serializers.Serializer):
+        target_user_id = serializers.IntegerField()
+
+    def post(self, request, group_id: int):
+        serializer = self.InputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        group_user_delete(user_id=request.user.id, group_id=group_id, **serializer.validated_data)
 
         return Response(status=status.HTTP_200_OK)

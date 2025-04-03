@@ -42,11 +42,11 @@ def group_thread_create(user_id: int,
     # Notify users when thread is created
     target_user_ids = None
     if work_group_id:
-        target_user_ids = WorkGroupUser.objects.filter(id=work_group_id).values_list('group_user__user_id',
-                                                                                     flat=True)
+        target_user_ids = list(WorkGroupUser.objects.filter(id=work_group_id).values_list('group_user__user_id',
+                                                                                          flat=True))
 
     group_notification.create(sender_id=group_id,
-                              action=group_thread_notification.Action.create,
+                              action=group_notification.Action.create,
                               category="thread",
                               message=f'User "{group_user.user.username}" created thread "{title}"',
                               related_id=thread.id,

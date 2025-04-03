@@ -78,6 +78,7 @@ if not SECRET_KEY:
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env('DEBUG')
+TESTING = sys.argv[1:2] == ['test']
 
 
 FLOWBACK_URL = env('FLOWBACK_URL')
@@ -249,7 +250,7 @@ CHANNEL_LAYERS = {
 
 
 # OIDC Settings
-LOGIN_URL = '/accounts/login/'
+LOGIN_URL = '/login/'
 OIDC_USERINFO = 'backend.oidc_provider_settings.userinfo'
 # Database
 # https://docs.djangoproject.com/en/4.0/ref/settings/#databases

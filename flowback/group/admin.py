@@ -1,6 +1,6 @@
 from django.contrib import admin
 from .models import Group, GroupPermissions, GroupTags, GroupUser, GroupUserInvite, GroupUserDelegatePool, \
-    GroupUserDelegate, GroupUserDelegator, GroupFolder
+    GroupUserDelegate, GroupUserDelegator, GroupFolder, GroupThread
 
 
 @admin.register(GroupFolder)
@@ -80,3 +80,19 @@ class GroupUserDelegateAdmin(admin.ModelAdmin):
 @admin.register(GroupUserDelegator)
 class GroupUserDelegatorAdmin(admin.ModelAdmin):
     list_display = ('delegator', 'delegate_pool', 'group')
+
+
+@admin.register(GroupThread)
+class GroupThreadAdmin(admin.ModelAdmin):
+    list_display = ('title', 'created_by', 'pinned', 'active', 'work_group')  # Fields visible in the list view
+    list_filter = ('pinned', 'active', 'work_group')  # Filters for easy navigation
+    search_fields = ('title', 'description', 'created_by__user__username')  # Search functionality
+    ordering = ('-id',)  # Default ordering
+    fieldsets = (
+        (None, {
+            'fields': ('title', 'description', 'created_by', 'work_group', 'attachments')
+        }),
+        ('Additional Information', {
+            'fields': ('pinned', 'active', 'comment_section'),
+        }),
+    )

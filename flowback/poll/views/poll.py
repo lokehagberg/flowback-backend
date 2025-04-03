@@ -41,6 +41,7 @@ class PollListApi(APIView):
         has_attachments = serializers.BooleanField(required=False, allow_null=True, default=None)
         status = serializers.IntegerField(required=False)
         phase = serializers.CharField(required=False)
+        work_group_ids = serializers.CharField(required=False)
 
         # Blob of gt and lt filter fields
         start_date__gt = serializers.DateTimeField(required=False)
@@ -77,6 +78,7 @@ class PollListApi(APIView):
         total_comments = serializers.IntegerField()
         total_proposals = serializers.IntegerField()
         total_predictions = serializers.IntegerField()
+        work_group_id = serializers.IntegerField()
 
         proposal_end_date = serializers.DateTimeField(required=False)
         prediction_statement_end_date = serializers.DateTimeField(required=False)
@@ -123,6 +125,7 @@ class PollListApi(APIView):
                       'status',
                       'status_prediction',
                       'attachments',
+                      'work_group_id',
                       'phase')
 
     def get(self, request, group_id: int = None):
@@ -167,6 +170,7 @@ class PollCreateAPI(APIView):
         delegate_vote_end_date = serializers.DateTimeField(required=False)
         vote_end_date = serializers.DateTimeField(required=False)
         end_date = serializers.DateTimeField(required=False)
+        work_group_id = serializers.IntegerField(required=False)
 
         class Meta:
             model = Poll
@@ -188,6 +192,7 @@ class PollCreateAPI(APIView):
                       'pinned',
                       'dynamic',
                       'quorum',
+                      'work_group_id',
                       'attachments')
 
     def post(self, request, group_id: int):
@@ -322,6 +327,7 @@ class PollPhaseTemplateListAPI(APIView):
         poll_is_dynamic = serializers.BooleanField(required=False)
 
     class OutputSerializer(serializers.Serializer):
+        id = serializers.IntegerField()
         created_by_group_user = GroupUserSerializer()
         name = serializers.CharField(max_length=255)
         poll_type = serializers.IntegerField(max_value=4, min_value=1)

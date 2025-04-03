@@ -3,7 +3,7 @@ from typing import Union
 from django.core.mail import send_mass_mail
 from rest_framework.exceptions import ValidationError
 
-from backend.settings import env, DEFAULT_FROM_EMAIL
+from backend.settings import env, DEFAULT_FROM_EMAIL, FLOWBACK_ALLOW_GROUP_CREATION, FLOWBACK_DEFAULT_GROUP_JOIN
 from flowback.common.services import get_object, model_update
 from flowback.group.models import Group, GroupUser, GroupPermissions, GroupUserInvite, WorkGroupUser
 from flowback.group.selectors import group_user_permissions
@@ -17,6 +17,8 @@ group_notification = NotificationManager(sender_type='group',
                                                               'kanban_self_assign',
                                                               'kanban_priority_update',
                                                               'kanban_lane_update',
+
+                                                              'thread',
 
                                                               'poll',
                                                               'poll_schedule',
@@ -167,20 +169,32 @@ def group_leave(*, user: int, group: int) -> None:
                               category='members', message=f'User {user.user.username} left the group {user.group.name}')
 
 
-def group_user_update(*, user: int, group: int, fetched_by: int, data) -> GroupUser:
-    user_to_update = group_user_permissions(user=fetched_by, group=group)
-    non_side_effect_fields = []
-
+def group_user_update(*, fetched_by: User, group: int, target_user_id: int, data) -> GroupUser:
     # If user updates someone else (requires Admin)
-    if group_user_permissions(user=fetched_by, group=group, permissions=['admin'], raise_exception=False):
-        user_to_update = group_user_permissions(user=user, group=group)
-        non_side_effect_fields.extend(['permission_id', 'is_admin'])
+    group_user_permissions(user=fetched_by, group=group, permissions=['admin'])
+
+    non_side_effect_fields = ['permission_id', 'is_admin']
+    user_to_update = group_user_permissions(user=target_user_id, group=group)
 
     group_user, has_updated = model_update(instance=user_to_update,
                                            fields=non_side_effect_fields,
                                            data=data)
 
     return group_user
+
+
+def group_user_delete(*, user_id: int, group_id: int, target_user_id: int) -> None:
+    if not FLOWBACK_ALLOW_GROUP_CREATION and group_id in FLOWBACK_DEFAULT_GROUP_JOIN:
+        raise ValidationError("Can't delete a group user when group creation is disabled and group user is in "
+                              "default group join list")
+
+    group_user_permissions(user=user_id, group=group_id, permissions=['admin'])
+    group_user_to_delete = group_user_permissions(user=target_user_id, group=group_id)
+
+    if group_user_to_delete.is_admin:
+        raise ValidationError("Can't delete a group user with admin status")
+
+    group_user_to_delete.delete()
 
 
 def group_notification_subscribe(*, user_id: int, group: int, categories: list[str]):

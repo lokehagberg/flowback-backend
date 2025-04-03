@@ -251,7 +251,8 @@ def user_get_chat_channel(fetched_by: User, target_user_ids: int | list[int], pr
             raise ValidationError("MessageChannel does not exist between the participants")
 
         title = f"{', '.join([u.username for u in target_users])}"
-        channel = message_channel_create(origin_name=User.message_channel_origin,
+        channel = message_channel_create(origin_name=f"{User.message_channel_origin}"
+                                                     f"{'_group' if len(target_users) > 2 else ''}",
                                          title=title if len(target_users) > 1 else None)
 
         # In the future, make this a bulk_create statement

@@ -86,7 +86,6 @@ def work_group_user_add(*, user_id: int,
                                             is_moderator=is_moderator
                                             if work_group_user_is_moderator or group_user.is_admin
                                             else False)
-            work_group_user.full_clean()
             work_group_user.save()
 
             return work_group_user

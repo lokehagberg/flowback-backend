@@ -5,6 +5,7 @@ from django_filters import FilterSet
 from rest_framework.exceptions import ValidationError
 
 from flowback.comment.models import Comment
+from flowback.common.filters import NumberInFilter
 from flowback.common.services import get_object
 from flowback.group.models import Group, GroupUser, GroupThread
 from flowback.poll.models import Poll, PollPredictionStatement
@@ -40,15 +41,14 @@ def get_user(fetched_by: User, user_id: int = None):
     elif (user.public_status == User.PublicStatus.PUBLIC
           or (share_groups and user.public_status == User.PublicStatus.GROUP_ONLY)):
         return user_to_dict(user, ('id', 'username',
-                           'profile_image', 'banner_image',
-                           'public_status', 'chat_status',
-                           'bio', 'website', 'contact_email', 'contact_phone',
-                           'public_status'))
+                                   'profile_image', 'banner_image',
+                                   'public_status', 'chat_status',
+                                   'bio', 'website', 'contact_email', 'contact_phone',
+                                   'public_status'))
 
     else:
         return user_to_dict(user, ('id', 'username', 'profile_image',
                                    'banner_image', 'public_status', 'chat_status'))
-
 
 
 def user_schedule_event_list(*, fetched_by: User, filters=None):
@@ -81,6 +81,7 @@ class UserHomeFeedFilter(django_filters.FilterSet):
     description = django_filters.CharFilter(lookup_expr='icontains')
     related_model = django_filters.CharFilter(lookup_expr='exact')
     group_joined = django_filters.BooleanFilter(lookup_expr='exact')
+    group_ids = NumberInFilter(field_name='created_by__group_id')
 
 
 # TODO add relevant Count (proposal, prediction, comments) to the home feed if possible
@@ -91,27 +92,53 @@ def user_home_feed(*, fetched_by: User, filters=None):
                       'created_by',
                       'created_at',
                       'updated_at',
+                      'group_id',
                       'title',
                       'description',
                       'related_model',
                       'group_joined']
 
-    # Thread
+    q = (Q(created_by__group__groupuser__user__in=[fetched_by])
+         & Q(created_by__group__groupuser__active=True))  # User in group
 
-    q = (Q(created_by__group__groupuser__user__in=[fetched_by]) & Q(created_by__group__groupuser__active=True)
-         | Q(created_by__group__public=True) & ~Q(created_by__group__groupuser__user__in=[fetched_by])
-         | Q(created_by__group__public=True) & Q(created_by__group__groupuser__user__in=[fetched_by])
-         & Q(created_by__group__groupuser__active=False))
+    thread_qs = GroupThread.objects.filter(
+        q & Q(work_group__isnull=True)  # All threads without workgroup
 
-    thread_qs = GroupThread.objects.filter(q)
+        | q & Q(work_group__isnull=False)  # User in workgroup
+        & Q(work_group__workgroupuser__group_user__user=fetched_by)
+
+        | q & Q(work_group__isnull=False)  # User is admin in group
+        & Q(created_by__group__groupuser__user=fetched_by)
+        & ~Q(created_by__group__groupuser__user__in=[fetched_by])
+        & Q(created_by__group__groupuser__is_admin=True))
+
     thread_qs = thread_qs.annotate(related_model=models.Value('group_thread', models.CharField()),
+                                   group_id=F('created_by__group_id'),
                                    group_joined=Exists(joined_groups))
     thread_qs = thread_qs.values(*related_fields)
     thread_qs = UserHomeFeedFilter(filters, thread_qs).qs
 
     # Poll
-    poll_qs = Poll.objects.filter(q)
+    poll_qs = Poll.objects.filter(
+        q & Q(work_group__isnull=True)  # User in Group
+
+        | Q(created_by__group__public=True)
+        & ~Q(created_by__group__groupuser__user__in=[fetched_by])  # Group is Public
+        & Q(work_group__isnull=True)
+        
+        | q & Q(work_group__isnull=False)  # User in workgroup
+        & Q(work_group__workgroupuser__group_user__user=fetched_by)
+
+        | q & Q(created_by__group__public=True)
+        & Q(created_by__group__groupuser__user__in=[fetched_by])
+        & Q(created_by__group__groupuser__active=False)  # User in group but not active, and group is public
+    
+        | q & Q(work_group__isnull=False)  # User is admin in group
+        & Q(created_by__group__groupuser__user=fetched_by)
+        & ~Q(created_by__group__groupuser__user__in=[fetched_by])
+        & Q(created_by__group__groupuser__is_admin=True))
     poll_qs = poll_qs.annotate(related_model=models.Value('poll', models.CharField()),
+                               group_id=F('created_by__group_id'),
                                group_joined=Exists(joined_groups))
     poll_qs = poll_qs.values(*related_fields)
     poll_qs = UserHomeFeedFilter(filters, poll_qs).qs
@@ -126,7 +153,6 @@ class UserChatInviteFilter(django_filters.FilterSet):
     message_channel_id = django_filters.NumberFilter(field_name="message_channel_id", lookup_expr="exact")
     rejected = django_filters.BooleanFilter(field_name="rejected", lookup_expr="exact")
     rejected__isnull = django_filters.BooleanFilter(field_name="rejected", lookup_expr="isnull")
-
 
     class Meta:
         model = UserChatInvite
