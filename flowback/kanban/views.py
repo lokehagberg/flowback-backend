@@ -73,7 +73,6 @@ class KanbanEntryUpdateAPI(APIView):
         description = serializers.CharField(required=False, allow_null=True, allow_blank=True)
         end_date = serializers.DateTimeField(required=False)
         priority = serializers.ChoiceField(range(1, FLOWBACK_KANBAN_PRIORITY_LIMIT + 1),
-                                           default=math.floor(FLOWBACK_KANBAN_PRIORITY_LIMIT / 2),
                                            required=False)
         lane = serializers.ChoiceField(range(1, len(FLOWBACK_KANBAN_LANES) + 1), required=False)
 

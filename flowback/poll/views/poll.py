@@ -124,6 +124,7 @@ class PollListApi(APIView):
                       'quorum',
                       'status',
                       'status_prediction',
+                      'interval_mean_absolute_correctness',
                       'attachments',
                       'work_group_id',
                       'phase')

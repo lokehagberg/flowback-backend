@@ -20,7 +20,6 @@ from flowback.group.models import Group, GroupUser, GroupUserDelegatePool, Group
 from flowback.comment.models import CommentSection, comment_section_create_model_default
 import pgtrigger
 
-
 from flowback.schedule.models import Schedule, ScheduleEvent
 from flowback.schedule.services import create_schedule
 
@@ -51,6 +50,13 @@ class Poll(BaseModel):
     # Determines if poll is visible outside of group
     public = models.BooleanField(default=False)
     allow_fast_forward = models.BooleanField(default=False)
+    interval_mean_absolute_correctness = models.DecimalField(
+        max_digits=12,
+        decimal_places=9,
+        null=True,
+        blank=True,
+        help_text="Calculates after end date, will contain the current Interval Mean Absolute Correctness "
+                  "at the time of calculation.")
 
     # Poll Phases
     start_date = models.DateTimeField()  # Poll Start
@@ -340,7 +346,8 @@ class PollVotingTypeCardinal(BaseModel):
 
     def clean(self):
         if FLOWBACK_SCORE_VOTE_CEILING is not None and self.raw_score >= FLOWBACK_SCORE_VOTE_CEILING:
-            raise ValidationError(f'Voting scores exceeds ceiling bounds (currently set at {FLOWBACK_SCORE_VOTE_CEILING})')
+            raise ValidationError(
+                f'Voting scores exceeds ceiling bounds (currently set at {FLOWBACK_SCORE_VOTE_CEILING})')
 
         if FLOWBACK_SCORE_VOTE_FLOOR is not None and self.raw_score <= FLOWBACK_SCORE_VOTE_FLOOR:
             raise ValidationError(f'Voting scores exceeds floor bounds (currently set at {FLOWBACK_SCORE_VOTE_FLOOR})')

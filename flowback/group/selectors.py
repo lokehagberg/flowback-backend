@@ -273,7 +273,7 @@ def group_tags_list(*, group: int, fetched_by: User, filters=None):
     return BaseGroupTagsFilter(filters, qs).qs
 
 
-def group_tags_interval_mean_absolute_correctness(*, tag_id: int, fetched_by: User):
+def group_tags_interval_mean_absolute_correctness(*, tag_id: int, fetched_by: User = None):
     """
     For every combined_bet & outcome in a given tag:
         abs(sum(combined_bet) – sum(outcome))/N
@@ -282,7 +282,9 @@ def group_tags_interval_mean_absolute_correctness(*, tag_id: int, fetched_by: Us
     TODO add this value to the group_tags_list selector
     """
     tag = GroupTags.objects.get(id=tag_id)
-    group_user_permissions(user=fetched_by, group=tag.group)
+
+    if fetched_by:
+        group_user_permissions(user=fetched_by, group=tag.group)
 
     qs_filter = PollPredictionStatement.objects.filter(poll__tag_id=tag_id, pollpredictionstatementvote__isnull=False)
 

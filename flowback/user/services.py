@@ -300,7 +300,7 @@ def user_chat_invite(user_id: int, invite_id: int, accept: bool = True):
     invite.save()
 
 
-def user_chat_channel_update(*, user_id: int, channel_id: int, data: dict):
+def user_chat_channel_update(*, user_id: int, channel_id: int, **data: dict):
     if MessageChannelParticipant.objects.filter(channel_id=channel_id,
                                                 user_id=user_id,
                                                 active=True,
