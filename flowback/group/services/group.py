@@ -129,7 +129,7 @@ def group_join(*, user: int, group: int) -> Union[GroupUser, GroupUserInvite]:
     if not group.public:
         raise ValidationError('Permission denied')
 
-    get_object(GroupUser, 'User already joined', reverse=True, user=user, group=group)
+    get_object(GroupUser, 'User already joined', reverse=True, user=user, group=group, active=True)
     get_object(GroupUserInvite, 'User already requested invite', reverse=True, user=user, group=group)
 
     if not group.direct_join:

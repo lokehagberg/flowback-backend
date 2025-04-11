@@ -34,7 +34,7 @@ def group_schedule_event_create(*,
                               category='schedule_event_create',
                               message='A new schedule event has been created',
                               related_id=event.id,
-                              target_user_ids=list(target_user_ids))
+                              target_user_ids=list(target_user_ids) if target_user_ids else None)
 
     return event
 
@@ -58,7 +58,7 @@ def group_schedule_event_update(*,
                               category='schedule_event_update',
                               message='A schedule event has been updated',
                               related_id=event_id,
-                              target_user_ids=list(target_user_ids))
+                              target_user_ids=list(target_user_ids) if target_user_ids else None)
 
 
 def group_schedule_event_delete(*,
@@ -79,7 +79,7 @@ def group_schedule_event_delete(*,
                               category='schedule_event_delete',
                               message='A schedule event has been deleted',
                               related_id=event_id,
-                              target_user_ids=list(target_user_ids))
+                              target_user_ids=list(target_user_ids) if target_user_ids else None)
 
 
 def group_schedule_subscribe(*,

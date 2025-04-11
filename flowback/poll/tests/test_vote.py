@@ -8,8 +8,10 @@ from ..views.vote import (PollProposalDelegateVoteUpdateAPI,
                           PollProposalVoteUpdateAPI,
                           PollProposalVoteListAPI,
                           DelegatePollVoteListAPI)
+from ...common.tests import generate_request
 from ...files.tests.factories import FileSegmentFactory
-from ...group.tests.factories import GroupFactory, GroupUserFactory, GroupUserDelegateFactory, GroupTagsFactory
+from ...group.tests.factories import GroupFactory, GroupUserFactory, GroupUserDelegateFactory, GroupTagsFactory, \
+    GroupUserDelegatePoolFactory, GroupUserDelegatorFactory
 from ...user.models import User
 
 
@@ -17,7 +19,7 @@ class PollVoteTest(APITransactionTestCase):
     def setUp(self):
         self.group = GroupFactory()
         self.group_tag = GroupTagsFactory(group=self.group)
-        self.group_user_creator = GroupUserFactory(group=self.group, user=self.group.created_by)
+        self.group_user_creator = self.group.group_user_creator
         (self.group_user_one,
          self.group_user_two,
          self.group_user_three) = GroupUserFactory.create_batch(3, group=self.group)
@@ -36,13 +38,10 @@ class PollVoteTest(APITransactionTestCase):
                                                                    poll=self.poll_cardinal) for x in self.group_users]
 
     @staticmethod
-    def cardinal_vote_update(user: User, poll: Poll, proposals: list[PollProposal], scores: list[int]):
-        factory = APIRequestFactory()
-        view = PollProposalVoteUpdateAPI.as_view()
+    def cardinal_vote_update(user: User, poll: Poll, proposals: list[PollProposal], scores: list[int], delegate=False):
+        api = PollProposalVoteUpdateAPI if not delegate else PollProposalDelegateVoteUpdateAPI
         data = dict(proposals=[x.id for x in proposals], scores=scores)
-        request = factory.post('', data=data)
-        force_authenticate(request, user)
-        return view(request, poll=poll.id)
+        return generate_request(api=api, data=data, user=user, url_params=dict(poll=poll.id))
 
     def test_vote_update_cardinal(self):
         user = self.group_user_one.user
@@ -98,22 +97,40 @@ class PollVoteTest(APITransactionTestCase):
         response = self.cardinal_vote_update(user, self.poll_cardinal, proposals, scores)
         self.assertEqual(response.status_code, 200, response.data)
 
+        # two delegators under group_user_three
+        delegate = GroupUserDelegateFactory(group=self.group, group_user=self.group_user_three)
+        delegators = GroupUserDelegatorFactory.create_batch(2,
+                                                            group=self.group,
+                                                            delegate_pool=delegate.pool)
+
+        [delegator.tags.add(self.poll_cardinal.tag) for delegator in delegators]
+        self.assertTrue(all([delegator.tags.filter(id=self.poll_cardinal.tag.id).exists() for delegator in delegators]))
+
         user = self.group_user_three.user
         proposals = [self.poll_cardinal_proposal_three, self.poll_cardinal_proposal_two]
         scores = [14, 86]
+
+        # User 3
         response = self.cardinal_vote_update(user, self.poll_cardinal, proposals, scores)
+        self.assertEqual(response.status_code, 200, response.data)
+
+        Poll.objects.filter(id=self.poll_cardinal.id).update(**generate_poll_phase_kwargs('delegate_vote'))
+
+        # Delegate User 3
+        response = self.cardinal_vote_update(user, self.poll_cardinal, proposals, scores, delegate=True)
         self.assertEqual(response.status_code, 200, response.data)
 
         Poll.objects.filter(id=self.poll_cardinal.id).update(**generate_poll_phase_kwargs('result'))
         poll_proposal_vote_count(poll_id=self.poll_cardinal.id)
+        self.assertNotEqual(Poll.objects.get(id=self.poll_cardinal.id).status, -1)
 
         self.poll_cardinal_proposal_one.refresh_from_db()
         self.poll_cardinal_proposal_two.refresh_from_db()
         self.poll_cardinal_proposal_three.refresh_from_db()
 
         self.assertEqual(self.poll_cardinal_proposal_one.score, 980)
-        self.assertEqual(self.poll_cardinal_proposal_two.score, 164)
-        self.assertEqual(self.poll_cardinal_proposal_three.score, 59)
+        self.assertEqual(self.poll_cardinal_proposal_two.score, 336)
+        self.assertEqual(self.poll_cardinal_proposal_three.score, 87)
 
     @staticmethod
     def schedule_vote_update(user: User, poll: Poll, proposals: list[PollProposal]):
@@ -193,8 +210,8 @@ class PollVoteTest(APITransactionTestCase):
         self.assertEqual(self.poll_schedule_proposal_three.score, 3)
 
         event = self.poll_schedule.created_by.group.schedule.scheduleevent_set.get(
-                    origin_name=self.poll_schedule.schedule_origin,
-                    origin_id=self.poll_schedule.id)
+            origin_name=self.poll_schedule.schedule_origin,
+            origin_id=self.poll_schedule.id)
 
         self.assertEqual(event.start_date, self.poll_schedule_proposal_three.pollproposaltypeschedule.event.start_date)
         self.assertEqual(event.end_date, self.poll_schedule_proposal_three.pollproposaltypeschedule.event.end_date)

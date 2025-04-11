@@ -11,7 +11,8 @@ from flowback.user.views.user import (UserCreateApi,
                                       UserDeleteAPI,
                                       UserForgotPasswordApi,
                                       UserForgotPasswordVerifyApi, UserGetChatChannelAPI, UserChatInviteListAPI,
-                                      UserChatInviteAPI)
+                                      UserChatInviteAPI, UserLogoutAPI, UserLeaveChatChannelAPI,
+                                      UserChatChannelUpdateAPI)
 from flowback.user.views.schedule import (UserScheduleEventListAPI,
                                           UserScheduleEventCreateAPI,
                                           UserScheduleEventUpdateAPI,
@@ -24,6 +25,7 @@ from flowback.user.views.home import UserHomeFeedAPI
 
 user_patterns = [
     path('login', views.obtain_auth_token, name='login'),
+    path('logout', UserLogoutAPI.as_view(), name='logout'),
     path('forgot_password', UserForgotPasswordApi.as_view(), name='forgot_password'),
     path('forgot_password/verify', UserForgotPasswordVerifyApi.as_view(), name='forgot_password_verify'),
     path('users', UserListApi.as_view(), name='users'),
@@ -45,8 +47,10 @@ user_patterns = [
 
     path('user/home', UserHomeFeedAPI.as_view(), name='user_home_feed'),
     path('user/chat', UserGetChatChannelAPI.as_view(), name='user_get_chat_channel'),
+    path('user/chat/leave', UserLeaveChatChannelAPI.as_view(), name='user_leave_chat_channel'),
     path('user/chat/invite/list', UserChatInviteListAPI.as_view(), name='user_chat_invite_list'),
     path('user/chat/invite', UserChatInviteAPI.as_view(), name='user_chat_invite'),
+    path('user/chat/update', UserChatChannelUpdateAPI.as_view(), name='user_chat_channel_update'),
     path('report/create', ReportCreateAPI.as_view(), name='report_create'),
 ]
 

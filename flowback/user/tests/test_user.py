@@ -156,7 +156,7 @@ class UserTest(APITransactionTestCase):
         group_private_workgroup = group_user_private_workgroupuser.work_group
         group_user_private_admin = GroupUser.objects.get(user=group_private.created_by)
         group_user_private = GroupUserFactory(group=group_private)
-        private_threads = GroupThreadFactory.create_batch(size=5, created_by=group_user_private)
+        private_threads = GroupThreadFactory.create_batch(size=5, created_by=group_user_private, pinned=True)
         private_polls = PollFactory.create_batch(size=5, created_by=group_user_private)
         private_threads_workgroup = GroupThreadFactory.create_batch(size=5,
                                                                     created_by=group_user_private,
@@ -165,7 +165,11 @@ class UserTest(APITransactionTestCase):
         # Public testing
 
         ## User
-        response = generate_request(api=UserHomeFeedAPI, user=group_user_private.user)
+        response = generate_request(api=UserHomeFeedAPI, user=group_user_private.user, data=dict(order_by='pinned,created_at_asc'))
+        self.assertTrue(any([i['pinned'] for i in response.data['results']]),
+                        [i['pinned'] for i in response.data['results']])  # Placeholder test for pinned
+        self.assertTrue(all([i['pinned'] for i in response.data['results'][:4]]),
+                        [i['pinned'] for i in response.data['results'][:4]])  # Placeholder test for order_by
         self.assertEqual(response.status_code, 200, response.data)
         self.assertEqual(response.data['count'], 15)
 

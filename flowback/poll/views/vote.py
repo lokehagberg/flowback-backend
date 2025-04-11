@@ -81,10 +81,12 @@ class PollProposalVoteListAPI(APIView):
 # TODO need fixes
 class DelegatePollVoteListAPI(APIView):
     class Pagination(LimitOffsetPagination):
-        max_limit = 20
-        default_limit = 10
+        max_limit = 100
+        default_limit = 25
 
     class InputSerializer(serializers.Serializer):
+        group_id = serializers.IntegerField()
+        delegate_pool_id = serializers.IntegerField(required=False)
         poll_id = serializers.IntegerField(required=False)
 
     class OutputSerializer(serializers.Serializer):
@@ -155,12 +157,11 @@ class DelegatePollVoteListAPI(APIView):
             else:
                 return None
 
-    def get(self, request, delegate_pool_id: int):
+    def get(self, request):
         serializer = self.InputSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
         votes = delegate_poll_vote_list(fetched_by=request.user,
-                                        delegate_pool_id=delegate_pool_id,
-                                        filters=serializer.validated_data)
+                                        **serializer.validated_data)
 
         return get_paginated_response(
             pagination_class=self.Pagination,

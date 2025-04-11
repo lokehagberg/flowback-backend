@@ -28,6 +28,7 @@ class UserHomeFeedAPI(APIView):
         created_at = serializers.DateTimeField()
         updated_at = serializers.DateTimeField()
         group_id = serializers.IntegerField()
+        pinned = serializers.BooleanField()
         id = serializers.IntegerField()
         title = serializers.CharField()
         description = serializers.CharField(allow_null=True, default=None)

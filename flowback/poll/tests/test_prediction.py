@@ -293,6 +293,12 @@ class PollPredictionStatementTest(APITransactionTestCase):
                                                vote=bet_user.vote)
 
     def test_poll_prediction_combined_bet(self):
+        # TODO in future add feature to inject sample values for combined_bets e.g.
+        # current_bets = [[0.2, 1.0, 1.0, 0.4, 0.6, 0.8, 0.6, 0.8, 0.6, 0.6, 0.6, 0.2, 0.2, 0.6, 0.2, 1.0]]
+        # previous_outcomes = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
+        # previous_bets = [[0.2, 0.2, 1.0, 0.6, 0.8, 0.2, 0.2, 1.0, 0.8, 0.6, 0.2, 0.2, 1.0, 0.8, 0.8, 1.0, 1.0, 0.8, 0.2, 0.8, 0.6, 1.0, 0.8, 0.6, 0.8, 0.8, 0.8, 1.0, 0.2, 0.6, 0.2, 0.8, 0.6, 0.6, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.2]]
+        # poll_statements = [217, 216, 215, 214, 212, 211, 213, 210, 209, 207, 208, 206, 205, 204, 203, 202]
+
         # Make random previous bets
         poll_one_bets = [self.BetUser(group_user=self.user_prediction_caster_one,
                                       score=0,
@@ -385,7 +391,7 @@ class PollPredictionStatementTest(APITransactionTestCase):
             p1=Abs(F('combined_bet') - F('outcome')))
 
         pprint([i.__dict__ for i in qs_outcome])
-        print(qs_outcome.aggregate(interval_mean_absolute_error=(Sum('p1') / Sum('has_bets'))))
+        print(f"Interval Mean Absolute Error: {qs_outcome.aggregate(interval_mean_absolute_error=(Sum('p1') / Sum('has_bets')))}")
 
         # Request Test
         factory = APIRequestFactory()

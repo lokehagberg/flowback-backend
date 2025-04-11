@@ -62,6 +62,14 @@ class Group(BaseModel):
         constraints = [models.CheckConstraint(check=~Q(Q(public=False) & Q(direct_join=True)),
                                               name='group_not_public_and_direct_join_check')]
 
+    @property
+    def group_user_creator(self):
+        try:
+            return GroupUser.objects.get(group=self, user=self.created_by, active=True)
+
+        except GroupUser.DoesNotExist:
+            raise ValidationError("Group creator has left the group..?")
+
     @classmethod
     def pre_save(cls, instance, raw, using, update_fields, *args, **kwargs):
         if instance.pk is None:

@@ -59,7 +59,7 @@ group_patterns = [
     path('<int:group>/subscribe', GroupNotificationSubscribeApi.as_view()),
     path('<int:group>/mail', GroupMailApi.as_view(), name='group_mail'),
 
-    path('<int:group>/users', GroupUserListApi.as_view(), name='group_users'),
+    path('<int:group_id>/users', GroupUserListApi.as_view(), name='group_users'),
     path('<int:group>/user/update', GroupUserUpdateApi.as_view(), name='group_user_update'),
     path('<int:group_id>/user/delete', GroupUserDeleteAPI.as_view(), name='group_user_delete'),
     path('<int:group>/join', GroupJoinApi.as_view(), name='group_join'),

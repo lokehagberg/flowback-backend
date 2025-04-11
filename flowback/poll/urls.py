@@ -36,7 +36,7 @@ group_poll_patterns = [
 ]
 
 poll_patterns = [
-    path('pool/<int:delegate_pool_id>/votes', DelegatePollVoteListAPI.as_view(), name='delegate_votes'),
+    path('pool/votes', DelegatePollVoteListAPI.as_view(), name='delegate_votes'),
     path('<int:poll>/subscribe', PollNotificationSubscribeApi.as_view(), name='poll_subscribe'),
     path('<int:poll>/update', PollUpdateAPI.as_view(), name='poll_update'),
     path('<int:poll_id>/fast_forward', PollFastForwardAPI.as_view(), name='poll_fast_forward'),

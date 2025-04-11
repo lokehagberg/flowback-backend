@@ -41,16 +41,17 @@ class BasePollVoteForAgainstFilter(django_filters.FilterSet):
 
 
 class BasePollDelegateVotingFilter(django_filters.FilterSet):
+    delegate_pool_id = django_filters.NumberFilter(field_name='created_by_id')
+
     class Meta:
         model = PollDelegateVoting
-        fields = dict(created_by=['exact'])
+        fields = dict(poll_id=['exact'])
 
 
-def delegate_poll_vote_list(*, fetched_by: User, delegate_pool_id: int, filters=None):
+def delegate_poll_vote_list(*, fetched_by: User, group_id: int, **filters):
     filters = filters or {}
-    delegate_pool = get_object(GroupUserDelegatePool, id=delegate_pool_id)
-    group_user_permissions(user=fetched_by, group=delegate_pool.group.id)
-    qs = PollDelegateVoting.objects.filter(poll__created_by__group=delegate_pool.group).order_by('poll__created_at')
+    group_user_permissions(user=fetched_by, group=group_id)
+    qs = PollDelegateVoting.objects.filter(poll__created_by__group_id=group_id)
     return BaseDelegatePollVoteFilter(filters, qs).qs
 
 

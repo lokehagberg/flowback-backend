@@ -75,6 +75,9 @@ def user_list(*, fetched_by: User, filters=None):
 
 
 class UserHomeFeedFilter(django_filters.FilterSet):
+    order_by = django_filters.OrderingFilter(fields=(('created_at', 'created_at_asc'),
+                                                     ('-created_at', 'created_at_desc'),
+                                                     ('-pinned', 'pinned')))
     id = django_filters.NumberFilter(lookup_expr='exact')
     created_by_id = django_filters.NumberFilter(lookup_expr='exact')
     title = django_filters.CharFilter(lookup_expr='icontains')
@@ -87,6 +90,11 @@ class UserHomeFeedFilter(django_filters.FilterSet):
 # TODO add relevant Count (proposal, prediction, comments) to the home feed if possible
 def user_home_feed(*, fetched_by: User, filters=None):
     filters = filters or {}
+    ordering_filter = {}
+
+    if 'order_by' in filters.keys():
+        ordering_filter['order_by'] = filters.pop('order_by')
+
     joined_groups = Group.objects.filter(id=OuterRef('created_by__group_id'), groupuser__user__in=[fetched_by])
     related_fields = ['id',
                       'created_by',
@@ -96,7 +104,8 @@ def user_home_feed(*, fetched_by: User, filters=None):
                       'title',
                       'description',
                       'related_model',
-                      'group_joined']
+                      'group_joined',
+                      'pinned']
 
     q = (Q(created_by__group__groupuser__user__in=[fetched_by])
          & Q(created_by__group__groupuser__active=True))  # User in group
@@ -109,7 +118,6 @@ def user_home_feed(*, fetched_by: User, filters=None):
 
         | q & Q(work_group__isnull=False)  # User is admin in group
         & Q(created_by__group__groupuser__user=fetched_by)
-        & ~Q(created_by__group__groupuser__user__in=[fetched_by])
         & Q(created_by__group__groupuser__is_admin=True))
 
     thread_qs = thread_qs.annotate(related_model=models.Value('group_thread', models.CharField()),
@@ -117,6 +125,7 @@ def user_home_feed(*, fetched_by: User, filters=None):
                                    group_joined=Exists(joined_groups))
     thread_qs = thread_qs.values(*related_fields)
     thread_qs = UserHomeFeedFilter(filters, thread_qs).qs
+
 
     # Poll
     poll_qs = Poll.objects.filter(
@@ -144,6 +153,7 @@ def user_home_feed(*, fetched_by: User, filters=None):
     poll_qs = UserHomeFeedFilter(filters, poll_qs).qs
 
     qs = thread_qs.union(poll_qs).order_by('-created_at')
+    qs = UserHomeFeedFilter(ordering_filter, qs).qs
 
     return qs
 

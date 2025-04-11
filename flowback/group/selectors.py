@@ -52,10 +52,10 @@ def group_user_permissions(*,
 
     # Setup initial values for the function
     if isinstance(user, int):
-        user = get_object(User, id=user)
+        user = User.objects.get(id=user, is_active=True)
 
     if isinstance(group, int):
-        group = get_object(Group, id=group)
+        group = Group.objects.get(id=group, active=True)
 
     if isinstance(permissions, str):
         permissions = [permissions]
@@ -64,10 +64,14 @@ def group_user_permissions(*,
         work_group = WorkGroup.objects.get(id=work_group)
 
     if isinstance(group_user, int):
-        group_user = GroupUser.objects.get(id=group_user)
+        group_user = GroupUser.objects.get(id=group_user, active=True)
+
+    if group_user:
+        if not group_user.active:
+            raise ValidationError('Group user is not active')
 
     if user and group:
-        group_user = GroupUser.objects.get(user=user, group=group)
+        group_user = GroupUser.objects.get(user=user, group=group, active=True)
 
     elif user and work_group:
         group_user = GroupUser.objects.get(group=work_group.group, user=user, active=True)
@@ -136,9 +140,18 @@ class BaseGroupFilter(django_filters.FilterSet):
 
 def group_list(*, fetched_by: User, filters=None):
     filters = filters or {}
-    joined_groups = Group.objects.filter(id=OuterRef('pk'), groupuser__user__in=[fetched_by])
+    joined_groups = Group.objects.filter(id=OuterRef('pk'), groupuser__user__in=[fetched_by], groupuser__active=True)
+    pending_join = Group.objects.filter(id=OuterRef('pk'),
+                                        groupuserinvite__user__in=[fetched_by],
+                                        groupuserinvite__external=True)
+    pending_invite = Group.objects.filter(id=OuterRef('pk'),
+                                          groupuserinvite__user__in=[fetched_by],
+                                          groupuserinvite__external=False)
+
     qs = _group_get_visible_for(user=fetched_by
                                 ).annotate(joined=Exists(joined_groups),
+                                           pending_invite=Exists(pending_invite),
+                                           pending_join=Exists(pending_join),
                                            member_count=Count('groupuser')
                                            ).order_by('created_at').all()
     qs = BaseGroupFilter(filters, qs).qs
@@ -173,7 +186,8 @@ def group_schedule_event_list(*, fetched_by: User, group_id: int, filters=None):
 
 class BaseGroupUserFilter(django_filters.FilterSet):
     username__icontains = django_filters.CharFilter(field_name='user__username', lookup_expr='icontains')
-    delegate = django_filters.BooleanFilter(field_name='delegate')
+    delegate_pool_id = django_filters.NumberFilter(),
+    is_delegate = django_filters.BooleanFilter(field_name='delegate_pool_id', lookup_expr='isnull', exclude=True)
 
     class Meta:
         model = GroupUser
@@ -183,13 +197,10 @@ class BaseGroupUserFilter(django_filters.FilterSet):
                       permission=['in'])
 
 
-def group_user_list(*, group: int, fetched_by: User, filters=None):
-    group_user_permissions(user=fetched_by, group=group)
+def group_user_list(*, group_id: int, fetched_by: User, filters=None):
+    group_user_permissions(user=fetched_by, group=group_id)
     filters = filters or {}
-    is_delegate = GroupUser.objects.filter(group_id=group, groupuserdelegate__group_user=OuterRef('pk'),
-                                           groupuserdelegate__group=OuterRef('group')
-                                           )
-    qs = GroupUser.objects.filter(group_id=group,
+    qs = GroupUser.objects.filter(group_id=group_id,
                                   active=True,
                                   ).annotate(delegate_pool_id=F('groupuserdelegate__pool_id'),
                                              work_groups=ArrayAgg('workgroupuser__work_group__name')).all()

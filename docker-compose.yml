@@ -52,6 +52,8 @@ services:
     depends_on:
       - flowback-backend
       - flowback-redis
+    volumes:
+      - .:/app # For persisting periodic task metadata
     environment:
       FLOWBACK_PSQL_NAME: ${POSTGRES_DB:-flowback}
       FLOWBACK_PSQL_USER: ${POSTGRES_USER:-flowback}

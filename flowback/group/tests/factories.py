@@ -122,7 +122,6 @@ class GroupUserDelegatorFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = GroupUserDelegator
 
-    delegator = factory.SubFactory(GroupUserFactory)
-    delegate_pool = factory.SubFactory(GroupUserDelegatePoolFactory)
     group = factory.SubFactory(GroupFactory)
-    tags = factory.SubFactory(GroupTagsFactory)
+    delegator = factory.SubFactory(GroupUserFactory, group=factory.SelfAttribute('..group'))
+    delegate_pool = factory.SubFactory(GroupUserDelegatePoolFactory, group=factory.SelfAttribute('..group'))

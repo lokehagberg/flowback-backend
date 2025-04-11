@@ -22,7 +22,7 @@ class GroupUserListApi(APIView):
         id = serializers.IntegerField(required=False, source='group_user_id')
         user_id = serializers.IntegerField(required=False)
         username__icontains = serializers.CharField(required=False)
-        delegate = serializers.BooleanField(required=False, default=None, allow_null=True)
+        is_delegate = serializers.BooleanField(required=False, default=None, allow_null=True)
         is_admin = serializers.BooleanField(required=False, default=None, allow_null=True)
         permission = serializers.IntegerField(required=False)
 
@@ -30,11 +30,11 @@ class GroupUserListApi(APIView):
         delegate_pool_id = serializers.IntegerField(allow_null=True)
         work_groups = serializers.ListField(allow_null=True, child=serializers.CharField())
 
-    def get(self, request, group: int):
+    def get(self, request, group_id: int):
         filter_serializer = self.FilterSerializer(data=request.query_params)
         filter_serializer.is_valid(raise_exception=True)
 
-        users = group_user_list(group=group,
+        users = group_user_list(group_id=group_id,
                                 fetched_by=request.user,
                                 filters=filter_serializer.validated_data)
 

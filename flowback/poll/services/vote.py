@@ -137,7 +137,7 @@ def poll_proposal_delegate_vote_update(*, user_id: int, poll_id: int, data) -> N
         pool_vote, created = PollDelegateVoting.objects.get_or_create(created_by=delegate_pool, poll=poll)
         poll_vote_cardinal = [PollVotingTypeCardinal(author_delegate=pool_vote,
                                                      proposal_id=data['proposals'][i],
-                                                     score=data['scores'][i])
+                                                     raw_score=data['scores'][i])
                               for i in range(len(data['proposals']))]
 
         PollVotingTypeCardinal.objects.filter(author_delegate=pool_vote).delete()

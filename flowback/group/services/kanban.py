@@ -66,11 +66,11 @@ def group_kanban_entry_update(*,
                                   target_user_ids=data['assignee_id'])
 
     for check in ['lane', 'priority']:
-        if check in data.keys() and data[check] is not None:  # Notify status update
+        if check in data.keys() and data[check] is not None and kanban.assignee:  # Notify status update
             group_notification.create(sender_id=group_id, related_id=entry_id,
                                       action=group_notification.Action.update, category=f'kanban_{check}_update',
                                       message=f'Status for {check} "{kanban.title}" has been updated',
-                                      target_user_ids=data['assignee_id'])
+                                      target_user_ids=kanban.assignee)
 
     return kanban
 

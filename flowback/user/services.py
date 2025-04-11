@@ -12,7 +12,7 @@ from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
 from backend.settings import DEFAULT_FROM_EMAIL, FLOWBACK_URL, EMAIL_HOST
-from flowback.chat.models import MessageChannel
+from flowback.chat.models import MessageChannel, MessageChannelParticipant
 from flowback.chat.services import message_channel_create, message_channel_join
 from flowback.common.services import model_update, get_object
 from flowback.kanban.services import KanbanManager
@@ -280,6 +280,15 @@ def user_get_chat_channel(fetched_by: User, target_user_ids: int | list[int], pr
     return channel
 
 
+def user_chat_channel_leave(*, user_id: int, channel_id: int):
+    participant = MessageChannelParticipant.objects.get(channel_id=channel_id, user_id=user_id)
+
+    if not participant.channel.origin_name == f'{User.message_channel_origin}_group':
+        raise ValidationError("You can only leave user_group channels")
+
+    participant.channel.delete()
+
+
 def user_chat_invite(user_id: int, invite_id: int, accept: bool = True):
     user = User.objects.get(id=user_id)
     invite = UserChatInvite.objects.get(id=invite_id, rejected=None)
@@ -289,6 +298,20 @@ def user_chat_invite(user_id: int, invite_id: int, accept: bool = True):
 
     invite.rejected = not accept
     invite.save()
+
+
+def user_chat_channel_update(*, user_id: int, channel_id: int, data: dict):
+    if MessageChannelParticipant.objects.filter(channel_id=channel_id,
+                                                user_id=user_id,
+                                                active=True,
+                                                channel__origin_name__in=[User.message_channel_origin,
+                                                                          f'{User.message_channel_origin}_group']
+                                                ).exists():
+        channel, has_updated = model_update(instance=MessageChannel.objects.get(id=channel_id),
+                                            fields=['title'],
+                                            data=data)
+
+        return channel
 
 
 def report_create(*, user_id: int, title: str, description: str):
