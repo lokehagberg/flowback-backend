@@ -15,7 +15,7 @@ import sys
 import environ
 from pathlib import Path
 
-env = environ.Env(DEBUG=(bool, False),
+env = environ.Env(DEBUG=(bool, True),
                   LOGGING=(str, 'NONE'),
                   SECURE_PROXY_SSL_HEADERS=(bool, False),
                   DJANGO_SECRET=str,
