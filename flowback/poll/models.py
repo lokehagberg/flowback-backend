@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
 from django.db.models import Q, F, Count
@@ -14,7 +16,7 @@ from flowback.prediction.models import (PredictionBet,
                                         PredictionStatementSegment,
                                         PredictionStatementVote)
 from flowback.common.models import BaseModel
-from flowback.group.models import Group, GroupUser, GroupUserDelegatePool, GroupTags
+from flowback.group.models import Group, GroupUser, GroupUserDelegatePool, GroupTags, WorkGroup
 from flowback.comment.models import CommentSection, comment_section_create_model_default
 import pgtrigger
 
@@ -48,6 +50,13 @@ class Poll(BaseModel):
     # Determines if poll is visible outside of group
     public = models.BooleanField(default=False)
     allow_fast_forward = models.BooleanField(default=False)
+    interval_mean_absolute_correctness = models.DecimalField(
+        max_digits=12,
+        decimal_places=9,
+        null=True,
+        blank=True,
+        help_text="Calculates after end date, will contain the current Interval Mean Absolute Correctness "
+                  "at the time of calculation.")
 
     # Poll Phases
     start_date = models.DateTimeField()  # Poll Start
@@ -60,6 +69,7 @@ class Poll(BaseModel):
     end_date = models.DateTimeField()  # Result Phase, Prediction Vote afterward indefinitely
 
     blockchain_id = models.PositiveIntegerField(null=True, blank=True, default=None)
+    work_group = models.ForeignKey(WorkGroup, on_delete=models.CASCADE, null=True, blank=True)
 
     """
     Poll Status Code
@@ -68,6 +78,14 @@ class Poll(BaseModel):
     -1 - Failed Quorum
     """
     status = models.IntegerField(default=0)
+
+    """
+    Prediction Status Code
+    0 - Idle
+    1 - Finished
+    2 - Calculating Combined Bets
+    """
+    status_prediction = models.IntegerField(default=0)
     result = models.BooleanField(default=False)
 
     # Comment section
@@ -180,7 +198,7 @@ class Poll(BaseModel):
 
         return 'waiting'
 
-    def get_phase_start_date(self, phase: str, field_name=False) -> str:
+    def get_phase(self, phase: str, field_name=False) -> datetime | str:
         time_table = self.time_table
 
         for x in reversed(range(len(time_table))):
@@ -262,7 +280,8 @@ class PollProposalTypeSchedule(BaseModel):
 
     def clean(self):
         if PollProposalTypeSchedule.objects.filter(event__start_date=self.event.start_date,
-                                                   event__end_date=self.event.end_date).exists():
+                                                   event__end_date=self.event.end_date,
+                                                   proposal__poll=self.proposal.poll).exists():
             raise ValidationError('Proposal event with same start_date and end_date already exists')
 
     class Meta:
@@ -327,7 +346,8 @@ class PollVotingTypeCardinal(BaseModel):
 
     def clean(self):
         if FLOWBACK_SCORE_VOTE_CEILING is not None and self.raw_score >= FLOWBACK_SCORE_VOTE_CEILING:
-            raise ValidationError(f'Voting scores exceeds ceiling bounds (currently set at {FLOWBACK_SCORE_VOTE_CEILING})')
+            raise ValidationError(
+                f'Voting scores exceeds ceiling bounds (currently set at {FLOWBACK_SCORE_VOTE_CEILING})')
 
         if FLOWBACK_SCORE_VOTE_FLOOR is not None and self.raw_score <= FLOWBACK_SCORE_VOTE_FLOOR:
             raise ValidationError(f'Voting scores exceeds floor bounds (currently set at {FLOWBACK_SCORE_VOTE_FLOOR})')

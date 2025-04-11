@@ -1,8 +1,10 @@
-from django.shortcuts import render
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework import serializers, status
 from rest_framework.views import APIView
+
+from flowback.common.pagination import get_paginated_response, LimitOffsetPagination
+from flowback.server.selectors import reports_list
 from flowback.server.services import get_public_config
 
 
@@ -24,7 +26,23 @@ class ServerConfigListAPI(APIView):
                                                             help_text="Default groups id's that users join")
         FLOWBACK_DISABLE_DEFAULT_USER_REGISTRATION = serializers.BooleanField(
             help_text="If users can register or not")
+        GIT_HASH = serializers.CharField(help_text="The latest commit hash associated with this repository")
 
     def get(self, request):
         serializer = self.OutputSerializer(get_public_config())
-        return Response(status=status, data=serializer.data)
+        return Response(status=status.HTTP_200_OK, data=serializer.data)
+
+
+class ServerReportListAPI(APIView):
+    class OutputSerializer(serializers.Serializer):
+        title = serializers.CharField()
+        description = serializers.CharField()
+
+    def get(self, request):
+        reports = reports_list(fetched_by=request.user)
+
+        return get_paginated_response(pagination_class=LimitOffsetPagination,
+                                      serializer_class=self.OutputSerializer,
+                                      queryset=reports,
+                                      request=request,
+                                      view=self)

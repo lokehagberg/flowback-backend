@@ -14,7 +14,7 @@ Faker==19.2.0
 channels==4.0.0
 channels-redis==4.0.0
 daphne==4.0.0
-celery==5.3.6
+celery[redis]==5.3.6
 django-celery-beat==2.5.0
 drf-spectacular==0.26.4
 pyyaml==6.0.1
@@ -30,3 +30,4 @@ django-oidc-provider~=0.8.2
 django-phonenumber-field[phonenumbers]==8.0.0
 phonenumbers==8.13.47
 sphinx-rtd-theme==3.0.1 # For ReadTheDocs
+# GitPython==3.1.44

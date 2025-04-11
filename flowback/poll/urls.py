@@ -19,7 +19,6 @@ from .views.prediction import (PollPredictionStatementListAPI,
                                PollPredictionBetListAPI,
                                PollPredictionStatementCreateAPI,
                                PollPredictionStatementDeleteAPI,
-                               PollPredictionBetCreateAPI,
                                PollPredictionBetUpdateAPI,
                                PollPredictionBetDeleteAPI,
                                PollPredictionStatementVoteCreateAPI,
@@ -37,7 +36,7 @@ group_poll_patterns = [
 ]
 
 poll_patterns = [
-    path('pool/<int:delegate_pool_id>/votes', DelegatePollVoteListAPI.as_view(), name='delegate_votes'),
+    path('pool/votes', DelegatePollVoteListAPI.as_view(), name='delegate_votes'),
     path('<int:poll>/subscribe', PollNotificationSubscribeApi.as_view(), name='poll_subscribe'),
     path('<int:poll>/update', PollUpdateAPI.as_view(), name='poll_update'),
     path('<int:poll_id>/fast_forward', PollFastForwardAPI.as_view(), name='poll_fast_forward'),
@@ -67,8 +66,6 @@ poll_patterns = [
     path('prediction/<int:prediction_statement_id>/statement/delete', PollPredictionStatementDeleteAPI.as_view(),
          name='poll_prediction_statement_delete'),
 
-    path('prediction/<int:prediction_statement_id>/bet/create', PollPredictionBetCreateAPI.as_view(),
-         name='poll_prediction_bet_create'),
     path('prediction/<int:prediction_statement_id>/bet/update', PollPredictionBetUpdateAPI.as_view(),
          name='poll_prediction_bet_update'),
     path('prediction/<int:prediction_statement_id>/bet/delete', PollPredictionBetDeleteAPI.as_view(),

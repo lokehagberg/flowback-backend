@@ -1,5 +1,9 @@
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
 from django.db import models
+from django.db.models.signals import post_delete, post_save
 
+from backend.settings import TESTING
 from flowback.common.models import BaseModel
 from flowback.files.models import FileCollection
 
@@ -24,6 +28,7 @@ class MessageChannelParticipant(BaseModel):
     timestamp = models.DateTimeField(auto_now=True)
     active = models.BooleanField(default=True)
 
+
     class Meta:
         unique_together = ('user', 'channel')
 
@@ -42,6 +47,7 @@ class MessageFileCollection(BaseModel):
 class Message(BaseModel):
     user = models.ForeignKey('user.User', on_delete=models.CASCADE)
     channel = models.ForeignKey(MessageChannel, on_delete=models.CASCADE)
+    type = models.CharField(max_length=255, default='message')
     topic = models.ForeignKey(MessageChannelTopic, on_delete=models.CASCADE, null=True, blank=True)
     message = models.TextField(max_length=2000)
     attachments = models.ForeignKey(MessageFileCollection,

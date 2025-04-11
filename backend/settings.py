@@ -15,7 +15,6 @@ import sys
 import environ
 from pathlib import Path
 
-
 env = environ.Env(DEBUG=(bool, False),
                   LOGGING=(str, 'NONE'),
                   SECURE_PROXY_SSL_HEADERS=(bool, False),
@@ -24,9 +23,13 @@ env = environ.Env(DEBUG=(bool, False),
                   INSTANCE_NAME=(str, 'Flowback'),
                   PG_SERVICE=(str, 'flowback'),
                   PG_PASS=(str, '.flowback_pgpass'),
-                  REDIS_IP=(str, 'localhost'),
-                  REDIS_PORT=(str, '6379'),
-                  RABBITMQ_BROKER_URL=(str, 'amqp://flowback:flowback@localhost:5672/flowback'),
+                  FLOWBACK_PSQL_NAME=(str, None),
+                  FLOWBACK_PSQL_USER=(str, None),
+                  FLOWBACK_PSQL_PASSWORD=(str, None),
+                  FLOWBACK_PSQL_HOST=(str, None),
+                  FLOWBACK_PSQL_PORT=(str, None),
+                  FLOWBACK_REDIS_HOST=(str, 'localhost'),
+                  FLOWBACK_REDIS_PORT=(str, '6379'),
                   URL_SUBPATH=(str, ''),
                   AWS_S3_ENDPOINT_URL=(str, None),
                   AWS_S3_ACCESS_KEY_ID=(str, None),
@@ -54,25 +57,35 @@ env = environ.Env(DEBUG=(bool, False),
                   FLOWBACK_KANBAN_LANES=(list, ['Backlog', 'Chosen For Execution', 'In Progress', 'Evaluation', 'Finished'])
                   )
 
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 TESTING = sys.argv[1:2] == ['test'] or "pytest" in sys.modules
-env.read_env(os.path.join(BASE_DIR, "../../.env"))
+env.read_env(os.path.join(BASE_DIR, ".env"))
 
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/4.0/howto/deployment/checklist/
+# Django Secret Key. If it's missing, it'll be generated and stored in .env
+SECRET_KEY = env('DJANGO_SECRET', default=None)
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = env('DJANGO_SECRET')
+if not SECRET_KEY:
+    from django.core.management.utils import get_random_secret_key
+
+    SECRET_KEY = get_random_secret_key()
+
+    with open(os.path.join(BASE_DIR, ".env"), "a+") as env_file:
+        env_file.write(f"\nDJANGO_SECRET={SECRET_KEY}\n")
+
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env('DEBUG')
+TESTING = sys.argv[1:2] == ['test']
+
 
 FLOWBACK_URL = env('FLOWBACK_URL')
 INSTANCE_NAME = env('INSTANCE_NAME')
 PG_SERVICE = env('PG_SERVICE')
 PG_PASS = env('PG_PASS')
+GIT_HASH = "Unavailable"  # TODO fix or remove, it breaks docker compose backend
 
 ALLOWED_HOSTS = [FLOWBACK_URL or "*"]
 
@@ -88,6 +101,7 @@ if env('SECURE_PROXY_SSL_HEADERS'):
 
 URL_SUBPATH = env('URL_SUBPATH')
 INTEGRATIONS = env('INTEGRATIONS')
+
 
 # Application definition
 
@@ -121,7 +135,7 @@ INSTALLED_APPS = [
     ] + env('INTEGRATIONS')
 
 
-CELERY_BROKER_URL = env('RABBITMQ_BROKER_URL')
+CELERY_BROKER_URL = f"redis://{env('FLOWBACK_REDIS_HOST')}:{env('FLOWBACK_REDIS_PORT')}/0"
 
 REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'flowback.common.documentation.CustomAutoSchema',
@@ -137,7 +151,7 @@ REST_FRAMEWORK = {
 SPECTACULAR_SETTINGS = {
     'TITLE': 'Flowback API',
     'DESCRIPTION': 'Documentation for interfacing with Flowback',
-    'VERSION': '1.0.0',
+    'VERSION': '1.0.2',
     'SERVE_INCLUDE_SCHEMA': False,
 }
 
@@ -226,29 +240,32 @@ CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [(env('REDIS_IP'), env('REDIS_PORT'))],
+            "hosts": [{
+                "address": f"redis://{env('FLOWBACK_REDIS_HOST')}:{env('FLOWBACK_REDIS_PORT')}/1",  # "REDIS_TLS_URL"
+                "ssl_cert_reqs": None,
+            }],
         },
     },
 }
 
 
 # OIDC Settings
-LOGIN_URL = '/accounts/login/'
+LOGIN_URL = '/login/'
 OIDC_USERINFO = 'backend.oidc_provider_settings.userinfo'
-
-
 # Database
 # https://docs.djangoproject.com/en/4.0/ref/settings/#databases
+db_data = dict(ENGINE='django.db.backends.postgresql_psycopg2')
+if env('FLOWBACK_PSQL_NAME'):
+    db_data['NAME'] = env('FLOWBACK_PSQL_NAME')
+    db_data['USER'] = env('FLOWBACK_PSQL_USER')
+    db_data['PASSWORD'] = env('FLOWBACK_PSQL_PASSWORD')
+    db_data['HOST'] = env('FLOWBACK_PSQL_HOST')
+    db_data['PORT'] = env('FLOWBACK_PSQL_PORT')
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'OPTIONS': {
-            'service': PG_SERVICE,
-            'passfile': PG_PASS,
-        },
-    }
-}
+else:
+    db_data['OPTIONS'] = dict(service=PG_SERVICE, passfile=PG_PASS)
+
+DATABASES = {'default': db_data}
 
 if TESTING:
     with (open(PG_PASS) as pgpass):

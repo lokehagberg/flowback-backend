@@ -8,6 +8,7 @@ from flowback.comment.views import CommentListAPI, CommentCreateAPI, CommentUpda
     CommentAncestorListAPI
 from flowback.files.serializers import FileSerializer
 from flowback.group.selectors import group_thread_list, group_thread_comment_list, group_thread_comment_ancestor_list
+from flowback.group.serializers import WorkGroupSerializer, GroupUserSerializer
 from flowback.group.services.thread import (group_thread_create,
                                             group_thread_update,
                                             group_thread_delete,
@@ -33,10 +34,13 @@ class GroupThreadListAPI(APIView):
         title = serializers.CharField(required=False)
         title__icontains = serializers.CharField(required=False)
         description = serializers.CharField(required=False)
+        group_ids = serializers.CharField(required=False)
         user_vote = serializers.BooleanField(required=False, allow_null=True, default=None)
+        work_group_ids = serializers.CharField(required=False)
 
     class OutputSerializer(serializers.Serializer):
-        created_by = BasicUserSerializer(source='created_by.user')
+        created_by = GroupUserSerializer()
+        created_at = serializers.DateTimeField()
         id = serializers.IntegerField()
         title = serializers.CharField()
         description = serializers.CharField(allow_null=True, default=None)
@@ -45,12 +49,13 @@ class GroupThreadListAPI(APIView):
         attachments = FileSerializer(many=True, source='attachments.filesegment_set', allow_null=True)
         score = serializers.IntegerField(default=0)
         user_vote = serializers.BooleanField(allow_null=True)
+        work_group = WorkGroupSerializer()
 
-    def get(self, request, group_id: int):
+    def get(self, request):
         serializer = self.FilterSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
 
-        threads = group_thread_list(group_id=group_id, fetched_by=request.user, filters=serializer.validated_data)
+        threads = group_thread_list(fetched_by=request.user, filters=serializer.validated_data)
         return get_paginated_response(pagination_class=self.Pagination,
                                       serializer_class=self.OutputSerializer,
                                       queryset=threads,
@@ -65,6 +70,7 @@ class GroupThreadCreateAPI(APIView):
         description = serializers.CharField(required=False)
         pinned = serializers.BooleanField(default=False)
         attachments = serializers.ListField(child=serializers.FileField(), required=False, max_length=10)
+        work_group_id = serializers.IntegerField(required=False)
 
     def post(self, request, group_id: int):
         serializer = self.InputSerializer(data=request.data)

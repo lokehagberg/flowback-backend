@@ -5,6 +5,8 @@ import django_filters
 class NumberInFilter(django_filters.BaseInFilter, django_filters.NumberFilter):
     pass
 
+class StringInFilter(django_filters.BaseInFilter, django_filters.CharFilter):
+    pass
 
 # Check whether attachments exist or not
 # TODO check if relevant

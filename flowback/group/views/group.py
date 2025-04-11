@@ -30,6 +30,8 @@ class GroupListApi(APIView):
     class OutputSerializer(serializers.ModelSerializer):
         joined = serializers.BooleanField()
         member_count = serializers.IntegerField()
+        pending_invite = serializers.BooleanField(help_text="Group sent invite to current user")
+        pending_join = serializers.BooleanField(help_text="Current user sent join request to group")
 
         class Meta:
             model = Group
@@ -45,6 +47,8 @@ class GroupListApi(APIView):
                       'joined',
                       'chat_id',
                       'member_count',
+                      'pending_invite',
+                      'pending_join',
                       'blockchain_id')
 
     def get(self, request):
@@ -182,6 +186,7 @@ class GroupMailApi(APIView):
     class InputSerializer(serializers.Serializer):
         title = serializers.CharField()
         message = serializers.CharField()
+        target_user_ids = serializers.ListField(child=serializers.IntegerField(), required=False)
         work_group_id = serializers.IntegerField(required=False)
 
     def post(self, request, group: int):
@@ -203,12 +208,19 @@ class WorkGroupListAPI(APIView):
         id = serializers.IntegerField(required=False)
         name = serializers.CharField(required=False)
         name__icontains = serializers.CharField(required=False)
+        order_by = serializers.ChoiceField(required=False, choices=['created_at_asc',
+                                                                    'created_at_desc',
+                                                                    'name_asc',
+                                                                    'name_desc'])
 
     class OutputSerializer(serializers.Serializer):
         id = serializers.IntegerField()
         name = serializers.CharField()
         member_count = serializers.IntegerField()
         direct_join = serializers.BooleanField()
+        joined = serializers.BooleanField()
+        chat_id = serializers.IntegerField()
+        requested_access = serializers.BooleanField()
 
     def get(self, request, group_id: int):
         serializer = self.FilterSerializer(data=request.query_params)

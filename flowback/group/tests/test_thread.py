@@ -1,10 +1,15 @@
 from rest_framework import status
+from rest_framework.exceptions import ValidationError
 from rest_framework.test import APITestCase
 
+from flowback.comment.tests.factories import CommentFactory
 from flowback.common.tests import generate_request
-from flowback.group.models import GroupThreadVote
-from flowback.group.tests.factories import GroupThreadFactory, GroupUserFactory, GroupThreadVoteFactory
-from flowback.group.views.thread import GroupThreadVoteUpdateAPI, GroupThreadListAPI
+from flowback.group.models import GroupThreadVote, GroupThread
+from flowback.group.services.thread import group_thread_comment_create, group_thread_comment_delete
+from flowback.group.tests.factories import GroupThreadFactory, GroupUserFactory, GroupThreadVoteFactory, \
+    WorkGroupFactory, WorkGroupUserFactory
+from flowback.group.views.thread import GroupThreadVoteUpdateAPI, GroupThreadListAPI, GroupThreadCommentCreateAPI, \
+    GroupThreadCommentDeleteAPI, GroupThreadCreateAPI
 from flowback.user.models import User
 
 
@@ -13,6 +18,7 @@ class TestGroupThread(APITestCase):
         self.group_admin = GroupUserFactory()
         self.threads = GroupThreadFactory.create_batch(10, created_by=self.group_admin)
         self.group_user = GroupUserFactory(group=self.group_admin.group)
+        self.group_user_two = GroupUserFactory(group=self.group_admin.group)
 
     def test_list(self):
         user = self.group_user.user
@@ -26,10 +32,12 @@ class TestGroupThread(APITestCase):
         GroupThreadVoteFactory.create(thread=self.threads[4], vote=True)
         GroupThreadVoteFactory.create(thread=self.threads[4], vote=False)
 
+        CommentFactory.create_batch(10, comment_section=self.threads[4].comment_section)
+
         GroupThreadVoteFactory.create(created_by=self.group_user, thread=self.threads[5], vote=False)
 
         response = generate_request(api=GroupThreadListAPI,
-                                    url_params=dict(group_id=self.group_user.group.id),
+                                    data=dict(group_ids=str(self.group_user.group.id)),
                                     user=user)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -48,6 +56,40 @@ class TestGroupThread(APITestCase):
         for n in [1, 2, 3, 6, 7, 8, 9]:
             self.assertIsNone(response.data['results'][n]['user_vote'])
             self.assertEqual(response.data['results'][n]['score'], 0)
+
+    def test_create(self):
+        work_group_user = WorkGroupUserFactory(group_user=self.group_user, work_group__group=self.group_user.group)
+        response = generate_request(api=GroupThreadCreateAPI,
+                                    data=dict(title="hi",
+                                              work_group_id=work_group_user.work_group.id),
+                                    url_params=dict(group_id=self.group_user.group.id),
+                                    user=self.group_user.user)
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(GroupThread.objects.get(id=response.data).work_group, work_group_user.work_group)
+
+
+    def test_comment_delete(self):
+        response = generate_request(api=GroupThreadCommentCreateAPI,
+                                    data=dict(message="hi"),
+                                    url_params=dict(thread_id=self.threads[0].id),
+                                    user=self.group_user.user)
+
+        comment_id = response.data
+
+        response = generate_request(api=GroupThreadCommentDeleteAPI,
+                                    url_params=dict(thread_id=self.threads[0].id,
+                                                    comment_id=comment_id),
+                                    user=self.group_user_two.user)
+
+        print(response.data)
+
+        response = generate_request(api=GroupThreadCommentDeleteAPI,
+                                    url_params=dict(thread_id=self.threads[0].id,
+                                                    comment_id=comment_id),
+                                    user=self.group_user.user)
+
+        print(response.data)
 
 
 class TestGroupThreadVote(APITestCase):
@@ -86,3 +128,6 @@ class TestGroupThreadVote(APITestCase):
         # Vote is None and still cast None
         response = self.vote(thread_id, user, None)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+

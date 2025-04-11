@@ -53,6 +53,11 @@ def group_user_delegate_update(*, user_id: int, group_id: int, data):
                                                      group_id=group_id,
                                                      delegate_pool__in=pools).all()
 
+
+    if tags == 0:
+        GroupUserDelegator.objects.filter(delegator=group_user, group_id=group_id, delegate_pool__in=pools).delete()
+        return
+
     if len(GroupTags.objects.filter(id__in=tags, active=True).all()) < len(tags):
         raise ValidationError('Not all tags are available in group')
 
@@ -85,10 +90,10 @@ def group_user_delegate_pool_create(*, user: int, group: int, blockchain_id: int
     group_user = group_user_permissions(user=user, group=group, permissions=['allow_delegate', 'admin'])
 
     if GroupUserDelegator.objects.filter(delegator=group_user).exists():
-        raise ValidationError('Delegate cannot be a delegator')
+        GroupUserDelegator.objects.filter(delegator=group_user).delete()
 
-    # To avoid duplicates (for now)
-    get_object(GroupUserDelegate, reverse=True, group=group, group_user=group_user)
+    if GroupUserDelegate.objects.filter(group=group, group_user=group_user).exists():
+        raise ValidationError('User is already a delegator')
 
     delegate_pool = GroupUserDelegatePool(group_id=group, blockchain_id=blockchain_id)
     delegate_pool.full_clean()
@@ -138,16 +143,17 @@ def group_delegate_pool_comment_create(*,
 
 
 def group_delegate_pool_comment_update(*,
-                                       author_id: int,
+                                       fetched_by: int,
                                        delegate_pool_id: int,
                                        comment_id: int,
                                        data) -> Comment:
     delegate_pool = get_object(GroupUserDelegatePool, id=delegate_pool_id)
-    group_user_permissions(user=author_id, group=delegate_pool.group)
+    group_user_permissions(user=fetched_by, group=delegate_pool.group)
 
-    return comment_update(fetched_by=author_id,
+    return comment_update(fetched_by=fetched_by,
                           comment_section_id=delegate_pool.comment_section.id,
                           comment_id=comment_id,
+                          attachment_upload_to="group/delegate_pool/comment/attachments",
                           data=data)
 
 
@@ -167,11 +173,11 @@ def group_delegate_pool_comment_delete(*,
                           force=force)
 
 
-def group_delegate_pool_comment_vote(*, user: int, delegate_pool_id: int, comment_id: int, vote: bool):
+def group_delegate_pool_comment_vote(*, fetched_by: int, delegate_pool_id: int, comment_id: int, vote: bool):
     delegate_pool = GroupUserDelegatePool.objects.get(id=delegate_pool_id)
-    group_user_permissions(user=user, group=delegate_pool.group)
+    group_user_permissions(user=fetched_by, group=delegate_pool.group)
 
-    return comment_vote(fetched_by=user,
+    return comment_vote(fetched_by=fetched_by,
                         comment_section_id=delegate_pool.comment_section.id,
                         comment_id=comment_id,
                         vote=vote)

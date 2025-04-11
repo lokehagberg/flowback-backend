@@ -15,8 +15,6 @@ from flowback.user.tests.factories import UserFactory
 
 
 class GroupTest(APITransactionTestCase):
-    reset_sequences = True
-
     def setUp(self):
         (self.group_one,
          self.group_two,
@@ -24,18 +22,13 @@ class GroupTest(APITransactionTestCase):
 
         (self.group_user_creator_one,
          self.group_user_creator_two,
-         self.group_user_creator_three) = [GroupUserFactory.create(group=group, user=group.created_by
-                                                                   ) for group in [self.group_one,
-                                                                                   self.group_two,
-                                                                                   self.group_three]]
+         self.group_user_creator_three) = GroupUser.objects.order_by('id').all()
 
         self.group_no_direct = GroupFactory.create(public=True, direct_join=False)
-        self.group_no_direct_user_creator = GroupUserFactory.create(group=self.group_no_direct,
-                                                                    user=self.group_no_direct.created_by)
+        self.group_no_direct_user_creator = GroupUser.objects.get(user=self.group_no_direct.created_by)
 
         self.group_private = GroupFactory.create(public=False)
-        self.group_private_user_creator = GroupUserFactory.create(group=self.group_private,
-                                                                  user=self.group_private.created_by)
+        self.group_private_user_creator = GroupUser.objects.get(user=self.group_private.created_by)
 
         self.groupless_user = UserFactory()
 

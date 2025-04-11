@@ -9,7 +9,6 @@ from flowback.common.services import get_object
 from flowback.poll.models import Poll, PollProposal
 
 from ..selectors.proposal import poll_proposal_list
-from ..services.poll import poll_refresh_cheap
 from ..services.proposal import poll_proposal_create, poll_proposal_delete
 from ...files.serializers import FileSerializer
 from ...group.serializers import GroupUserSerializer
@@ -61,7 +60,6 @@ class PollProposalListAPI(APIView):
             output_serializer = self.OutputSerializerTypeSchedule
 
         filter_serializer.is_valid(raise_exception=True)
-        poll_refresh_cheap(poll_id=poll.id)  # TODO get celery
         proposals = poll_proposal_list(fetched_by=request.user, poll_id=poll.id,
                                        filters=filter_serializer.validated_data)
 
@@ -107,7 +105,6 @@ class PollProposalCreateAPI(APIView):
             serializer = self.InputSerializerDefault(data=request.data)
 
         serializer.is_valid(raise_exception=True)
-        poll_refresh_cheap(poll_id=poll.id)  # TODO get celery
         proposal = poll_proposal_create(user_id=request.user.id, poll_id=poll.id, **serializer.validated_data)
         return Response(status=status.HTTP_200_OK, data=proposal.id)
 

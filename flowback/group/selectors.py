@@ -4,9 +4,10 @@ from typing import Union
 from django.contrib.postgres.aggregates import ArrayAgg
 from django.db import models
 from django.db.models import Q, Exists, OuterRef, Count, Case, When, F, Subquery, Sum
-from django.db.models.functions import Abs
+from django.db.models.functions import Abs, Coalesce
 from django.forms import model_to_dict
 
+from flowback.comment.models import Comment
 from flowback.comment.selectors import comment_list, comment_ancestor_list
 from flowback.common.filters import NumberInFilter
 from flowback.common.services import get_object
@@ -46,40 +47,40 @@ def group_user_permissions(*,
                            work_group: WorkGroup | int = None,
                            raise_exception: bool = True,
                            allow_admin: bool = False) -> Union[GroupUser, bool]:
+    permissions = permissions or []
+    work_group_moderator_check = False
+
+    # Setup initial values for the function
     if isinstance(user, int):
-        user = get_object(User, id=user)
+        user = User.objects.get(id=user, is_active=True)
 
     if isinstance(group, int):
-        group = get_object(Group, id=group)
-
-    permissions = permissions or []
-    admin = False
-    work_group_moderator_check = False
+        group = Group.objects.get(id=group, active=True)
 
     if isinstance(permissions, str):
         permissions = [permissions]
 
+    if isinstance(work_group, int):
+        work_group = WorkGroup.objects.get(id=work_group)
+
+    if isinstance(group_user, int):
+        group_user = GroupUser.objects.get(id=group_user, active=True)
+
+    if group_user:
+        if not group_user.active:
+            raise ValidationError('Group user is not active')
+
     if user and group:
-        group_user = get_object(GroupUser, 'User is not in group', group=group, user=user, active=True)
+        group_user = GroupUser.objects.get(user=user, group=group, active=True)
 
     elif user and work_group:
-        if isinstance(work_group, int):
-            work_group = WorkGroup.objects.get(id=work_group)
-
         group_user = GroupUser.objects.get(group=work_group.group, user=user, active=True)
 
-    elif group_user:
-        if isinstance(group_user, int):
-            group_user = get_object(GroupUser, id=group_user, active=True)
-
-        elif isinstance(group_user, GroupUser):
-            group_user = get_object(GroupUser, id=group_user.id, active=True)
-
-    else:
+    elif not group_user:
         raise Exception('group_user_permissions is missing appropiate parameters')
 
+    # Logic behind checking permissions
     admin = group_user.is_admin
-    perobj = GroupPermissions()
     user_permissions = model_to_dict(group_user.permission) if group_user.permission else group_default_permissions(
         group=group_user.group)
 
@@ -88,20 +89,14 @@ def group_user_permissions(*,
         if group_user.is_admin or group_user.group.created_by == group_user.user or group_user.user.is_superuser:
             allow_admin = True
 
-        permissions.remove('admin')
-
     # Check if creator permission is present
     if 'creator' in permissions:
         if group_user.group.created_by == group_user.user or group_user.user.is_superuser:
             allow_admin = True
 
-        permissions.remove('creator')
-
     # Check if work_group_moderator is present, mark as true and check further down
     if 'work_group_moderator' in permissions:
         work_group_moderator_check = True
-
-        permissions.remove('work_group_moderator')
 
     validated_permissions = any([user_permissions.get(key, False) for key in permissions]) or not permissions
     if not validated_permissions and not (admin and allow_admin):
@@ -111,8 +106,12 @@ def group_user_permissions(*,
         else:
             return False
 
-    if work_group and not (admin and allow_admin):
-        work_group_user = WorkGroupUser.objects.get(group_user=group_user, work_group=work_group)
+    if work_group and not admin:
+        try:
+            work_group_user = WorkGroupUser.objects.get(group_user=group_user, work_group=work_group)
+
+        except WorkGroupUser.DoesNotExist:
+            raise PermissionDenied("Requires work group membership")
 
         if work_group_moderator_check and not work_group_user.is_moderator:
             raise PermissionDenied("Requires work group moderator permission")
@@ -141,9 +140,18 @@ class BaseGroupFilter(django_filters.FilterSet):
 
 def group_list(*, fetched_by: User, filters=None):
     filters = filters or {}
-    joined_groups = Group.objects.filter(id=OuterRef('pk'), groupuser__user__in=[fetched_by])
+    joined_groups = Group.objects.filter(id=OuterRef('pk'), groupuser__user__in=[fetched_by], groupuser__active=True)
+    pending_join = Group.objects.filter(id=OuterRef('pk'),
+                                        groupuserinvite__user__in=[fetched_by],
+                                        groupuserinvite__external=True)
+    pending_invite = Group.objects.filter(id=OuterRef('pk'),
+                                          groupuserinvite__user__in=[fetched_by],
+                                          groupuserinvite__external=False)
+
     qs = _group_get_visible_for(user=fetched_by
                                 ).annotate(joined=Exists(joined_groups),
+                                           pending_invite=Exists(pending_invite),
+                                           pending_join=Exists(pending_join),
                                            member_count=Count('groupuser')
                                            ).order_by('created_at').all()
     qs = BaseGroupFilter(filters, qs).qs
@@ -178,7 +186,8 @@ def group_schedule_event_list(*, fetched_by: User, group_id: int, filters=None):
 
 class BaseGroupUserFilter(django_filters.FilterSet):
     username__icontains = django_filters.CharFilter(field_name='user__username', lookup_expr='icontains')
-    delegate = django_filters.BooleanFilter(field_name='delegate')
+    delegate_pool_id = django_filters.NumberFilter(),
+    is_delegate = django_filters.BooleanFilter(field_name='delegate_pool_id', lookup_expr='isnull', exclude=True)
 
     class Meta:
         model = GroupUser
@@ -188,15 +197,12 @@ class BaseGroupUserFilter(django_filters.FilterSet):
                       permission=['in'])
 
 
-def group_user_list(*, group: int, fetched_by: User, filters=None):
-    group_user_permissions(user=fetched_by, group=group)
+def group_user_list(*, group_id: int, fetched_by: User, filters=None):
+    group_user_permissions(user=fetched_by, group=group_id)
     filters = filters or {}
-    is_delegate = GroupUser.objects.filter(group_id=group, groupuserdelegate__group_user=OuterRef('pk'),
-                                           groupuserdelegate__group=OuterRef('group')
-                                           )
-    qs = GroupUser.objects.filter(group_id=group,
-                                  active=True
-                                  ).annotate(delegate=Exists(is_delegate),
+    qs = GroupUser.objects.filter(group_id=group_id,
+                                  active=True,
+                                  ).annotate(delegate_pool_id=F('groupuserdelegate__pool_id'),
                                              work_groups=ArrayAgg('workgroupuser__work_group__name')).all()
     return BaseGroupUserFilter(filters, qs).qs
 
@@ -252,6 +258,7 @@ class BaseGroupTagsFilter(django_filters.FilterSet):
         model = GroupTags
         fields = dict(id=['exact'],
                       name=['exact', 'icontains'],
+                      description=['exact', 'icontains'],
                       active=['exact'])
 
 
@@ -266,7 +273,7 @@ def group_tags_list(*, group: int, fetched_by: User, filters=None):
     return BaseGroupTagsFilter(filters, qs).qs
 
 
-def group_tags_interval_mean_absolute_correctness(*, tag_id: int, fetched_by: User):
+def group_tags_interval_mean_absolute_correctness(*, tag_id: int, fetched_by: User = None):
     """
     For every combined_bet & outcome in a given tag:
         abs(sum(combined_bet) – sum(outcome))/N
@@ -275,7 +282,9 @@ def group_tags_interval_mean_absolute_correctness(*, tag_id: int, fetched_by: Us
     TODO add this value to the group_tags_list selector
     """
     tag = GroupTags.objects.get(id=tag_id)
-    group_user_permissions(user=fetched_by, group=tag.group)
+
+    if fetched_by:
+        group_user_permissions(user=fetched_by, group=tag.group)
 
     qs_filter = PollPredictionStatement.objects.filter(poll__tag_id=tag_id, pollpredictionstatementvote__isnull=False)
 
@@ -325,6 +334,8 @@ class BaseGroupThreadFilter(django_filters.FilterSet):
                 ('-pinned', 'pinned')))
     user_vote = django_filters.BooleanFilter()
     id_list = NumberInFilter(field_name='id')
+    group_ids = NumberInFilter(field_name='created_by__group_id')
+    work_group_ids = NumberInFilter(field_name='work_group_id')
 
     class Meta:
         model = GroupThread
@@ -333,18 +344,51 @@ class BaseGroupThreadFilter(django_filters.FilterSet):
                       description=['icontains'])
 
 
-def group_thread_list(*, group_id: int, fetched_by: User, filters=None):
+def group_thread_list(*, fetched_by: User, filters=None):
     filters = filters or {}
-    group_user = group_user_permissions(user=fetched_by, group=group_id)
 
-    sq_user_vote = GroupThreadVote.objects.filter(thread_id=OuterRef('id'), created_by=group_user).values('vote')
+    threads = GroupThread.objects.filter(
+        Q(Q(work_group__isnull=True)  # All threads without workgroup
+          | Q(work_group__isnull=False) & Q(  # All threads with workgroup
+            Q(work_group__workgroupuser__group_user__user=fetched_by))  # Check if groupuser is member in workgroup
+          | Q(Q(created_by__group__groupuser__user=fetched_by) & Q(
+            created_by__group__groupuser__is_admin=True)))  # Check if groupuser is admin in group
+    ).values('id')
 
-    qs = (GroupThread.objects.filter(created_by__group_id=group_id)
-          .annotate(total_comments=Count('comment_section__comment',
-                                         filter=Q(comment_section__comment__active=True)),
-                    user_vote=Subquery(sq_user_vote),
-                    score=Count('groupthreadvote', filter=Q(groupthreadvote__vote=True)) -
-                          Count('groupthreadvote', filter=Q(groupthreadvote__vote=False))).all())
+    threads = GroupThread.objects.filter(id__in=[t['id'] for t in threads])  # TODO make this one query
+
+    comment_qs = Coalesce(Subquery(
+        Comment.objects.filter(comment_section_id=OuterRef('comment_section_id'), active=True).values(
+            'comment_section_id').annotate(total=Count('*')).values('total')[:1]), 0)
+
+    user_vote_qs = GroupThreadVote.objects.filter(thread_id=OuterRef('id'), created_by__user=fetched_by).values('vote')
+
+    positive_votes_qs = (
+        GroupThreadVote.objects.filter(
+            thread_id=OuterRef('pk'),
+            vote=True
+        )
+        .values('thread_id')
+        .annotate(positive_count=Count('id'))
+        .values('positive_count')
+    )
+
+    negative_votes_qs = (
+        GroupThreadVote.objects.filter(
+            thread_id=OuterRef('pk'),
+            vote=False
+        )
+        .values('thread_id')
+        .annotate(negative_count=Count('id'))
+        .values('negative_count')
+    )
+
+    qs = threads.annotate(total_comments=comment_qs,
+                          user_vote=Subquery(user_vote_qs),
+                          score=Coalesce(Subquery(positive_votes_qs,
+                                                  output_field=models.IntegerField()), 0) -
+                                Coalesce(Subquery(negative_votes_qs,
+                                                  output_field=models.IntegerField()), 0)).all()
 
     return BaseGroupThreadFilter(filters, qs).qs
 
@@ -378,8 +422,7 @@ class BaseWorkGroupFilter(django_filters.FilterSet):
     order_by = django_filters.OrderingFilter(fields=(('created_at', 'created_at_asc'),
                                                      ('-created_at', 'created_at_desc'),
                                                      ('name', 'name_asc'),
-                                                     ('-name', 'name_desc'))
-                                             )
+                                                     ('-name', 'name_desc')))
     joined = django_filters.BooleanFilter()
 
     class Meta:
@@ -392,9 +435,25 @@ def work_group_list(*, group_id: int, fetched_by: User, filters=None):
     filters = filters or {}
     group_user = group_user_permissions(user=fetched_by, group=group_id)
 
-    qs = WorkGroup.objects.filter(group_id=group_id
-                                  ).annotate(joined=Q(workgroupuser__group_user__in=[group_user]),
-                                             member_count=Count('workgroupuser'))
+    qs = WorkGroup.objects.filter(group_id=group_id).annotate(
+        joined=Exists(
+            WorkGroupUser.objects.filter(
+                work_group=OuterRef('pk'),
+                group_user=group_user
+            )
+        ),
+        requested_access=Exists(
+            WorkGroupUserJoinRequest.objects.filter(
+                work_group=OuterRef('pk'),
+                group_user=group_user
+            )
+        ),
+        member_count=Coalesce(Subquery(
+            WorkGroupUser.objects.filter(work_group=OuterRef('pk'))
+            .values('work_group')
+            .annotate(count=Count('id'))
+            .values('count')[:1]), 0)
+    )
 
     return BaseWorkGroupFilter(filters, qs).qs
 
@@ -441,14 +500,18 @@ def work_group_user_join_request_list(*, work_group_id: int, fetched_by: User, f
     work_group = WorkGroup.objects.get(id=work_group_id)
 
     # Won't need to check if group_user is in work_group due to admin/moderator requirement
-    group_user_is_admin = group_user_permissions(user=fetched_by, group=work_group.group, permissions=['admin'])
+    group_user_is_admin = group_user_permissions(user=fetched_by,
+                                                 group=work_group.group,
+                                                 permissions=['admin'],
+                                                 raise_exception=False)
+
     work_group_user_is_moderator = WorkGroupUser.objects.filter(id=work_group_id,
                                                                 group_user__user__in=[fetched_by],
                                                                 is_moderator=True).exists()
 
     if group_user_is_admin or work_group_user_is_moderator:
-        qs = WorkGroupUserJoinRequest.objects.filter(id=work_group_id)
+        qs = WorkGroupUserJoinRequest.objects.filter(work_group_id=work_group_id)
 
         return BaseWorkGroupFilter(filters, qs).qs
 
-    return PermissionDenied()
+    raise PermissionDenied("Requires admin or work group moderator permission")

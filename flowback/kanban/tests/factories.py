@@ -6,6 +6,7 @@ import factory
 from backend.settings import FLOWBACK_KANBAN_LANES, FLOWBACK_KANBAN_PRIORITY_LIMIT
 from flowback.common.tests import fake
 from flowback.kanban.models import KanbanEntry, Kanban
+from flowback.user.tests.factories import UserFactory
 
 
 class KanbanFactory(factory.django.DjangoModelFactory):
@@ -21,6 +22,7 @@ class KanbanEntryFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = KanbanEntry
 
+    created_by = factory.SubFactory(UserFactory)
     description = factory.lazy_attribute(lambda _: fake.sentence())
     priority = factory.LazyAttribute(lambda _: random.randint(1, math.floor(FLOWBACK_KANBAN_PRIORITY_LIMIT / 2)))
     lane = factory.LazyAttribute(lambda _: random.randint(1, len(FLOWBACK_KANBAN_LANES)))

@@ -10,7 +10,6 @@ from flowback.common.services import get_object
 from flowback.poll.models import Poll, PollVotingTypeRanking, PollVotingTypeForAgainst, PollVotingTypeCardinal
 
 from ..selectors.vote import poll_vote_list, delegate_poll_vote_list
-from ..services.poll import poll_refresh_cheap
 from ..services.vote import poll_proposal_vote_update, poll_proposal_delegate_vote_update
 
 
@@ -56,7 +55,6 @@ class PollProposalVoteListAPI(APIView):
         filter_serializer = self.FilterSerializer(data=request.query_params)
         filter_serializer.is_valid(raise_exception=True)
         delegates = filter_serializer.validated_data.pop('delegates')
-        poll_refresh_cheap(poll_id=poll.id)  # TODO get celery
 
         votes = poll_vote_list(fetched_by=request.user, poll_id=poll.id,
                                delegates=delegates,
@@ -83,10 +81,12 @@ class PollProposalVoteListAPI(APIView):
 # TODO need fixes
 class DelegatePollVoteListAPI(APIView):
     class Pagination(LimitOffsetPagination):
-        max_limit = 20
-        default_limit = 10
+        max_limit = 100
+        default_limit = 25
 
     class InputSerializer(serializers.Serializer):
+        group_id = serializers.IntegerField()
+        delegate_pool_id = serializers.IntegerField(required=False)
         poll_id = serializers.IntegerField(required=False)
 
     class OutputSerializer(serializers.Serializer):
@@ -157,12 +157,11 @@ class DelegatePollVoteListAPI(APIView):
             else:
                 return None
 
-    def get(self, request, delegate_pool_id: int):
+    def get(self, request):
         serializer = self.InputSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
         votes = delegate_poll_vote_list(fetched_by=request.user,
-                                        delegate_pool_id=delegate_pool_id,
-                                        filters=serializer.validated_data)
+                                        **serializer.validated_data)
 
         return get_paginated_response(
             pagination_class=self.Pagination,
@@ -196,7 +195,6 @@ class PollProposalVoteUpdateAPI(APIView):
 
         serializer = input_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        poll_refresh_cheap(poll_id=poll.id)  # TODO get celery
         poll_proposal_vote_update(user_id=request.user.id, poll_id=poll.id, data=serializer.validated_data)
         return Response(status=status.HTTP_200_OK)
 
@@ -229,6 +227,5 @@ class PollProposalDelegateVoteUpdateAPI(APIView):
 
         serializer = input_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        poll_refresh_cheap(poll_id=poll.id)  # TODO get celery
         poll_proposal_delegate_vote_update(user_id=request.user.id, poll_id=poll.id, data=serializer.validated_data)
         return Response(status=status.HTTP_200_OK)

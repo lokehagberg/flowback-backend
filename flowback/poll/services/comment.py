@@ -32,7 +32,7 @@ def poll_comment_create(*, author_id: int, poll_id: int, message: str = None, at
                                  message=f'User {group_user.user.username} replied to your comment '
                                          f'in poll {poll.title}',
                                  related_id=comment.id,
-                                 target_user_id=comment.author_id)
+                                 target_user_ids=comment.author_id)
 
     return comment
 
@@ -44,6 +44,7 @@ def poll_comment_update(*, fetched_by: int, poll_id: int, comment_id: int, data)
     return comment_update(fetched_by=fetched_by,
                           comment_section_id=poll.comment_section.id,
                           comment_id=comment_id,
+                          attachment_upload_to="group/poll/comment/attachments",
                           data=data)
 
 

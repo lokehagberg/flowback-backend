@@ -14,6 +14,10 @@ def comment_create(*,
                    attachments: list = None,
                    attachment_upload_to="",
                    attachment_upload_to_include_timestamp=True) -> Comment:
+
+    if not (message or attachments):
+        raise ValidationError("Comments can't be created without either a Message or Attachment(s)")
+
     if attachments:
         collection = upload_collection(user_id=author_id,
                                        file=attachments,
@@ -38,8 +42,27 @@ def comment_create(*,
     return comment
 
 
-def comment_update(*, fetched_by: int, comment_section_id: int, comment_id: int, data) -> Comment:
+def comment_update(*, fetched_by: int,
+                   comment_section_id: int,
+                   comment_id: int,
+                   attachment_upload_to="",
+                   attachment_upload_to_include_timestamp=True,
+                   data) -> Comment:
     comment = get_object(Comment, comment_section_id=comment_section_id, id=comment_id)
+
+    if 'attachments' in data.keys():
+        collection = upload_collection(user_id=fetched_by,
+                                       file=data['attachments'],
+                                       upload_to=attachment_upload_to,
+                                       upload_to_include_timestamp=attachment_upload_to_include_timestamp)
+
+        data['attachments_id'] = collection.id
+
+        if comment.attachments:
+            comment.attachments.delete()
+
+    else:
+        collection = None
 
     if not comment.active:
         raise ValidationError("Parent has already been removed")
@@ -48,7 +71,7 @@ def comment_update(*, fetched_by: int, comment_section_id: int, comment_id: int,
         raise ValidationError("Comment doesn't belong to User")
 
     data['edited'] = True
-    non_side_effect_fields = ['message', 'edited']
+    non_side_effect_fields = ['message', 'edited', 'attachments_id']
     comment, has_updated = model_update(instance=comment,
                                         fields=non_side_effect_fields,
                                         data=data)
@@ -58,7 +81,7 @@ def comment_update(*, fetched_by: int, comment_section_id: int, comment_id: int,
 
 def comment_delete(*, fetched_by: int, comment_section_id: int, comment_id: int, force: bool = False):
     comment = get_object(Comment, comment_section_id=comment_section_id, id=comment_id)
-    if (fetched_by != comment.author_id) and not force:
+    if not (fetched_by == comment.author_id) and not force:
         raise ValidationError("Comment doesn't belong to User")
 
     if not comment.active:
@@ -75,9 +98,6 @@ def comment_delete(*, fetched_by: int, comment_section_id: int, comment_id: int,
 def comment_vote(*, fetched_by: int, comment_section_id: int, comment_id: int, vote: bool = None):
     comment = Comment.objects.get(comment_section_id=comment_section_id, id=comment_id)
     user = User.objects.get(id=fetched_by)
-
-    if comment.author == user:
-        raise ValidationError("Can't vote on a comment that belongs to yourself")
 
     if vote is None:
         try:

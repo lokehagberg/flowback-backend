@@ -9,7 +9,6 @@ def work_group_create(*, user_id: int, group_id: int, name: str, direct_join: bo
     group_user = group_user_permissions(user=user_id, group=group_id, permissions=['admin'])
 
     work_group = WorkGroup(name=name, direct_join=direct_join, group=group_user.group)
-    work_group.full_clean()
     work_group.save()
 
     return work_group
@@ -41,7 +40,7 @@ def work_group_user_join(*, user_id: int, work_group_id: int) -> int | None:
 
     if work_group.direct_join:
         work_group_user = WorkGroupUser(group_user=group_user, work_group=work_group)
-        work_group_user.full_clean()
+        # TODO make full_clean work
         work_group_user.save()
         return work_group_user.id
 
@@ -87,7 +86,6 @@ def work_group_user_add(*, user_id: int,
                                             is_moderator=is_moderator
                                             if work_group_user_is_moderator or group_user.is_admin
                                             else False)
-            work_group_user.full_clean()
             work_group_user.save()
 
             return work_group_user

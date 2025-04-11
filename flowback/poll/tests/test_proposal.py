@@ -1,7 +1,7 @@
 from django.utils import timezone
 from django.core.exceptions import ObjectDoesNotExist
 from rest_framework.test import APIRequestFactory, force_authenticate, APITransactionTestCase
-from .factories import PollFactory, PollProposalFactory
+from .factories import PollFactory, PollProposalFactory, PollProposalTypeScheduleFactory
 
 from .utils import generate_poll_phase_kwargs
 from ..models import PollProposal, Poll
@@ -15,7 +15,7 @@ class ProposalTest(APITransactionTestCase):
     def setUp(self):
         self.group = GroupFactory()
         self.group_tag = GroupTagsFactory(group=self.group)
-        self.group_user_creator = GroupUserFactory(group=self.group, user=self.group.created_by)
+        self.group_user_creator = self.group.group_user_creator
         (self.group_user_one,
          self.group_user_two,
          self.group_user_three) = GroupUserFactory.create_batch(3, group=self.group)
@@ -28,6 +28,7 @@ class ProposalTest(APITransactionTestCase):
          self.poll_schedule_proposal_two,
          self.poll_schedule_proposal_three) = [PollProposalFactory(created_by=x,
                                                                    poll=self.poll_schedule) for x in group_users]
+
         (self.poll_cardinal_proposal_one,
          self.poll_cardinal_proposal_two,
          self.poll_cardinal_proposal_three) = [PollProposalFactory(created_by=x,
@@ -46,6 +47,21 @@ class ProposalTest(APITransactionTestCase):
         self.assertEqual(response.data.get('count'), 3)
 
     def test_proposal_list_schedule(self):
+        factory = APIRequestFactory()
+        user = self.group_user_one.user
+        view = PollProposalListAPI.as_view()
+        request = factory.get('')
+        force_authenticate(request, user=user)
+
+        response = view(request, poll=self.poll_schedule.id)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data.get('count'), 3)
+
+    def test_proposal_list_schedule_hide_poll_users(self):
+        self.group.hide_poll_users = True
+        self.group.save()
+
         factory = APIRequestFactory()
         user = self.group_user_one.user
         view = PollProposalListAPI.as_view()
@@ -103,7 +119,7 @@ class ProposalTest(APITransactionTestCase):
                                         title='Test Proposal', description='Test',
                                         event__start_date=start_date, event__end_date=end_date)
 
-        self.assertRaises(ObjectDoesNotExist, PollProposal.objects.get, id=proposal.id+1)
+        self.assertRaises(ObjectDoesNotExist, PollProposal.objects.get, id=proposal.id + 1)
 
     def test_proposal_create_no_schedule_data(self):
         response = self.proposal_create(user=self.group_user_one.user, poll=self.poll_schedule,

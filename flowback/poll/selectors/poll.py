@@ -1,14 +1,16 @@
 from typing import Union
 
 import django_filters
-from django.db.models import Q, Exists, OuterRef, Count
+from django.db.models import Q, Exists, OuterRef, Count, Subquery, Case, When, Value, CharField
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 
 from flowback.comment.models import Comment
-from flowback.common.filters import ExistsFilter
+from flowback.common.filters import ExistsFilter, NumberInFilter
 from flowback.group.models import Group
-from flowback.poll.models import Poll, PollPhaseTemplate
+from flowback.poll.models import Poll, PollPhaseTemplate, PollPredictionStatement
 from flowback.user.models import User
+from flowback.group.models import WorkGroupUser
 from flowback.group.selectors import group_user_permissions
 
 
@@ -20,46 +22,102 @@ class BasePollFilter(django_filters.FilterSet):
                                                      ('-end_date', 'end_date_desc')))
     start_date = django_filters.DateTimeFilter()
     end_date = django_filters.DateTimeFilter()
+    id_list = NumberInFilter(field_name='id')
     description = django_filters.CharFilter(field_name='description', lookup_expr='icontains')
     has_attachments = ExistsFilter(field_name='attachments')
     tag_name = django_filters.CharFilter(lookup_expr=['exact', 'icontains'], field_name='tag__name')
     tag_id = django_filters.NumberFilter(lookup_expr='exact', field_name='tag__id')
+    phase = django_filters.CharFilter(lookup_expr='iexact')
+    work_group_ids = NumberInFilter(field_name="work_group_id")
 
     class Meta:
         model = Poll
-        fields = dict(id=['exact', 'in'],
+        fields = dict(id=['exact'],
                       created_by=['exact'],
                       title=['exact', 'icontains'],
                       description=['exact', 'icontains'],
                       poll_type=['exact'],
                       public=['exact'],
                       status=['exact'],
-                      pinned=['exact'])
+                      pinned=['exact'],
+                      start_date=['lt', 'gt'],
+                      area_vote_end_date=['lt', 'gt'],
+                      proposal_end_date=['lt', 'gt'],
+                      prediction_statement_end_date=['lt', 'gt'],
+                      prediction_bet_end_date=['lt', 'gt'],
+                      delegate_vote_end_date=['lt', 'gt'],
+                      vote_end_date=['lt', 'gt'],
+                      end_date=['lt', 'gt'])
 
 
 # TODO order_by(pinned, param)
 def poll_list(*, fetched_by: User, group_id: Union[int, None], filters=None):
     filters = filters or {}
 
-    if group_id:
-        group_user_permissions(user=fetched_by, group=group_id)
-        qs = Poll.objects.filter(created_by__group_id=group_id) \
-            .annotate(total_comments=Count('comment_section__comment', filters=dict(active=True)),
-                      total_proposals=Count('pollproposal'),
-                      total_predictions=Count('pollpredictionstatement')).all()
+    # Determine phase by case qs
+    poll_phase = Case(
+        When(dynamic=True, end_date__lt=timezone.now(), then=Value('result')),
+        When(end_date__lt=timezone.now(), then=Value('prediction_vote')),
 
-    else:
-        joined_groups = Group.objects.filter(id=OuterRef('created_by__group_id'), groupuser__user__in=[fetched_by])
-        qs = Poll.objects.filter(
-            (Q(created_by__group__groupuser__user__in=[fetched_by]) & Q(created_by__group__groupuser__active=True)
-             | Q(public=True) & ~Q(created_by__group__groupuser__user__in=[fetched_by])
-             | Q(public=True) & Q(created_by__group__groupuser__user__in=[fetched_by]
-                                  ) & Q(created_by__group__groupuser__active=False)
-             ) & Q(start_date__lte=timezone.now())
-        ).annotate(group_joined=Exists(joined_groups),
-                   total_comments=Count('comment_section__comment', filters=dict(active=True)),
-                   total_proposals=Count('pollproposal'),
-                   total_predictions=Count('pollpredictionstatement')).all()
+        When(dynamic=True, vote_end_date__lte=timezone.now(), then=Value('result_default')),
+        When(vote_end_date__lte=timezone.now(), then=Value('result')),
+
+        When(delegate_vote_end_date__lte=timezone.now(), then=Value('vote')),
+        When(prediction_bet_end_date__lte=timezone.now(), then=Value('delegate_vote')),
+        When(prediction_statement_end_date__lte=timezone.now(), then=Value('prediction_bet')),
+        When(proposal_end_date__lte=timezone.now(), then=Value('prediction_statement')),
+        When(area_vote_end_date__lte=timezone.now(), then=Value('proposal')),
+
+        When(dynamic=True,
+             poll_type=Poll.PollType.SCHEDULE,
+             start_date__lte=timezone.now(),
+             then=Value('schedule')),
+        When(dynamic=True, start_date__lte=timezone.now(), then=Value('dynamic')),
+        When(start_date__lte=timezone.now(), then=Value('area_vote')),
+
+        default=Value('waiting'),
+        output_field=CharField()
+    )
+    
+    polls = Poll.objects.filter(
+
+        ).values('id')
+
+
+    q = (Q(created_by__group__groupuser__user__in=[fetched_by])
+         & Q(created_by__group__groupuser__active=True))  # User in group
+
+
+    base_qs = (
+        q & Q(work_group__isnull=True)  # User in Group
+
+        | Q(created_by__group__public=True)
+        & ~Q(created_by__group__groupuser__user__in=[fetched_by])  # Group is Public
+        & Q(work_group__isnull=True)
+        
+        | q & Q(work_group__isnull=False)  # User in workgroup
+        & Q(work_group__workgroupuser__group_user__user=fetched_by)
+
+        | q & Q(created_by__group__public=True)
+        & Q(created_by__group__groupuser__user__in=[fetched_by])
+        & Q(created_by__group__groupuser__active=False)  # User in group but not active, and group is public
+    
+        | q & Q(work_group__isnull=False)  # User is admin in group
+        & Q(created_by__group__groupuser__user=fetched_by)
+        & ~Q(created_by__group__groupuser__user__in=[fetched_by])
+        & Q(created_by__group__groupuser__is_admin=True))
+
+
+    joined_groups = Group.objects.filter(id=OuterRef('created_by__group_id'), groupuser__user__in=[fetched_by])
+    qs = Poll.objects.filter(base_qs).annotate(phase=poll_phase,
+                group_joined=Exists(joined_groups),
+                total_comments=Coalesce(Subquery(
+                    Comment.objects.filter(comment_section_id=OuterRef('comment_section_id'), active=True).values(
+                        'comment_section_id').annotate(total=Count('*')).values('total')[:1]), 0),
+                total_proposals=Count('pollproposal', distinct=True),
+                total_predictions=Coalesce(Subquery(
+                    PollPredictionStatement.objects.filter(poll_id=OuterRef('id')).values('poll_id')
+                    .annotate(total=Count('*')).values('total')[:1]), 0)).all()
 
     return BasePollFilter(filters, qs).qs
 

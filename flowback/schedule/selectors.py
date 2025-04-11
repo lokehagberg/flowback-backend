@@ -9,7 +9,7 @@ from flowback.schedule.models import ScheduleEvent, ScheduleSubscription
 
 class ScheduleEventBaseFilter(django_filters.FilterSet):
     title = django_filters.CharFilter(lookup_expr='iexact')
-    work_group_ids = NumberInFilter()
+    work_group_ids = NumberInFilter(field_name='work_group_id')
     assignee_ids = NumberInFilter(field_name='assignees__id')
     repeat_frequency__isnull = django_filters.BooleanFilter(field_name='repeat_frequency', lookup_expr='isnull')
 

@@ -21,6 +21,11 @@ class Comment(BaseModel, TreeNode):
     active = models.BooleanField(default=True)
     score = models.DecimalField(default=0, max_digits=17, decimal_places=10)
 
+    @classmethod
+    def comment_save(cls, instance, created, *args, **kwargs):
+        if created:
+            CommentVote.objects.create(comment=instance, created_by=instance.author, vote=True)
+
     # Updates score based on Wilson score interval when creating/deleting comment votes
     @classmethod
     def comment_score_update(cls, instance, *args, **kwargs):
@@ -51,6 +56,7 @@ class Comment(BaseModel, TreeNode):
                                               name='temp_comment_data_check')]
 
 
+post_save.connect(Comment.comment_save, sender=Comment)
 post_save.connect(Comment.comment_score_update, sender="comment.CommentVote")
 post_delete.connect(Comment.comment_score_update, sender="comment.CommentVote")
 

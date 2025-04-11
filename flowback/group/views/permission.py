@@ -118,7 +118,7 @@ class GroupPermissionCreateApi(APIView):
 class GroupPermissionUpdateApi(APIView):
     class InputSerializer(serializers.Serializer):
         permission_id = serializers.IntegerField()
-        role_name = serializers.CharField()
+        role_name = serializers.CharField(required=False)
         invite_user = serializers.BooleanField(required=False)
         create_poll = serializers.BooleanField(required=False)
         poll_fast_forward = serializers.BooleanField(required=False)

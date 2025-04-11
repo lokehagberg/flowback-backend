@@ -13,7 +13,7 @@ from flowback.poll.selectors.poll import poll_list, poll_phase_template_list
 from flowback.poll.selectors.proposal import poll_user_schedule_list
 from flowback.poll.selectors.vote import poll_delegates_list
 
-from flowback.poll.services.poll import poll_create, poll_update, poll_delete, poll_refresh_cheap, poll_notification, \
+from flowback.poll.services.poll import poll_create, poll_update, poll_delete, poll_notification, \
     poll_notification_subscribe, poll_fast_forward, poll_phase_template_create, poll_phase_template_update, \
     poll_phase_template_delete
 
@@ -25,7 +25,7 @@ class PollListApi(APIView):
 
     class FilterSerializer(serializers.Serializer):
         id = serializers.IntegerField(required=False)
-        id__in = serializers.CharField(required=False)
+        id_list = serializers.CharField(required=False)
         order_by = serializers.CharField(default='start_date_desc',
                                          required=False)  # TODO add desc, add a way to limit order_by fields to two.
         pinned = serializers.BooleanField(required=False, default=None, allow_null=True)
@@ -40,6 +40,26 @@ class PollListApi(APIView):
         tag_name__icontains = serializers.ListField(child=serializers.CharField(), required=False)
         has_attachments = serializers.BooleanField(required=False, allow_null=True, default=None)
         status = serializers.IntegerField(required=False)
+        phase = serializers.CharField(required=False)
+        work_group_ids = serializers.CharField(required=False)
+
+        # Blob of gt and lt filter fields
+        start_date__gt = serializers.DateTimeField(required=False)
+        start_date__lt = serializers.DateTimeField(required=False)
+        area_vote_end_date__gt = serializers.DateTimeField(required=False)
+        area_vote_end_date__lt = serializers.DateTimeField(required=False)
+        proposal_end_date__gt = serializers.DateTimeField(required=False)
+        proposal_end_date__lt = serializers.DateTimeField(required=False)
+        prediction_statement_end_date__gt = serializers.DateTimeField(required=False)
+        prediction_statement_end_date__lt = serializers.DateTimeField(required=False)
+        prediction_bet_end_date__gt = serializers.DateTimeField(required=False)
+        prediction_bet_end_date__lt = serializers.DateTimeField(required=False)
+        delegate_vote_end_date__gt = serializers.DateTimeField(required=False)
+        delegate_vote_end_date__lt = serializers.DateTimeField(required=False)
+        vote_end_date__gt = serializers.DateTimeField(required=False)
+        vote_end_date__lt = serializers.DateTimeField(required=False)
+        end_date__gt = serializers.DateTimeField(required=False)
+        end_date__lt = serializers.DateTimeField(required=False)
 
     class OutputSerializer(serializers.ModelSerializer):
         class FileSerializer(serializers.Serializer):
@@ -58,6 +78,7 @@ class PollListApi(APIView):
         total_comments = serializers.IntegerField()
         total_proposals = serializers.IntegerField()
         total_predictions = serializers.IntegerField()
+        work_group_id = serializers.IntegerField()
 
         proposal_end_date = serializers.DateTimeField(required=False)
         prediction_statement_end_date = serializers.DateTimeField(required=False)
@@ -66,6 +87,7 @@ class PollListApi(APIView):
         delegate_vote_end_date = serializers.DateTimeField(required=False)
         vote_end_date = serializers.DateTimeField(required=False)
         end_date = serializers.DateTimeField(required=False)
+        phase = serializers.CharField()
 
         class Meta:
             model = Poll
@@ -101,7 +123,11 @@ class PollListApi(APIView):
                       'total_predictions',
                       'quorum',
                       'status',
-                      'attachments')
+                      'status_prediction',
+                      'interval_mean_absolute_correctness',
+                      'attachments',
+                      'work_group_id',
+                      'phase')
 
     def get(self, request, group_id: int = None):
         filter_serializer = self.FilterSerializer(data=request.query_params)
@@ -145,6 +171,7 @@ class PollCreateAPI(APIView):
         delegate_vote_end_date = serializers.DateTimeField(required=False)
         vote_end_date = serializers.DateTimeField(required=False)
         end_date = serializers.DateTimeField(required=False)
+        work_group_id = serializers.IntegerField(required=False)
 
         class Meta:
             model = Poll
@@ -166,6 +193,7 @@ class PollCreateAPI(APIView):
                       'pinned',
                       'dynamic',
                       'quorum',
+                      'work_group_id',
                       'attachments')
 
     def post(self, request, group_id: int):
@@ -185,12 +213,12 @@ class PollUpdateAPI(APIView):
     def post(self, request, poll: int):
         serializer = self.InputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        poll_refresh_cheap(poll_id=poll)  # TODO get celery
         poll_update(user_id=request.user.id, poll_id=poll, data=serializer.validated_data)
         return Response(status=status.HTTP_200_OK)
 
 
-@extend_schema(tags=['poll'])
+@extend_schema(tags=['poll'], 
+               description="Forwards the poll into the next phase. For example: if the poll is in area vote, it will go to proposal creation")
 class PollFastForwardAPI(APIView):
     class InputSerializer(serializers.Serializer):
         phase = serializers.CharField()
@@ -205,7 +233,6 @@ class PollFastForwardAPI(APIView):
 @extend_schema(tags=['poll'])
 class PollDeleteAPI(APIView):
     def post(self, request, poll: int):
-        poll_refresh_cheap(poll_id=poll)  # TODO get celery
         poll_delete(user_id=request.user.id, poll_id=poll)
         return Response(status=status.HTTP_200_OK)
 
@@ -277,7 +304,6 @@ class PollDelegatesListAPI(APIView):
     def get(self, request, poll: int):
         filter_serializer = self.FilterSerializer(data=request.query_params)
         filter_serializer.is_valid(raise_exception=True)
-        poll_refresh_cheap(poll_id=poll)  # TODO get celery
 
         delegates = poll_delegates_list(fetched_by=request.user, poll_id=poll,
                                         filters=filter_serializer.validated_data)
@@ -302,6 +328,7 @@ class PollPhaseTemplateListAPI(APIView):
         poll_is_dynamic = serializers.BooleanField(required=False)
 
     class OutputSerializer(serializers.Serializer):
+        id = serializers.IntegerField()
         created_by_group_user = GroupUserSerializer()
         name = serializers.CharField(max_length=255)
         poll_type = serializers.IntegerField(max_value=4, min_value=1)

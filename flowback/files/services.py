@@ -12,7 +12,7 @@ from .models import FileCollection, FileSegment
 
 # A function to allow uploading a collection of files to a specified directory
 def upload_collection(*, user_id: int, file: Union[list[InMemoryUploadedFile], InMemoryUploadedFile], upload_to="",
-                      upload_to_uuid=True, upload_to_include_timestamp=True):
+                      upload_to_uuid=True, upload_to_include_timestamp=True) -> FileCollection:
     files = file if isinstance(file, list) else [file]
     data = []
 
