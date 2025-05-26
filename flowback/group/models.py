@@ -200,6 +200,7 @@ class Group(BaseModel, NotifiableModel):
         instance.schedule.delete()
         instance.kanban.delete()
         instance.chat.delete()
+        instance.notification_channel.delete()
 
 
 pre_save.connect(Group.pre_save, sender=Group)
@@ -313,6 +314,7 @@ class GroupUser(BaseModel):
         KanbanSubscription.objects.filter(kanban_id=instance.user.kanban_id,
                                           target_id=instance.group.kanban_id).delete()
         instance.chat_participant.delete()
+        instance.group.notification_channel.subscribe(user=instance.user)
 
     class Meta:
         unique_together = ('user', 'group')

@@ -1,6 +1,7 @@
 from rest_framework.exceptions import ValidationError
 from flowback.common.services import get_object, model_update
 from flowback.files.services import upload_collection
+from flowback.group.models import WorkGroup
 from flowback.group.notify import notify_group_poll
 from flowback.notification.models import NotificationChannel
 from flowback.poll.models import Poll, PollPhaseTemplate
@@ -36,7 +37,10 @@ def poll_create(*, user_id: int,
                 quorum: int = None,
                 work_group_id: int = None
                 ) -> Poll:
-    group_user = group_user_permissions(user=user_id, group=group_id, permissions=['create_poll', 'admin'])
+    group_user = group_user_permissions(user=user_id,
+                                        group=group_id,
+                                        permissions=['create_poll', 'admin'],
+                                        work_group=work_group_id)
 
     if pinned and not group_user.is_admin:
         raise ValidationError('Permission denied')
@@ -63,7 +67,7 @@ def poll_create(*, user_id: int,
                   end_date]):
         raise ValidationError('Missing required parameter(s) for generic poll')
 
-    elif work_group_id != None:
+    elif work_group_id is not None:
         raise ValidationError("Work groups are only assignable to date polls")
     
     collection = None
@@ -92,7 +96,8 @@ def poll_create(*, user_id: int,
                 dynamic=dynamic,
                 quorum=quorum,
                 work_group_id=work_group_id,
-                attachments=collection)
+                attachments=collection,
+                related_notification_channel=group_user.group.notification_channel)
 
     poll.full_clean()
     poll.save()
