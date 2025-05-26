@@ -9,12 +9,14 @@ from flowback.common.pagination import LimitOffsetPagination, get_paginated_resp
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from flowback.notification.views import NotificationSubscribeTemplateAPI
 from flowback.user.models import OnboardUser, User
 from flowback.user.selectors import get_user, user_list, user_chat_invite_list
 from flowback.user.serializers import BasicUserSerializer
 from flowback.user.services import (user_create, user_create_verify, user_forgot_password,
                                     user_forgot_password_verify, user_update, user_delete, user_get_chat_channel,
-                                    user_chat_invite, user_chat_channel_leave, user_chat_channel_update)
+                                    user_chat_invite, user_chat_channel_leave, user_chat_channel_update,
+                                    user_notification_subscribe)
 
 
 class UserCreateApi(APIView):
@@ -169,6 +171,11 @@ class UserDeleteAPI(APIView):
         user_delete(user_id=request.user.id)
 
         return Response(status=status.HTTP_200_OK)
+
+
+class UserNotificationSubscribeAPI(NotificationSubscribeTemplateAPI):
+    lazy_action = user_notification_subscribe
+
 
 @extend_schema(description="Get/creates a message channel between user(s). "
                            "If there are more than two target_user_ids or the target_user_id has direct_message turned "

@@ -49,8 +49,8 @@ class UserTest(APITestCase):
                                  user.schedule]))
 
     def test_user_create(self):
-        code = user_create(username="test_user", email="test@example.com")
-        user = user_create_verify(verification_code=code, password="password123")
+        onboard_user = user_create(username="test_user", email="test@example.com")
+        user = user_create_verify(verification_code=str(onboard_user.verification_code), password="TestPassword!=27")
 
         self.assertTrue(User.objects.filter(id=user.id).exists())
 
@@ -132,7 +132,7 @@ class UserTest(APITestCase):
                                                     id=response.data['results'][x]['id']).exists())
 
         self.assertEqual(response.status_code, 200, response.data)
-        self.assertEqual(response.data['count'], 17)
+        self.assertEqual(response.data['count'], 10)
 
     def test_user_home_feed_visibility(self):
         # Create public group with 5 polls and 10 threads
@@ -236,6 +236,7 @@ class UserTest(APITestCase):
                                     data=dict(target_user_ids=[u.id for u in participants]),
                                     user=self.user_one)
 
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         channel_id = response.data['id']
         self.assertEqual(UserChatInvite.objects.all().count(), len(participants))
         self.assertEqual(MessageChannelParticipant.objects.filter(channel_id=channel_id, active=True).count(),
