@@ -11,13 +11,14 @@ from flowback.common.tests import generate_request
 from flowback.group.models import GroupThread, GroupUser
 from flowback.group.tests.factories import GroupThreadFactory, GroupUserFactory, GroupFactory, WorkGroupFactory, \
     WorkGroupUserFactory
+from flowback.notification.models import NotificationObject, Notification, NotificationSubscription, NotificationChannel
 from flowback.poll.models import Poll
 from flowback.poll.tests.factories import PollFactory
 from flowback.user.models import User, UserChatInvite
 from flowback.user.services import user_create, user_create_verify
 from flowback.user.tests.factories import UserFactory
 from flowback.user.views.home import UserHomeFeedAPI
-from flowback.user.views.user import UserDeleteAPI, UserGetChatChannelAPI, UserUpdateApi, UserChatInviteAPI, UserGetApi
+from flowback.user.views.user import UserDeleteAPI, UserGetChatChannelAPI, UserUpdateApi, UserChatInviteAPI, UserGetApi, UserNotificationSubscribeAPI
 
 
 class UserTest(APITestCase):
@@ -281,3 +282,97 @@ class UserTest(APITestCase):
 
     def test_user_get_chat_channel_invite_group(self):
         self.user_get_chat_channel_invite(participants=25)
+
+    def test_notify_user_chat(self):
+        """Test the notify_chat method in the User model"""
+        # Create a user and a message channel
+        user = UserFactory()
+        message_channel = MessageChannelFactory()
+        message_channel_title = "Test Channel"
+        message = "Test message"
+        action = NotificationChannel.Action.CREATED
+
+        # Call the notify_chat method
+        notification = user.notify_chat(
+            action=action,
+            message=message,
+            message_channel_id=message_channel.id,
+            message_channel_title=message_channel_title
+        )
+
+        # Verify the notification was created
+        self.assertIsNotNone(notification)
+        self.assertEqual(notification.action, action)
+        self.assertEqual(notification.message, message)
+        self.assertEqual(notification.channel, user.notification_channel)
+        self.assertEqual(notification.tag, "chat")
+
+        # Verify the notification data
+        self.assertEqual(notification.data["message_channel_id"], message_channel.id)
+        self.assertEqual(notification.data["message_channel_title"], message_channel_title)
+
+        # Verify the notification is in the database
+        db_notification = NotificationObject.objects.get(
+            channel=user.notification_channel,
+            action=action,
+            message=message,
+            tag="chat"
+        )
+        self.assertEqual(db_notification.id, notification.id)
+
+    def test_user_notification_subscribe_api(self):
+        """Test the UserNotificationSubscribeAPI endpoint"""
+        # Create a user
+        user = UserFactory()
+
+        # Make a POST request to the UserNotificationSubscribeAPI endpoint
+        response = generate_request(
+            api=UserNotificationSubscribeAPI,
+            data=dict(tags='chat'),
+            user=user
+        )
+
+        # Verify the response status code
+        self.assertEqual(response.status_code, 200)
+
+        # Verify that the user is subscribed to the notification channel
+        subscription = NotificationSubscription.objects.get(
+            user=user,
+            channel=user.notification_channel
+        )
+        self.assertEqual(set(subscription.tags), {'chat'})
+
+        # Send a notification to the user
+        notification = user.notify_chat(
+            action=NotificationChannel.Action.CREATED,
+            message="Test notification",
+            message_channel_id=1,
+            message_channel_title="Test Channel"
+        )
+
+        # Verify that the user receives the notification
+        user_notifications = Notification.objects.filter(
+            user=user,
+            notification_object__channel=user.notification_channel,
+            notification_object__tag="chat"
+        )
+        self.assertEqual(user_notifications.count(), 1)
+        self.assertEqual(user_notifications.first().notification_object, notification)
+
+        # Test unsubscribing (empty tags list)
+        response = generate_request(
+            api=UserNotificationSubscribeAPI,
+            user=user
+        )
+
+        # Verify the response status code
+        self.assertEqual(response.status_code, 200, response.data)
+
+        # Verify that the user is unsubscribed from the notification channel
+        self.assertEqual(
+            NotificationSubscription.objects.filter(
+                user=user,
+                channel=user.notification_channel
+            ).count(),
+            0
+        )
