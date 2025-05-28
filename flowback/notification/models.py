@@ -180,6 +180,9 @@ class NotificationChannel(BaseModel, TreeNode):
         :param subscription_filters: List of NotificationSubscription filters to pass onto the delivery of notifications.
         :param subscription_q_filters: List of NotificationSubscription Q filters to pass onto the delivery of notifications.
         """
+        if "self" in data.items():
+            data.pop('self')  # Always remove 'self' from data
+
         source = inspect.stack()[1].function
         if source.startswith('notify_') and not tag:
             tag = source.replace('notify_', '')
@@ -244,7 +247,12 @@ class NotificationChannel(BaseModel, TreeNode):
     def subscribe(self, *, user, tags: list[str] = None) -> NotificationSubscription | None:
         # Delete subscription if no tags are present
         if not tags:
-            NotificationSubscription.objects.get(user=user, channel=self).delete()
+            try:
+                NotificationSubscription.objects.get(user=user, channel=self).delete()
+
+            except NotificationSubscription.DoesNotExist:
+                pass
+
             return None
 
         tags = list(dict.fromkeys(tags))

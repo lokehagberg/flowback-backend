@@ -1,4 +1,4 @@
-from flowback.group.models import GroupThread
+from flowback.group.models import GroupThread, GroupUserDelegatePool, GroupUserDelegator
 from flowback.poll.models import Poll
 from flowback.kanban.models import KanbanEntry
 from flowback.notification.models import NotificationChannel
@@ -81,3 +81,18 @@ def notify_group_schedule_event(message: str,
                                        work_group_name=schedule_event.work_group.name
                                        if schedule_event.work_group else None,
                                        subscription_filters=dict(user_id__in=users) if users else None)
+
+
+def notify_group_user_delegate_pool_poll_vote_update(message: str,
+                                                     action: NotificationChannel.Action,
+                                                     delegate_pool: GroupUserDelegatePool,
+                                                     poll: Poll):
+    user_ids = list(GroupUserDelegator.objects.filter(delegate_pool=delegate_pool,
+                                                      tags__in=[poll.tag]).values_list('delegator__user_id',
+                                                                                       flat=True))
+
+    delegate_pool.notify_poll_vote_update(action=action,
+                                          message=message,
+                                          poll_id=poll.id,
+                                          poll_title=poll.title,
+                                          subscription_filters=dict(user_id__in=user_ids))

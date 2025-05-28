@@ -47,6 +47,7 @@ def group_user_delegate_update(*, user_id: int, group_id: int, data):
     tags = sum([x.get('tags', []) for x in data], [])
     tags_rel = {rel['delegate_pool_id']: rel['tags'] for rel in data}
     pools = [x.get('delegate_pool_id') for x in data]
+    print(data)
 
     delegate_rel = GroupUserDelegator.objects.filter(delegator_id=group_user.id,
                                                      group_id=group_id,
@@ -94,12 +95,16 @@ def group_user_delegate_pool_create(*, user: int, group: int, blockchain_id: int
     if GroupUserDelegate.objects.filter(group=group, group_user=group_user).exists():
         raise ValidationError('User is already a delegator')
 
-    delegate_pool = GroupUserDelegatePool(group_id=group, blockchain_id=blockchain_id)
+    delegate_pool = GroupUserDelegatePool(group_id=group,
+                                          blockchain_id=blockchain_id,
+                                          related_notification_channel=group_user.group.notification_channel)
+
     delegate_pool.full_clean()
     delegate_pool.save()
     user_delegate = GroupUserDelegate(group_id=group,
                                       group_user=group_user,
                                       pool=delegate_pool)
+
     user_delegate.full_clean()
     user_delegate.save()
 
@@ -113,6 +118,16 @@ def group_user_delegate_pool_delete(*, user: int, group: int):
     delegate_pool = get_object(GroupUserDelegatePool, id=delegate_user.pool_id)
 
     delegate_pool.delete()
+
+
+def group_user_delegate_pool_notification_subscribe(*, user: int, delegate_pool_id: int, tags: list[str] = None):
+    delegate_pool = GroupUserDelegatePool.objects.get(id=delegate_pool_id)
+    group_user = group_user_permissions(user=user, group=delegate_pool.group)
+
+    if not delegate_pool.groupuserdelegator_set.filter(delegator=group_user).exists():
+        raise ValidationError('User is not a delegate in the pool')
+
+    delegate_pool.notification_channel.subscribe(user=user, tags=tags)
 
 
 def group_delegate_pool_comment_create(*,
