@@ -6,8 +6,7 @@ from ..models import PollDelegateVoting, PollVotingTypeCardinal, Poll, PollPropo
 from ..tasks import poll_proposal_vote_count
 from ..views.vote import (PollProposalDelegateVoteUpdateAPI,
                           PollProposalVoteUpdateAPI,
-                          PollProposalVoteListAPI,
-                          DelegatePollVoteListAPI)
+                          PollProposalVoteListAPI)
 from ...common.tests import generate_request
 from ...files.tests.factories import FileSegmentFactory
 from ...group.tests.factories import GroupFactory, GroupUserFactory, GroupUserDelegateFactory, GroupTagsFactory, \
