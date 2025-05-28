@@ -80,7 +80,7 @@ class UserHomeFeedFilter(django_filters.FilterSet):
                                                      ('-pinned', 'pinned')))
     id = django_filters.NumberFilter(lookup_expr='exact')
     created_by_id = django_filters.NumberFilter(lookup_expr='exact')
-    title = django_filters.CharFilter(lookup_expr='icontains')
+    title__icontains = django_filters.CharFilter(lookup_expr='icontains')
     description = django_filters.CharFilter(lookup_expr='icontains')
     related_model = django_filters.CharFilter(lookup_expr='exact')
     group_joined = django_filters.BooleanFilter(lookup_expr='exact')
