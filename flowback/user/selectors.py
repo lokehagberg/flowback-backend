@@ -80,6 +80,7 @@ class UserHomeFeedFilter(django_filters.FilterSet):
                                                      ('-pinned', 'pinned')))
     id = django_filters.NumberFilter(lookup_expr='exact')
     created_by_id = django_filters.NumberFilter(lookup_expr='exact')
+    work_group_ids = NumberInFilter()
     title__icontains = django_filters.CharFilter(lookup_expr='icontains')
     description = django_filters.CharFilter(lookup_expr='icontains')
     related_model = django_filters.CharFilter(lookup_expr='exact')
@@ -101,6 +102,7 @@ def user_home_feed(*, fetched_by: User, filters=None):
                       'created_at',
                       'updated_at',
                       'group_id',
+                      'work_group_id',
                       'title',
                       'description',
                       'related_model',
