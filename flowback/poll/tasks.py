@@ -9,12 +9,14 @@ from django.utils import timezone
 from flowback.common.services import get_object
 from flowback.group.models import GroupTags, GroupUser, GroupUserDelegatePool
 from flowback.group.selectors import group_tags_interval_mean_absolute_correctness
+from flowback.notification.models import NotificationChannel
 from flowback.poll.models import Poll, PollAreaStatement, PollPredictionBet, PollPredictionStatementVote, \
     PollPredictionStatement, PollDelegateVoting, PollVotingTypeRanking, PollProposal, PollVoting, \
     PollVotingTypeCardinal, PollVotingTypeForAgainst
 
 import numpy as np
 
+from flowback.poll.notify import notify_poll
 from flowback.schedule.services import create_event
 
 
@@ -33,6 +35,10 @@ def poll_area_vote_count(poll_id: int):
 
         # Clean all area tag votes, we won't need it anymore
         PollAreaStatement.objects.filter(poll=poll).delete()
+
+    notify_poll(message="Poll area phase has ended and results have been counted",
+                action=NotificationChannel.Action.UPDATED,
+                poll=poll)
 
     return poll
 
@@ -309,6 +315,10 @@ def poll_prediction_bet_count(poll_id: int):
     poll.status_prediction = 1
     poll.save()
 
+    notify_poll(message="Poll prediction phase has ended and results have been counted",
+                action=NotificationChannel.Action.UPDATED,
+                poll=poll)
+
 
 @shared_task
 def poll_proposal_vote_count(poll_id: int) -> None:
@@ -452,3 +462,7 @@ def poll_proposal_vote_count(poll_id: int) -> None:
         poll.interval_mean_absolute_correctness = group_tags_interval_mean_absolute_correctness(tag_id=poll.tag_id)
         poll.result = True
         poll.save()
+
+        notify_poll(message="Poll has ended and results have been counted",
+                    action=NotificationChannel.Action.UPDATED,
+                    poll=poll)

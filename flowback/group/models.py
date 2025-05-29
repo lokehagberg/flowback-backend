@@ -80,11 +80,11 @@ class Group(BaseModel, NotifiableModel):
                     group_image=self.image)
 
     def notify_group(self, message: str, action: NotificationChannel.Action):
-        """Notify all users in the group about general events"""
+        """Notifies about general group events"""
         return self.notification_channel.notify(action=action, message=message)
 
     def notify_group_user(self, _user_id: int, message: str, action: NotificationChannel.Action):
-        """Notify users about changes to their group user profile"""
+        """Notifies about changes to their group user profile"""
         return self.notification_channel.notify(message=message,
                                                 action=action,
                                                 subscription_filters=dict(user_id=_user_id))
@@ -98,7 +98,7 @@ class Group(BaseModel, NotifiableModel):
                       work_group_name: str = None,
                       subscription_filters: dict = None,
                       subscription_q_filters: dict = None):
-        """Notify relevant users about important changes to the kanban board"""
+        """Notifies about important changes to the kanban board"""
         params = locals()
         params.pop('self')
 
@@ -114,7 +114,7 @@ class Group(BaseModel, NotifiableModel):
                       work_group_name: str = None,
                       subscription_filters: dict = None,
                       subscription_q_filters: dict = None):
-        """Notify relevant users about new threads"""
+        """Notifies about new threads"""
         params = locals()
         params.pop('self')
 
@@ -128,7 +128,7 @@ class Group(BaseModel, NotifiableModel):
                     work_group_id: int = None,
                     work_group_name: str = None,
                     subscription_filters: dict = None):
-        """Notify relevant users about new polls"""
+        """Notifies about new polls"""
         params = locals()
         params.pop('self')
 
@@ -142,7 +142,7 @@ class Group(BaseModel, NotifiableModel):
                               work_group_id: int = None,
                               work_group_name: str = None,
                               subscription_filters: dict = None):
-        """Notify relevant users about new schedule events"""
+        """Notifies about new schedule events"""
         params = locals()
         params.pop('self')
 
@@ -200,6 +200,7 @@ class Group(BaseModel, NotifiableModel):
         instance.schedule.delete()
         instance.kanban.delete()
         instance.chat.delete()
+        instance.notification_channel.delete()
 
 
 pre_save.connect(Group.pre_save, sender=Group)
@@ -313,6 +314,7 @@ class GroupUser(BaseModel):
         KanbanSubscription.objects.filter(kanban_id=instance.user.kanban_id,
                                           target_id=instance.group.kanban_id).delete()
         instance.chat_participant.delete()
+        instance.group.notification_channel.subscribe(user=instance.user)
 
     class Meta:
         unique_together = ('user', 'group')
@@ -422,12 +424,30 @@ class GroupUserInvite(BaseModel):
 
 # A pool containing multiple delegates
 # TODO in future, determine if we need the multiple delegates support or not, as we're currently not using it
-class GroupUserDelegatePool(BaseModel):
+class GroupUserDelegatePool(BaseModel, NotifiableModel):
     group = models.ForeignKey(Group, on_delete=models.CASCADE)
     blockchain_id = models.PositiveIntegerField(null=True, blank=True, default=None)
     comment_section = models.ForeignKey(CommentSection,
                                         default=comment_section_create_model_default,
                                         on_delete=models.CASCADE)
+
+    @property
+    def notification_data(self) -> dict | None:
+        return dict(group_id=self.group.id,
+                    group_name=self.group.name,
+                    group_image=self.group.image,
+                    delegator_id=self.groupuserdelegator_set.first().delegator.id,
+                    delegator_name=self.groupuserdelegator_set.first().delegator.user.username,
+                    delegator_image=self.groupuserdelegator_set.first().delegator.user.profile_image)
+
+    def notify_poll_vote_update(self, action: NotificationChannel.Action,
+                                message: str,
+                                poll_id: int,
+                                poll_title: str,
+                                subscription_filters):
+        params = locals()
+        params.pop('self')
+        self.notification_channel.notify(**params)
 
 
 # Delegate accounts for group
@@ -438,6 +458,13 @@ class GroupUserDelegate(BaseModel):
 
     class Meta:
         unique_together = ('group_user', 'group')
+
+    @classmethod
+    def post_delete(cls, instance, *args, **kwargs):
+        instance.pool.notification_channel.subscribe(user=instance.group_user.user)
+
+
+post_delete.connect(GroupUserDelegate.post_delete, sender=GroupUserDelegate)
 
 
 # Delegator to delegate relations

@@ -7,6 +7,7 @@ from rest_framework.test import APITestCase
 from flowback.common.tests import generate_request
 from flowback.group.tests.factories import GroupFactory, GroupUserFactory
 from flowback.group.views.schedule import GroupScheduleEventListAPI
+from flowback.schedule.models import ScheduleEvent
 from flowback.schedule.services import create_event
 from flowback.schedule.tests.factories import ScheduleFactory, ScheduleEventFactory
 
@@ -25,13 +26,15 @@ class TestSchedule(APITestCase):
                      origin_name="group",
                      origin_id=1,
                      description="test",
+                     repeat_frequency=ScheduleEvent.Frequency.DAILY,
                      assignee_ids=[x.id for x in self.group_users])
 
         # Relevant
         ScheduleEventFactory.create_batch(size=10,
                                           schedule_id=self.group.schedule.id,
                                           origin_id=1,
-                                          origin_name="group")
+                                          origin_name="group",
+                                          repeat_frequency=ScheduleEvent.Frequency.DAILY)
 
         # Irrelevant, wrong group
         ScheduleEventFactory.create_batch(size=10,
@@ -50,3 +53,5 @@ class TestSchedule(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         self.assertEqual(response.data['count'], 11)
         self.assertEqual(len(response.data['results'][0]['assignees']), 10)
+        self.assertTrue(all([x.get('repeat_frequency', None) == 'Daily' for x in response.data['results']]),
+                        [x.get('repeat_frequency', None) for x in response.data['results']])

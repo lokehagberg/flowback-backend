@@ -21,7 +21,7 @@ from flowback.schedule.tests.factories import ScheduleEventFactory
 from flowback.user.tests.factories import UserFactory
 
 
-class GroupNotifyTest(TestCase):
+class GroupNotificationTest(TestCase):
     def setUp(self):
         self.group = GroupFactory()
         self.group_user = self.group.group_user_creator

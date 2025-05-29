@@ -12,7 +12,7 @@ from flowback.user.views.user import (UserCreateApi,
                                       UserForgotPasswordApi,
                                       UserForgotPasswordVerifyApi, UserGetChatChannelAPI, UserChatInviteListAPI,
                                       UserChatInviteAPI, UserLogoutAPI, UserLeaveChatChannelAPI,
-                                      UserChatChannelUpdateAPI)
+                                      UserChatChannelUpdateAPI, UserNotificationSubscribeAPI)
 from flowback.user.views.schedule import (UserScheduleEventListAPI,
                                           UserScheduleEventCreateAPI,
                                           UserScheduleEventUpdateAPI,
@@ -33,6 +33,9 @@ user_patterns = [
     path('user/detail', UserGetApi.as_view(), name='user'),
     path('user/update', UserUpdateApi.as_view(), name='user_update'),
     path('user/delete', UserDeleteAPI.as_view(), name='user_delete'),
+    path('user/notification/subscribe',
+         UserNotificationSubscribeAPI.as_view(),
+         name='user_notification_subscribe'),
 
     path('user/schedule', UserScheduleEventListAPI.as_view(), name='user_schedule'),
     path('user/schedule/create', UserScheduleEventCreateAPI.as_view(), name='user_schedule_create'),

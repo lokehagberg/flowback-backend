@@ -28,7 +28,7 @@ from .views.delegate import (GroupUserDelegateListApi,
                              GroupUserDelegateDeleteApi,
                              GroupUserDelegatePoolListApi,
                              GroupUserDelegatePoolCreateApi,
-                             GroupUserDelegatePoolDeleteApi)
+                             GroupUserDelegatePoolDeleteApi, GroupUserDelegatePoolNotificationSubscribeAPI)
 from .views.schedule import (GroupScheduleEventListAPI,
                              GroupScheduleEventCreateAPI,
                              GroupScheduleEventUpdateAPI,
@@ -112,7 +112,9 @@ group_patterns = [
     path('<int:group>/delegate/pool/delete',
          GroupUserDelegatePoolDeleteApi.as_view(),
          name='group_user_delegate_pool_delete'),
-
+    path('delegate/pool/<int:delegate_pool_id>/notification/subscribe',
+         GroupUserDelegatePoolNotificationSubscribeAPI.as_view(),
+         name='group_user_delegate_pool_notification_subscribe_api'),
     path('delegate/pool/<int:delegate_pool_id>/comment/list',
          GroupDelegatePoolCommentListAPI.as_view(),
          name='group_user_delegate_pool_list'),

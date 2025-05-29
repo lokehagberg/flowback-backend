@@ -91,7 +91,7 @@ class NotificationSubscribeTemplateAPI(APIView):
         default_limit = 25
 
     class FilterSerializer(serializers.Serializer):
-        tags = CharacterSeparatedField(child=serializers.CharField(), required=False)
+        tags = CharacterSeparatedField(child=serializers.CharField(), required=False, allow_null=True, default=None)
 
     def post(self, request, *args, **kwargs):
         serializer = self.FilterSerializer(data=request.data)

@@ -13,6 +13,7 @@ from rest_framework.authtoken.models import Token
 from flowback.chat.models import MessageChannelParticipant
 from flowback.common.models import BaseModel
 from flowback.kanban.models import Kanban
+from flowback.notification.models import NotifiableModel, NotificationChannel
 from flowback.schedule.models import Schedule
 
 
@@ -51,7 +52,7 @@ class CustomUserManager(BaseUserManager):
         return user
 
 
-class User(AbstractBaseUser, PermissionsMixin):
+class User(AbstractBaseUser, PermissionsMixin, NotifiableModel):
     class PublicStatus(models.TextChoices):
         PUBLIC = 'public', _('Public')  # Everyone can see/access
         GROUP_ONLY = 'group_only', _('Group Only')  # Only users in the same group can see/access
@@ -87,6 +88,22 @@ class User(AbstractBaseUser, PermissionsMixin):
     @classproperty
     def message_channel_origin(self) -> str:
         return "user"
+
+    @property
+    def notification_data(self) -> dict | None:
+        return dict(user_id=self.id,
+                    username=self.username)
+
+    def notify_chat(self,
+                    action: NotificationChannel.Action,
+                    message: str,
+                    message_channel_id: int,
+                    message_channel_title: str
+                    ):
+        params = locals()
+        params.pop('self')
+
+        return self.notification_channel.notify(**params)
 
     @classmethod
     # Updates Schedule name

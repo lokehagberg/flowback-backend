@@ -4,6 +4,7 @@ from inspect import getfullargspec
 
 from django.db import models
 from django.db.models import F, Q
+from django.db.models.fields.files import ImageFieldFile
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.utils import timezone
@@ -46,6 +47,8 @@ class NotificationObject(BaseModel):
 
         subscription_filters = dict()
         subscription_q_filters = []
+        exclude_subscription_filters = dict()
+        exclude_subscription_q_filters = []
 
         if hasattr(instance, 'subscription_filters'):
             subscription_filters = instance.subscription_filters
@@ -53,11 +56,22 @@ class NotificationObject(BaseModel):
         if hasattr(instance, 'subscription_q_filters'):
             subscription_q_filters = instance.subscription_q_filters
 
+        if hasattr(instance, 'subscription_filters'):
+            exclude_subscription_filters = instance.exclude_subscription_filters
+
+        if hasattr(instance, 'subscription_q_filters'):
+            exclude_subscription_q_filters = instance.exclude_subscription_q_filters
+
         if created:
-            subscribers = NotificationSubscription.objects.filter(*subscription_q_filters,
-                                                                  channel=instance.channel,
-                                                                  tags__contains=[instance.tag],
-                                                                  **subscription_filters)
+            subscribers = NotificationSubscription.objects.filter(
+                *subscription_q_filters,
+                channel=instance.channel,
+                tags__contains=[instance.tag],
+                **subscription_filters
+            ).exclude(
+                *exclude_subscription_q_filters,
+                **exclude_subscription_filters
+            )
 
             notifications = [Notification(user=x.user, notification_object=instance) for x in subscribers]
             Notification.objects.bulk_create(notifications)
@@ -124,7 +138,7 @@ class NotificationChannel(BaseModel, TreeNode):
             tag_fields = list(*getfullargspec(getattr(self.content_object, f'notify_{tag}'))[0])
             tag_fields = [tag_field for tag_field in tag_fields
                           if not (tag_field in excluded_fields
-                          or tag_field.startswith('_', ''))]
+                                  or tag_field.startswith('_', ''))]
 
             return tag_fields
 
@@ -150,6 +164,8 @@ class NotificationChannel(BaseModel, TreeNode):
                timestamp: datetime = None,
                subscription_filters: dict = None,
                subscription_q_filters: list[Q] = None,
+               exclude_subscription_filters: dict = None,
+               exclude_subscription_q_filters: list[Q] = None,
                **data) -> NotificationObject:
         """
         Creates a new notification. If called by a 'notify_*' function,
@@ -164,6 +180,9 @@ class NotificationChannel(BaseModel, TreeNode):
         :param subscription_filters: List of NotificationSubscription filters to pass onto the delivery of notifications.
         :param subscription_q_filters: List of NotificationSubscription Q filters to pass onto the delivery of notifications.
         """
+        if "self" in data.items():
+            data.pop('self')  # Always remove 'self' from data
+
         source = inspect.stack()[1].function
         if source.startswith('notify_') and not tag:
             tag = source.replace('notify_', '')
@@ -173,7 +192,12 @@ class NotificationChannel(BaseModel, TreeNode):
 
         if self.content_object.notification_data is not None:
             data = data or {}
-            data = dict(zip(data, self.content_object.notification_data))
+            data = data | self.content_object.notification_data
+
+        # A patchwork for django image fields due to them returning <ImageFieldFile: None> when empty
+        for k, v in data.items():
+            if isinstance(v, ImageFieldFile) and not v:
+                data[k] = None
 
         extra_fields = dict(timestamp=timestamp)  # Dict of fields that has defaults in NotificationObject model
         notification_object = NotificationObject(channel=self,
@@ -185,6 +209,8 @@ class NotificationChannel(BaseModel, TreeNode):
 
         notification_object.subscription_filters = subscription_filters or {}
         notification_object.subscription_q_filters = subscription_q_filters or []
+        notification_object.exclude_subscription_filters = exclude_subscription_filters or {}
+        notification_object.exclude_subscription_q_filters = exclude_subscription_q_filters or []
 
         notification_object.full_clean()
         notification_object.save()
@@ -218,10 +244,15 @@ class NotificationChannel(BaseModel, TreeNode):
             models.Index(fields=["content_type", "object_id"]),
         ]
 
-    def subscribe(self, *, user, tags: list[str]) -> NotificationSubscription | None:
+    def subscribe(self, *, user, tags: list[str] = None) -> NotificationSubscription | None:
         # Delete subscription if no tags are present
         if not tags:
-            NotificationSubscription.objects.get(user=user, channel=self).delete()
+            try:
+                NotificationSubscription.objects.get(user=user, channel=self).delete()
+
+            except NotificationSubscription.DoesNotExist:
+                pass
+
             return None
 
         tags = list(dict.fromkeys(tags))

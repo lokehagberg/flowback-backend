@@ -1,6 +1,7 @@
 from rest_framework.exceptions import ValidationError
 from flowback.common.services import get_object, model_update
 from flowback.files.services import upload_collection
+from flowback.group.models import WorkGroup
 from flowback.group.notify import notify_group_poll
 from flowback.notification.models import NotificationChannel
 from flowback.poll.models import Poll, PollPhaseTemplate
@@ -8,7 +9,10 @@ from flowback.group.selectors import group_user_permissions
 from django.utils import timezone
 from datetime import datetime
 
+from flowback.poll.notify import notify_poll, notify_poll_phase
 from flowback.poll.tasks import poll_area_vote_count, poll_prediction_bet_count, poll_proposal_vote_count
+from flowback.user.models import User
+
 
 def poll_create(*, user_id: int,
                 group_id: int,
@@ -33,7 +37,10 @@ def poll_create(*, user_id: int,
                 quorum: int = None,
                 work_group_id: int = None
                 ) -> Poll:
-    group_user = group_user_permissions(user=user_id, group=group_id, permissions=['create_poll', 'admin'])
+    group_user = group_user_permissions(user=user_id,
+                                        group=group_id,
+                                        permissions=['create_poll', 'admin'],
+                                        work_group=work_group_id)
 
     if pinned and not group_user.is_admin:
         raise ValidationError('Permission denied')
@@ -60,7 +67,7 @@ def poll_create(*, user_id: int,
                   end_date]):
         raise ValidationError('Missing required parameter(s) for generic poll')
 
-    elif work_group_id != None:
+    elif work_group_id is not None:
         raise ValidationError("Work groups are only assignable to date polls")
     
     collection = None
@@ -89,7 +96,8 @@ def poll_create(*, user_id: int,
                 dynamic=dynamic,
                 quorum=quorum,
                 work_group_id=work_group_id,
-                attachments=collection)
+                attachments=collection,
+                related_notification_channel=group_user.group.notification_channel)
 
     poll.full_clean()
     poll.save()
@@ -118,6 +126,10 @@ def poll_update(*, user_id: int, poll_id: int, data) -> Poll:
                                      fields=non_side_effect_fields,
                                      data=data)
 
+    notify_poll(poll=poll,
+                action=NotificationChannel.Action.UPDATED,
+                message="Poll has been updated")
+
     return poll
 
 
@@ -140,6 +152,10 @@ def poll_delete(*, user_id: int, poll_id: int) -> None:
         poll.attachments.delete()
 
     poll.delete()
+
+    notify_poll(poll=poll,
+                action=NotificationChannel.Action.DELETED,
+                message="Poll has been deleted")
 
 
 def poll_fast_forward(*, user_id: int, poll_id: int, phase: str):
@@ -189,6 +205,11 @@ def poll_fast_forward(*, user_id: int, poll_id: int, phase: str):
 
     else:
         poll_proposal_vote_count.apply_async(kwargs=dict(poll_id=poll.id), countdown=1)
+
+    notify_poll_phase(message=f"Poll has been fast forwarded "
+                              f"to {poll.current_phase.replace('_', ' ').capitalize()}",
+                      action=NotificationChannel.Action.UPDATED,
+                      poll=poll)
 
 
 def poll_phase_template_create(*, user_id: int,
@@ -250,3 +271,10 @@ def poll_phase_template_delete(*, user_id: int, template_id: int):
     group_user_permissions(user=user_id, group=template.created_by_group_user.group, permissions=['admin'])
 
     template.delete()
+
+
+def poll_notification_subscribe(*, user: User, poll_id: int, tags: list[str] = None):
+    poll = Poll.objects.get(id=poll_id)
+    group_user = group_user_permissions(user=user, group=poll.created_by.group, work_group=poll.work_group)
+
+    poll.notification_channel.subscribe(user=group_user.user, tags=tags)

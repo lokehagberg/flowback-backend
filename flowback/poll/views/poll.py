@@ -8,13 +8,15 @@ from rest_framework.views import APIView, Response
 from flowback.common.pagination import LimitOffsetPagination, get_paginated_response
 
 from flowback.group.serializers import GroupUserSerializer
+from flowback.notification.views import NotificationSubscribeTemplateAPI
 from flowback.poll.models import Poll, PollProposal
 from flowback.poll.selectors.poll import poll_list, poll_phase_template_list
 from flowback.poll.selectors.proposal import poll_user_schedule_list
 from flowback.poll.selectors.vote import poll_delegates_list
 
 from flowback.poll.services.poll import (poll_create, poll_update, poll_delete, poll_fast_forward,
- poll_phase_template_create, poll_phase_template_update, poll_phase_template_delete)
+                                         poll_phase_template_create, poll_phase_template_update,
+                                         poll_phase_template_delete, poll_notification_subscribe)
 
 
 @extend_schema(tags=['home', 'poll'])
@@ -383,3 +385,8 @@ class PollPhaseTemplateDeleteAPI(APIView):
         poll_phase_template_delete(user_id=request.user.id, template_id=template_id)
 
         return Response(status=status.HTTP_200_OK)
+
+
+@extend_schema(tags=['poll'])
+class PollNotificationSubscribeAPI(NotificationSubscribeTemplateAPI):
+    lazy_action = poll_notification_subscribe

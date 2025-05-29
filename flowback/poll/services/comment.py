@@ -1,8 +1,10 @@
 from flowback.comment.models import Comment
 from flowback.common.services import get_object
 from flowback.group.selectors import group_user_permissions
+from flowback.notification.models import NotificationChannel
 from flowback.poll.models import Poll, PollDelegateVoting
 from flowback.comment.services import comment_create, comment_update, comment_delete, comment_vote
+from flowback.poll.notify import notify_poll_comment
 
 
 def poll_comment_create(*, author_id: int, poll_id: int, message: str = None, attachments: list = None,
@@ -16,6 +18,11 @@ def poll_comment_create(*, author_id: int, poll_id: int, message: str = None, at
                              parent_id=parent_id,
                              attachments=attachments,
                              attachment_upload_to="group/poll/comment/attachments")
+
+    notify_poll_comment(message="A new comment has been posted",
+                        action=NotificationChannel.Action.CREATED,
+                        poll=poll,
+                        comment=comment)
 
     return comment
 

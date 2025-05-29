@@ -16,6 +16,7 @@ from flowback.chat.models import MessageChannel, MessageChannelParticipant
 from flowback.chat.services import message_channel_create, message_channel_join
 from flowback.common.services import model_update, get_object
 from flowback.kanban.services import KanbanManager
+from flowback.notification.models import NotificationChannel
 from flowback.schedule.models import ScheduleEvent
 from flowback.schedule.services import ScheduleManager, unsubscribe_schedule
 from flowback.user.models import User, OnboardUser, PasswordReset, Report, UserChatInvite
@@ -147,6 +148,10 @@ def user_delete(*, user_id: int) -> None:
         user.kanban.delete()
 
 
+def user_notification_subscribe(*, user: User, tags: list[str]):
+    user.notification_channel.subscribe(user=user, tags=tags)
+
+
 def user_schedule_event_create(*,
                                user_id: int,
                                title: str,
@@ -215,15 +220,18 @@ def user_kanban_entry_delete(*, user_id: int, entry_id: int):
 
 
 def user_get_chat_channel(fetched_by: User, target_user_ids: int | list[int], preview: bool = False) -> MessageChannel:
+    if len(target_user_ids) > 25:
+        raise ValidationError("Cannot invite more than 25 users to group.")
+
     if isinstance(target_user_ids, int):
         target_user_ids = [target_user_ids]
 
     if fetched_by.id not in target_user_ids:
         target_user_ids.append(fetched_by.id)
 
-    target_users = User.objects.filter(id__in=target_user_ids, is_active=True)
+    target_users = User.objects.filter(id__in=target_user_ids, is_active=True).all()
 
-    if not len(target_users) == len(target_user_ids):
+    if not target_users.count() == len(target_user_ids):
         raise ValidationError("Not every user requested do exist")
 
     if len(target_user_ids) == 1 and fetched_by.id == target_user_ids[0]:
@@ -234,7 +242,7 @@ def user_get_chat_channel(fetched_by: User, target_user_ids: int | list[int], pr
         channel = MessageChannel.objects.annotate(count=Count('users')).filter(
             count=target_users.count())
 
-        for u in target_users.all():
+        for u in target_users:
             channel = channel.filter(users=u.id)
 
         channel = channel.first()
@@ -242,35 +250,45 @@ def user_get_chat_channel(fetched_by: User, target_user_ids: int | list[int], pr
         if not channel:
             raise MessageChannel.DoesNotExist
 
-        for u in target_users.all():
+        for u in target_users:
             UserChatInvite.objects.filter(user=u, message_channel=channel, rejected=True).update(rejected=None)
 
     except MessageChannel.DoesNotExist:
         if preview:
             raise ValidationError("MessageChannel does not exist between the participants")
 
-        title = f"{', '.join([u.username for u in target_users])}"
+        title = ""
+        for i, u in enumerate(target_users):
+            if len(title + u.username) > 80:
+                title += f" and {target_users.count() - i} other{'s' if target_users.count() != 1 else ''}..."
+                ", ".join([title, u.username])
+
         channel = message_channel_create(origin_name=f"{User.message_channel_origin}"
-                                                     f"{'_group' if len(target_users) > 2 else ''}",
-                                         title=title if len(target_users) > 1 else None)
+                                                     f"{'_group' if target_users.count() > 2 else ''}",
+                                         title=title if target_users.count() > 1 else None)
 
         # In the future, make this a bulk_create statement
         share_groups = False
 
-        if len(target_users) <= 2:
+        if target_users.count() <= 2:
             share_groups = User.objects.filter(group__groupuser__user__in=target_users).exists()
 
         for u in target_users:
             u_is_public = u.chat_status == User.PublicStatus.PUBLIC
             u_is_group_only = u.chat_status == User.PublicStatus.GROUP_ONLY
 
-            if (((u_is_public or (u_is_group_only and share_groups)) and len(target_users) <= 2)
+            if (((u_is_public or (u_is_group_only and share_groups)) and target_users.count() <= 2)
                     or u.id == fetched_by.id
                     or fetched_by.is_superuser == True):
                 message_channel_join(user_id=u.id, channel_id=channel.id)
 
             else:
                 if not channel.messagechannelparticipant_set.filter(user_id=u.id).exists():
+                    u.notify_chat(action=NotificationChannel.Action.CREATED,
+                                  message="You have been invited to join a chat group",
+                                  message_channel_id=channel.id,
+                                  message_channel_title=channel.title)
+
                     UserChatInvite.objects.update_or_create(user_id=u.id,
                                                             message_channel_id=channel.id,
                                                             rejected=False,

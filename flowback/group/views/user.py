@@ -19,7 +19,7 @@ class GroupUserListApi(APIView):
         max_limit = 1000
 
     class FilterSerializer(serializers.Serializer):
-        id = serializers.IntegerField(required=False, source='group_user_id')
+        id = serializers.IntegerField(required=False)
         user_id = serializers.IntegerField(required=False)
         username__icontains = serializers.CharField(required=False)
         is_delegate = serializers.BooleanField(required=False, default=None, allow_null=True)
