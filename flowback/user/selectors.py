@@ -122,7 +122,7 @@ def user_home_feed(*, fetched_by: User, filters=None):
         & Q(created_by__group__groupuser__user=fetched_by)
         & Q(created_by__group__groupuser__is_admin=True))
 
-    thread_qs = thread_qs.annotate(related_model=models.Value('group_thread', models.CharField()),
+    thread_qs = thread_qs.annotate(related_model=models.Value('thread', models.CharField()),
                                    group_id=F('created_by__group_id'),
                                    group_joined=Exists(joined_groups))
     thread_qs = thread_qs.values(*related_fields)
