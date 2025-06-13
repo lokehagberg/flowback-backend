@@ -6,7 +6,7 @@ from rest_framework.exceptions import ValidationError
 from backend.settings import env, DEFAULT_FROM_EMAIL, FLOWBACK_ALLOW_GROUP_CREATION, FLOWBACK_DEFAULT_GROUP_JOIN
 from flowback.common.services import get_object, model_update
 from flowback.group.models import Group, GroupUser, GroupPermissions, GroupUserInvite, WorkGroupUser
-from flowback.group.selectors import group_user_permissions
+from flowback.group.selectors.permission import group_user_permissions
 from flowback.user.models import User
 
 

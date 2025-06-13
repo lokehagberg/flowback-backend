@@ -1,8 +1,5 @@
-from django.utils import timezone
-
-from flowback.group.models import WorkGroupUser
 from flowback.group.notify import notify_group_schedule_event
-from flowback.group.selectors import group_user_permissions
+from flowback.group.selectors.permission import group_user_permissions
 from flowback.notification.models import NotificationChannel
 from flowback.schedule.models import ScheduleEvent
 from flowback.schedule.services import ScheduleManager, subscribe_schedule

@@ -21,7 +21,7 @@ from .views.permission import (GroupPermissionListApi,
 from .views.tag import (GroupTagsListApi,
                         GroupTagsCreateApi,
                         GroupTagsUpdateApi,
-                        GroupTagsDeleteApi, GroupTagIntervalMeanAbsoluteCorrectnessAPI)
+                        GroupTagsDeleteApi)
 from .views.delegate import (GroupUserDelegateListApi,
                              GroupUserDelegateApi,
                              GroupUserDelegateUpdateApi,
@@ -95,11 +95,10 @@ group_patterns = [
     path('<int:group>/permission/update', GroupPermissionUpdateApi.as_view(), name='group_permission_update'),
     path('<int:group>/permission/delete', GroupPermissionDeleteApi.as_view(), name='group_permission_delete'),
 
-    path('<int:group>/tags', GroupTagsListApi.as_view(), name='group_tags'),
+    path('<int:group_id>/tags', GroupTagsListApi.as_view(), name='group_tags'),
     path('<int:group>/tag/create', GroupTagsCreateApi.as_view(), name='group_tags_create'),
     path('<int:group>/tag/update', GroupTagsUpdateApi.as_view(), name='group_tags_update'),
     path('<int:group>/tag/delete', GroupTagsDeleteApi.as_view(), name='group_tags_delete'),
-    path('tag/<int:tag_id>/imac', GroupTagIntervalMeanAbsoluteCorrectnessAPI.as_view(), name='group_tag_imac'),
 
     path('<int:group>/delegates', GroupUserDelegateListApi.as_view(), name='group_user_delegates'),
     path('<int:group>/delegate/create', GroupUserDelegateApi.as_view(), name='group_user_delegate'),

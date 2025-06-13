@@ -10,8 +10,7 @@ from flowback.common.filters import ExistsFilter, NumberInFilter
 from flowback.group.models import Group
 from flowback.poll.models import Poll, PollPhaseTemplate, PollPredictionStatement
 from flowback.user.models import User
-from flowback.group.models import WorkGroupUser
-from flowback.group.selectors import group_user_permissions
+from flowback.group.selectors.permission import group_user_permissions
 
 
 class BasePollFilter(django_filters.FilterSet):

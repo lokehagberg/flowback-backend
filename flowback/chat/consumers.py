@@ -2,21 +2,14 @@ import json
 from json import JSONDecodeError
 from typing import Union
 
-from asgiref.sync import sync_to_async
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
-from django.shortcuts import get_object_or_404
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
-from flowback.chat.models import MessageChannelParticipant, MessageChannel
-from flowback.chat.serializers import BasicMessageSerializer, MessageSerializer
-from flowback.chat.services import message_create, message_update, message_delete, user_message_channel_permission
-from flowback.common.services import get_object
-from flowback.user.models import User
-from flowback.group.models import Group
-from flowback.group.selectors import group_user_permissions
-from flowback.user.serializers import BasicUserSerializer
+from flowback.chat.models import MessageChannelParticipant
+from flowback.chat.serializers import MessageSerializer
+from flowback.chat.services import message_create, message_update, message_delete
 
 
 class ChatConsumer(AsyncWebsocketConsumer):

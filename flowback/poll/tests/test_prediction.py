@@ -2,18 +2,21 @@ import json
 import random
 from pprint import pprint
 
-from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import models
-from django.db.models import Sum, Case, When, F
+from django.db.models import Sum, Case, When, F, Q
 from django.db.models.functions import Abs
 from django.utils import timezone
+from rest_framework import status
 from rest_framework.test import APIRequestFactory, force_authenticate, APITestCase
 
+from flowback.common.tests import generate_request
 from flowback.group.models import GroupUser, GroupTags
+from flowback.group.selectors.tags import group_tags_list
 from flowback.group.tests.factories import GroupFactory, GroupUserFactory, GroupTagsFactory
-from flowback.group.views.tag import GroupTagsListApi, GroupTagIntervalMeanAbsoluteCorrectnessAPI
+from flowback.group.views.tag import GroupTagsListApi
 from flowback.poll.models import Poll, PollPredictionStatement, PollPredictionStatementSegment, PollPredictionBet, \
-    PollPredictionStatementVote, PollProposal
+    PollPredictionStatementVote
+from flowback.poll.services.prediction import update_poll_prediction_statement_outcomes
 from flowback.poll.tasks import poll_prediction_bet_count
 from flowback.poll.tests.factories import PollFactory, PollPredictionBetFactory, PollProposalFactory, \
     PollPredictionStatementFactory, PollPredictionStatementSegmentFactory, PollPredictionStatementVoteFactory
@@ -74,7 +77,7 @@ class PollPredictionStatementTest(APITestCase):
                                                                                   "the prediction statement")
         self.assertEqual(self.proposal_one.poll.created_by.group,
                          self.proposal_three.poll.created_by.group, "Proposal is not in same group "
-                                                    "as eachother")
+                                                                    "as eachother")
         self.assertEqual(self.proposal_one.poll.created_by.group,
                          self.user_prediction_caster_one.group, "Proposal is not in same"
                                                                 " group as predictor")
@@ -400,36 +403,36 @@ class PollPredictionStatementTest(APITestCase):
                                                                                  self.user_prediction_caster_three]]
 
         poll_prediction_bet_count(poll_id=self.poll.id)
-        print(self.poll.tag, self.prediction_statement.combined_bet)
-        print("Combined bet: ", [i.combined_bet for i in PollPredictionStatement.objects.all()])
-
-        # Query Test
-        qs = PollPredictionStatement.objects.filter(poll__tag=self.poll.tag, pollpredictionstatementvote__isnull=False)
-
-        qs_outcome = qs.annotate(
-            outcome_sum=Sum(Case(When(pollpredictionstatementvote__vote=True, then=1),
-                                 When(pollpredictionstatementvote__vote=False, then=-1),
-                                 default=0,
-                                 output_field=models.IntegerField())),
-
-            outcome=Case(When(outcome_sum__gt=0, then=1),
-                         When(outcome_sum__lte=0, then=0),
-                         default=0.5,
-                         output_field=models.DecimalField(max_digits=14, decimal_places=4)),
-            has_bets=Case(When(pollpredictionbet__isnull=True, then=0), default=1),
-            p1=Abs(F('combined_bet') - F('outcome')))
-
-        pprint([i.__dict__ for i in qs_outcome])
-        print(f"Interval Mean Absolute Error: {qs_outcome.aggregate(interval_mean_absolute_error=(Sum('p1') / Sum('has_bets')))}")
+        # print(self.poll.tag, self.prediction_statement.combined_bet)
+        update_poll_prediction_statement_outcomes(poll_prediction_statement_ids=list(PollPredictionStatement.objects.all().values_list('id', flat=True)))
+        # print("Outcomes: ", PollPredictionStatement)
 
         # Request Test
-        factory = APIRequestFactory()
-        user = self.user_group_creator.user
-        view = GroupTagIntervalMeanAbsoluteCorrectnessAPI.as_view()
+        response = generate_request(api=GroupTagsListApi,
+                                    url_params=dict(group_id=self.group),
+                                    user=self.user_group_creator.user)
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        print(response.data)
 
-        request = factory.get('', data=dict(limit=10))
-        force_authenticate(request, user=user)
-        response = view(request, tag_id=self.poll.tag_id)
+        tags = group_tags_list(group_id=self.user_group_creator.group_id)
 
-        data = json.loads(response.rendered_content)
-        pprint(data)
+        print(tags.first().imac)
+
+        #
+        # print("Tag: ", GroupTags.objects.first())
+        # print("Has bets: ", PollPredictionStatement.objects.filter(
+        #     poll__tag=GroupTags.objects.first(),
+        #     pollpredictionstatementvote__isnull=False).aggregate(
+        #         val=Sum(Case(When(outcome=True, then=1), default=0))))
+        # print("Outcome sum: ", PollPredictionStatement.objects.filter(
+        #     poll__tag=GroupTags.objects.first(),
+        #     pollpredictionstatementvote__isnull=False).aggregate(
+        #     val=Sum(Case(When(outcome=True, then=1),
+        #                  When(Q(outcome=False) | Q(outcome__isnull=True), then=-1),
+        #                  default=-1))))
+        # print("Combined bets sum: ", PollPredictionStatement.objects.filter(
+        #     poll__tag=GroupTags.objects.first(),
+        #     pollpredictionstatementvote__isnull=False).aggregate(Sum('combined_bet')))
+        # print(PollPredictionStatement.objects.filter(poll__tag=GroupTags.objects.first(), pollpredictionstatementvote__isnull=False).distinct('id').values_list('outcome', flat=True))
+        # print(PollPredictionStatement.objects.filter(poll__tag=GroupTags.objects.first()).aggregate(Sum('combined_bet')))
+        # print(PollPredictionStatement.objects.filter(poll__tag=GroupTags.objects.first(), pollpredictionstatementvote__isnull=False).distinct('id').aggregate(Sum('combined_bet')))

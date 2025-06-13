@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from rest_framework import status, serializers
 
 from flowback.common.pagination import get_paginated_response
-from flowback.group.selectors import group_kanban_entry_list
+from flowback.group.selectors.group import group_kanban_entry_list
 from flowback.group.services.kanban import group_kanban_entry_create, group_kanban_entry_update, group_kanban_entry_delete
 
 from flowback.kanban.views import KanbanEntryListApi, KanbanEntryCreateAPI, KanbanEntryUpdateAPI, KanbanEntryDeleteAPI

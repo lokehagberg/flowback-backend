@@ -13,6 +13,7 @@ class PredictionStatement(BaseModel):
     # created_by: represents ownership
     # fk: represents relationship
     combined_bet = models.DecimalField(max_digits=8, decimal_places=7, null=True, blank=True)
+    outcome = models.BooleanField(default=False, null=True, blank=True)
     attachments = ArrayField(models.FileField(upload_to='group/poll/prediction/attachments'),
                              null=True,
                              blank=True,

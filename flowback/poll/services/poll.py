@@ -1,11 +1,10 @@
 from rest_framework.exceptions import ValidationError
 from flowback.common.services import get_object, model_update
 from flowback.files.services import upload_collection
-from flowback.group.models import WorkGroup
 from flowback.group.notify import notify_group_poll
 from flowback.notification.models import NotificationChannel
 from flowback.poll.models import Poll, PollPhaseTemplate
-from flowback.group.selectors import group_user_permissions
+from flowback.group.selectors.permission import group_user_permissions
 from django.utils import timezone
 from datetime import datetime
 

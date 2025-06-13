@@ -1,5 +1,7 @@
 from typing import Union
 
+from django.db import models
+from django.db.models import Sum, Case, When, F, OuterRef, Subquery, Count
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
@@ -9,7 +11,7 @@ from ..models import (PollPredictionBet,
                       PollPredictionStatementVote,
                       Poll, PollProposal)
 from ...common.services import get_object, model_update
-from ...group.selectors import group_user_permissions
+from ...group.selectors.permission import group_user_permissions
 from ...user.models import User
 
 
@@ -190,3 +192,25 @@ def poll_prediction_statement_vote_delete(user: Union[int, User], prediction_sta
         raise ValidationError('Prediction statement vote not created by user')
 
     prediction_statement_vote.delete()
+
+
+def update_poll_prediction_statement_outcomes(poll_prediction_statement_ids: list[int] | int) -> None:
+    if isinstance(poll_prediction_statement_ids, int):
+        poll_prediction_statement_ids = [poll_prediction_statement_ids]
+
+    qs_filter = PollPredictionStatement.objects.filter(id__in=poll_prediction_statement_ids)
+
+    outcome_score = PollPredictionStatement.objects.filter(id=OuterRef('id')).annotate(
+        has_votes=Count('pollpredictionstatementvote'),
+        outcome_sum=Sum(Case(When(pollpredictionstatementvote__vote=True, then=1),
+                             When(pollpredictionstatementvote__vote=False, then=-1),
+                             default=0,
+                             output_field=models.IntegerField())),
+
+        outcome_score=Case(When(has_votes=0, then=None),
+                           When(outcome_sum__gt=0, then=True),
+                           When(outcome_sum__lt=0, then=False),
+                           default=None,
+                           output_field=models.BooleanField())).values("outcome_score")
+
+    qs_filter.update(outcome=Subquery(outcome_score))

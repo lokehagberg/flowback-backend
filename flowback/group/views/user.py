@@ -5,7 +5,7 @@ from rest_framework.views import APIView
 from flowback.common.pagination import LimitOffsetPagination, get_paginated_response
 
 from flowback.group.models import GroupUser
-from flowback.group.selectors import group_user_list, group_user_invite_list
+from flowback.group.selectors.user import group_user_list, group_user_invite_list
 from flowback.group.serializers import GroupUserSerializer
 
 from flowback.group.services.group import group_user_update, group_join, group_leave, group_user_delete

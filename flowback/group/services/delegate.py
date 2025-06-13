@@ -6,7 +6,7 @@ from flowback.comment.services import comment_create, comment_update, comment_de
 
 from flowback.common.services import get_object
 from flowback.group.models import GroupUserDelegator, GroupUserDelegatePool, GroupTags, GroupUserDelegate
-from flowback.group.selectors import group_user_permissions
+from flowback.group.selectors.permission import group_user_permissions
 
 
 def group_user_delegate(*, user: int, group: int, delegate_pool_id: int, tags: list[int] = None) -> GroupUserDelegator:

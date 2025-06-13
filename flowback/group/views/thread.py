@@ -7,7 +7,8 @@ from flowback.common.pagination import LimitOffsetPagination, get_paginated_resp
 from flowback.comment.views import CommentListAPI, CommentCreateAPI, CommentUpdateAPI, CommentDeleteAPI, CommentVoteAPI, \
     CommentAncestorListAPI
 from flowback.files.serializers import FileSerializer
-from flowback.group.selectors import group_thread_list, group_thread_comment_list, group_thread_comment_ancestor_list
+from flowback.group.selectors.thread import group_thread_list, group_thread_comment_list, \
+    group_thread_comment_ancestor_list
 from flowback.group.serializers import WorkGroupSerializer, GroupUserSerializer
 from flowback.group.services.thread import (group_thread_create,
                                             group_thread_update,
@@ -17,7 +18,6 @@ from flowback.group.services.thread import (group_thread_create,
                                             group_thread_comment_delete,
                                             group_thread_comment_vote,
                                             group_thread_vote_update)
-from flowback.user.serializers import BasicUserSerializer
 
 
 @extend_schema(tags=['group/thread'])

@@ -5,7 +5,7 @@ from rest_framework.views import APIView
 
 from flowback.common.pagination import LimitOffsetPagination, get_paginated_response
 from flowback.group.models import GroupPermissions
-from flowback.group.selectors import group_permissions_list
+from flowback.group.selectors.permission import group_permissions_list
 from flowback.group.services.permission import (group_permission_create,
                                                 group_permission_update,
                                                 group_permission_delete)
