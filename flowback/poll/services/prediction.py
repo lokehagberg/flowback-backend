@@ -156,6 +156,8 @@ def poll_prediction_statement_vote_create(user: Union[int, User], prediction_sta
     prediction_vote.full_clean()
     prediction_vote.save()
 
+    update_poll_prediction_statement_outcomes(poll_prediction_statement_ids=prediction_statement_id)
+
 
 def poll_prediction_statement_vote_update(user: Union[int, User],
                                           prediction_statement_id: int,
@@ -175,6 +177,8 @@ def poll_prediction_statement_vote_update(user: Union[int, User],
     prediction_statement_vote, has_updated = model_update(instance=prediction_statement_vote,
                                                           fields=non_side_effect_fields,
                                                           data=data)
+
+    update_poll_prediction_statement_outcomes(poll_prediction_statement_ids=prediction_statement_id)
 
     return prediction_statement_vote
 
