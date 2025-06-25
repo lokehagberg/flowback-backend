@@ -5,7 +5,7 @@ def add_notification_channels(apps, schema_editor):
     Group = apps.get_model('group', 'Group')
 
     for group in Group.objects.all():
-        NotificationChannel.objects.get_or_create(content_type='group', object_id=group.id)
+        NotificationChannel.objects.get_or_create(content_object=group)
 
 class Migration(migrations.Migration):
 
