@@ -1,6 +1,6 @@
 from flowback.common.services import get_object, model_update
 from flowback.group.models import GroupPermissions
-from flowback.group.selectors import group_user_permissions
+from flowback.group.selectors.permission import group_user_permissions
 
 
 def group_permission_create(*,

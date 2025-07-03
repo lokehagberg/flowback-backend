@@ -15,7 +15,7 @@ class UserHomeFeedAPI(APIView):
 
     class FilterSerializer(serializers.Serializer):
         order_by = serializers.CharField(required=False)
-        related_model = serializers.CharField(required=False)
+        related_model = serializers.ChoiceField(required=False, choices=['poll', 'thread'])
         id = serializers.IntegerField(required=False)
         work_group_id = serializers.IntegerField(required=False)
         title__icontains = serializers.CharField(required=False)

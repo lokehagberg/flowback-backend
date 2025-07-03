@@ -5,7 +5,7 @@ from flowback.common.filters import NumberInFilter, ExistsFilter
 from flowback.common.services import get_object
 from flowback.poll.models import Poll, PollProposal
 from flowback.user.models import User
-from flowback.group.selectors import group_user_permissions
+from flowback.group.selectors.permission import group_user_permissions
 
 
 class BasePollProposalFilter(django_filters.FilterSet):

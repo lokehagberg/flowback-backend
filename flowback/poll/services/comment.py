@@ -1,8 +1,8 @@
 from flowback.comment.models import Comment
 from flowback.common.services import get_object
-from flowback.group.selectors import group_user_permissions
+from flowback.group.selectors.permission import group_user_permissions
 from flowback.notification.models import NotificationChannel
-from flowback.poll.models import Poll, PollDelegateVoting
+from flowback.poll.models import Poll
 from flowback.comment.services import comment_create, comment_update, comment_delete, comment_vote
 from flowback.poll.notify import notify_poll_comment
 

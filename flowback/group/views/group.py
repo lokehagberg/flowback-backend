@@ -1,12 +1,12 @@
 from drf_spectacular.utils import extend_schema
-from rest_framework import serializers, status, generics
+from rest_framework import serializers, status
 from flowback.common.pagination import LimitOffsetPagination, get_paginated_response
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from flowback.group.models import Group
-from flowback.group.selectors import group_list, group_detail, group_folder_list, work_group_user_list, \
-    work_group_user_join_request_list, work_group_list
+from flowback.group.selectors.workgroup import work_group_list, work_group_user_list, work_group_user_join_request_list
+from flowback.group.selectors.group import group_list, group_folder_list, group_detail
 from flowback.group.serializers import GroupUserSerializer
 from flowback.group.services.group import group_create, group_update, group_delete, group_mail, \
     group_notification_subscribe

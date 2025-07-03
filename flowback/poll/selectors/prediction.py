@@ -1,14 +1,12 @@
 import django_filters
 from django.db import models
-from django.db.models import Avg, When, F, Case, Count, Q, Exists, Subquery, OuterRef
-from django.db.models.fields.related import RelatedField
+from django.db.models import Avg, When, F, Case, Count, Q, OuterRef
 from django.db.models.lookups import LessThan
 from django.utils import timezone
 
 from flowback.common.filters import NumberInFilter
-from flowback.group.selectors import group_user_permissions
-from flowback.poll.models import PollPredictionStatement, PollPredictionBet, PollPredictionStatementVote, \
-    PollPredictionStatementSegment
+from flowback.group.selectors.permission import group_user_permissions
+from flowback.poll.models import PollPredictionStatement, PollPredictionBet, PollPredictionStatementVote
 from flowback.user.models import User
 
 

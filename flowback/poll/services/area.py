@@ -1,8 +1,8 @@
 from django.contrib.postgres.aggregates import ArrayAgg
 from rest_framework.exceptions import ValidationError
 
-from flowback.common.services import get_object, model_update
-from flowback.group.selectors import group_user_permissions
+from flowback.common.services import get_object
+from flowback.group.selectors.permission import group_user_permissions
 from flowback.poll.models import PollAreaStatement, PollAreaStatementSegment, PollAreaStatementVote, Poll
 
 

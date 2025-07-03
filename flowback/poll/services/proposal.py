@@ -1,9 +1,8 @@
-from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
 from flowback.common.services import get_object
 from flowback.files.services import upload_collection
-from flowback.group.selectors import group_user_permissions
+from flowback.group.selectors.permission import group_user_permissions
 from flowback.poll.models import PollProposal, Poll, PollProposalTypeSchedule
 
 # TODO proposal can be created without schedule, dangerous

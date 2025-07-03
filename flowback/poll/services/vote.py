@@ -7,7 +7,7 @@ from flowback.group.notify import notify_group_user_delegate_pool_poll_vote_upda
 from flowback.notification.models import NotificationChannel
 from flowback.poll.models import Poll, PollVoting, PollVotingTypeRanking, PollDelegateVoting, \
     PollVotingTypeForAgainst, PollVotingTypeCardinal
-from flowback.group.selectors import group_user_permissions
+from flowback.group.selectors.permission import group_user_permissions
 
 
 def poll_proposal_vote_update(*, user_id: int, poll_id: int, data: dict) -> None:

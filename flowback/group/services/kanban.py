@@ -1,7 +1,7 @@
 from django.utils import timezone
 
 from flowback.group.notify import notify_group_kanban
-from flowback.group.selectors import group_user_permissions
+from flowback.group.selectors.permission import group_user_permissions
 from flowback.kanban.models import KanbanEntry
 from flowback.kanban.services import KanbanManager
 from flowback.notification.models import NotificationChannel

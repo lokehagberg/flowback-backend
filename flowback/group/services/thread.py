@@ -1,12 +1,11 @@
 from rest_framework.exceptions import ValidationError
 
-from flowback.comment.models import Comment
 from flowback.comment.services import comment_create, comment_update, comment_delete, comment_vote
 from flowback.common.services import get_object, model_update
 from flowback.files.services import upload_collection
-from flowback.group.models import GroupThread, GroupThreadVote, WorkGroupUser
+from flowback.group.models import GroupThread, GroupThreadVote
 from flowback.group.notify import notify_group_thread
-from flowback.group.selectors import group_user_permissions
+from flowback.group.selectors.permission import group_user_permissions
 from flowback.notification.models import NotificationChannel
 
 
