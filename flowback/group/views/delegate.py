@@ -149,12 +149,12 @@ class GroupUserDelegateApi(APIView):
 class GroupUserDelegateUpdateApi(APIView):
     class InputSerializer(serializers.Serializer):
         delegate_pool_id = serializers.IntegerField()
-        tags = serializers.ListField(child=serializers.IntegerField(), required=False)
+        tags = NumberInFilter(required=False)
 
     def post(self, request, group: int):
-        serializer = self.InputSerializer(data=request.data, many=True)
+        serializer = self.InputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        group_user_delegate_update(user_id=request.user.id, group_id=group, data=serializer.validated_data)
+        group_user_delegate_update(user_id=request.user.id, group_id=group, **serializer.validated_data)
 
         return Response(status=status.HTTP_200_OK)
 
