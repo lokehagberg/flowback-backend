@@ -9,11 +9,12 @@ from flowback.poll.models import PollPredictionStatement
 from flowback.poll.services.prediction import update_poll_prediction_statement_outcomes
 from flowback.user.models import User
 
-    # print(f"Tag: {tags.first()}, "
-    #       f"Combined bets sum: {tags.first().sum_combined_bet}, "
-    #       f"Has bets: {tags.first().sum_outcome}, "
-    #       f"Outcome Sum: {tags.first().sum_outcome_score} "
-    #       f"IMAC: {tags.first().imac}")
+
+# print(f"Tag: {tags.first()}, "
+#       f"Combined bets sum: {tags.first().sum_combined_bet}, "
+#       f"Has bets: {tags.first().sum_outcome}, "
+#       f"Outcome Sum: {tags.first().sum_outcome_score} "
+#       f"IMAC: {tags.first().imac}")
 
 
 class BaseGroupTagsFilter(django_filters.FilterSet):
@@ -54,8 +55,13 @@ def group_tags_list(*, group_id: int, fetched_by: User = None, filters: dict = N
                          sum_outcome_score=Sum(Case(When(poll__pollpredictionstatement__outcome=True, then=1),
                                                     When(Q(poll__pollpredictionstatement__outcome=False)
                                                          | Q(poll__pollpredictionstatement__outcome=None), then=0),
-                                                    output_field=models.DecimalField(max_digits=13, decimal_places=1))),
+                                                    output_field=models.DecimalField(max_digits=13, decimal_places=8))),
 
-                         imac=1 - (Abs(F('sum_combined_bet') - F('sum_outcome_score'))) / F('sum_outcome'))
+                         imac=Case(When(~Q(sum_outcome=0),
+                                        then=1 - (Abs(F('sum_combined_bet') - F('sum_outcome_score'))) / F(
+                                            'sum_outcome')),
+                                   default=None, output_field=models.DecimalField(max_digits=13,
+                                                                                  decimal_places=8,
+                                                                                  null=True)))
 
     return BaseGroupTagsFilter(filters, tags).qs
