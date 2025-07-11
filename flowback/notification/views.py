@@ -39,7 +39,7 @@ class NotificationListAPI(APIView):
         tag = serializers.CharField(source='notification_object.tag')
 
         channel_name = serializers.CharField(source='notification_object.channel.content_type.model')
-        channel_data = serializers.CharField(source='notification_object.channel.data')
+        channel_data = serializers.JSONField(source='notification_object.channel.data')
 
     def get(self, request):
         filter_serializer = self.FilterSerializer(data=request.query_params)
