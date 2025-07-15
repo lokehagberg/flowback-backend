@@ -173,6 +173,7 @@ class UserDeleteAPI(APIView):
         return Response(status=status.HTTP_200_OK)
 
 
+@extend_schema(description=User.notification_docs())
 class UserNotificationSubscribeAPI(NotificationSubscribeTemplateAPI):
     lazy_action = user_notification_subscribe
 

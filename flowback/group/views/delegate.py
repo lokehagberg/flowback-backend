@@ -6,7 +6,7 @@ from rest_framework.views import APIView
 from flowback.common.filters import NumberInFilter
 from flowback.common.pagination import LimitOffsetPagination, get_paginated_response
 
-from flowback.group.models import GroupUserDelegator, GroupTags
+from flowback.group.models import GroupUserDelegator, GroupTags, GroupUserDelegatePool
 from flowback.group.selectors.user import group_user_delegate_list
 from flowback.group.selectors.delegate import group_user_delegate_pool_list
 from flowback.group.serializers import GroupUserSerializer
@@ -126,7 +126,7 @@ class GroupUserDelegatePoolDeleteApi(APIView):
         return Response(status=status.HTTP_200_OK)
 
 
-@extend_schema(tags=['group/delegate'])
+@extend_schema(tags=['group/delegate'], description=GroupUserDelegatePool.notification_docs())
 class GroupUserDelegatePoolNotificationSubscribeAPI(NotificationSubscribeTemplateAPI):
     lazy_action = group_user_delegate_pool_notification_subscribe
 

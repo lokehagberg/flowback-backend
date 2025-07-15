@@ -387,6 +387,6 @@ class PollPhaseTemplateDeleteAPI(APIView):
         return Response(status=status.HTTP_200_OK)
 
 
-@extend_schema(tags=['poll'])
+@extend_schema(tags=['poll'], description=Poll.notification_docs())
 class PollNotificationSubscribeAPI(NotificationSubscribeTemplateAPI):
     lazy_action = poll_notification_subscribe
