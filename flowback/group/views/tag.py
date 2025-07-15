@@ -25,7 +25,7 @@ class GroupTagsListApi(APIView):
         active = serializers.BooleanField(required=False, default=None, allow_null=True)
 
     class OutputSerializer(serializers.ModelSerializer):
-        imac = serializers.DecimalField(max_digits=9, decimal_places=5, help_text="Interval Mean Absolute Correctness")
+        imac = serializers.DecimalField(max_digits=13, decimal_places=8, help_text="Interval Mean Absolute Correctness")
         class Meta:
             model = GroupTags
             fields = ('id', 'name', 'description', 'active', 'imac')

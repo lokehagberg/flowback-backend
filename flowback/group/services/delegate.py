@@ -41,20 +41,20 @@ def group_user_delegate(*, user: int, group: int, delegate_pool_id: int, tags: l
 
 
 # TODO Likely needs an update
-def group_user_delegate_update(*, user_id: int, group_id: int, data):
+def group_user_delegate_update(*, user_id: int, group_id: int, delegate_pool_id: int, tags: list[int] = None):
+    tags = tags or []
+
     group_user = group_user_permissions(user=user_id, group=group_id)
 
-    tags = sum([x.get('tags', []) for x in data], [])
-    tags_rel = {rel['delegate_pool_id']: rel['tags'] for rel in data}
-    pools = [x.get('delegate_pool_id') for x in data]
-    print(data)
+    tags_rel = {delegate_pool_id: tags}
+    pools = [delegate_pool_id]
 
     delegate_rel = GroupUserDelegator.objects.filter(delegator_id=group_user.id,
                                                      group_id=group_id,
                                                      delegate_pool__in=pools).all()
 
 
-    if tags == 0:
+    if len(tags) == 0:
         GroupUserDelegator.objects.filter(delegator=group_user, group_id=group_id, delegate_pool__in=pools).delete()
         return
 

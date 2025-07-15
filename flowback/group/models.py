@@ -436,9 +436,7 @@ class GroupUserDelegatePool(BaseModel, NotifiableModel):
         return dict(group_id=self.group.id,
                     group_name=self.group.name,
                     group_image=self.group.image,
-                    delegator_id=self.groupuserdelegator_set.first().delegator.id,
-                    delegator_name=self.groupuserdelegator_set.first().delegator.user.username,
-                    delegator_image=self.groupuserdelegator_set.first().delegator.user.profile_image)
+                    group_user_delegate_pool_id=self.id)
 
     def notify_poll_vote_update(self, action: NotificationChannel.Action,
                                 message: str,
