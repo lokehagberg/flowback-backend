@@ -73,6 +73,10 @@ class Group(BaseModel, NotifiableModel):
             raise ValidationError("Group creator has left the group..?")
 
     # Notifications
+    NOTIFICATION_DATA_FIELDS = (('group_id', int, 'Group ID'),
+                                ('group_name', str, 'Name of the group'),
+                                ('group_image', str, 'URL path to the group image'))
+
     @property
     def notification_data(self):
         return dict(group_id=self.id,
@@ -430,6 +434,11 @@ class GroupUserDelegatePool(BaseModel, NotifiableModel):
     comment_section = models.ForeignKey(CommentSection,
                                         default=comment_section_create_model_default,
                                         on_delete=models.CASCADE)
+
+    NOTIFICATION_DATA_FIELDS = (('group_id', int, 'Group ID'),
+                                ('group_name', str, 'Group Name'),
+                                ('group_image', str, 'URL path to the group image'),
+                                ('group_user_delegate_pool_id', int, 'the delegate pool id'))
 
     @property
     def notification_data(self) -> dict | None:

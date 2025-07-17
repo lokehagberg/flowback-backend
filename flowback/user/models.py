@@ -89,6 +89,9 @@ class User(AbstractBaseUser, PermissionsMixin, NotifiableModel):
     def message_channel_origin(self) -> str:
         return "user"
 
+    NOTIFICATION_DATA_FIELDS = (('user_id', int, 'The ID of the user'),
+                                ('username', str, "The user's username"))
+
     @property
     def notification_data(self) -> dict | None:
         return dict(user_id=self.id,
@@ -97,9 +100,17 @@ class User(AbstractBaseUser, PermissionsMixin, NotifiableModel):
     def notify_chat(self,
                     action: NotificationChannel.Action,
                     message: str,
-                    message_channel_id: int,
+                    message_channel_id,
                     message_channel_title: str
                     ):
+        """
+        Notifies chat users
+        :param action: FIGHT!
+        :param message:
+        :param message_channel_id: Chat channel ID
+        :param message_channel_title: Chat channel title
+        :return:
+        """
         params = locals()
         params.pop('self')
 

@@ -1,6 +1,7 @@
 import inspect
+import re
 from datetime import timedelta, datetime
-from inspect import getfullargspec
+from inspect import getfullargspec, isclass
 
 from django.db import models
 from django.db.models import F, Q
@@ -293,6 +294,14 @@ class NotifiableModel(models.Model):
     The fields for the function will be used for checks and documentation.
     """
     notification_channels = GenericRelation(NotificationChannel)
+    NOTIFICATION_DATA_FIELDS: tuple[tuple[str, str] | tuple[str] | str] | None = None
+    """A tuple containing information that'll be served from notification_data function, intended for documentation.
+    **The tuple content should follow either of the following formats**: 
+        > (key: str, type: str | class, description: str)
+        > (key: str, type: str | class)
+        > (key: str)
+        > str
+    """
 
     @property
     def notification_channel(self) -> NotificationChannel:
@@ -301,6 +310,101 @@ class NotifiableModel(models.Model):
     @property
     def notification_data(self) -> dict | None:
         return None
+
+    @classmethod
+    def notification_docs(cls) -> str:
+        """
+        Returns a string containing documentation for the model.
+        """
+
+        # Notification Data
+        notification_data_doc = ""
+        if cls.NOTIFICATION_DATA_FIELDS:
+            notification_data_doc = (f"### Notification Data Fields\n"
+                                     f"Data that'll be passed onto all notification tags related to this channel.\n"
+                                     "| Field | Type | Description |\n"
+                                     "| ----- | ---- | ----------- |\n")
+
+            for field in cls.NOTIFICATION_DATA_FIELDS:
+                if isinstance(field, tuple):
+                    type_info = "undefined"
+                    if len(field) > 1 and isclass(field[1]):
+                        type_info = field[1].__name__
+
+                    else:
+                        type_info = field[1]
+
+                    if len(field) == 3:
+                        notification_data_doc += f"| {field[0]} | {type_info} | {field[2]} |\n"
+
+                    if len(field) == 2:
+                        notification_data_doc += f"| {field[0]} | {type_info} | |\n"
+
+                    elif len(field) == 1:
+                        notification_data_doc += f"| {field[0]} | | |\n"
+
+                if isinstance(field, str):
+                    notification_data_doc += f"| {field} | | |\n"
+
+        # Notification Tags
+        notification_tags_doc = ""
+        tags = [(x[0].replace('notify_', ''), x[1])
+                for x in inspect.getmembers(object=cls)
+                if x[0].startswith('notify_')]
+
+        if tags:
+            notification_tags_doc = (f"### Notification Tags Fields\n"
+                                     f"Data that'll be included (in addition to notification data) with every "
+                                     f"Notification channel & tag pair related to this channel.\n\n")
+
+            for tag, func in tags:
+                docstring_data = {}
+                notification_tags_doc += f"#### <ins>{tag}</ins>\n"
+                if func.__doc__:
+                    tag_description = None
+                    pattern = r'(.*?)(?=:param|:return|$)'
+                    match = re.search(pattern, func.__doc__, re.DOTALL)
+                    if match:
+                        # Get the description and remove extra whitespace
+                        tag_description = match.group(1).strip()
+                        # Replace multiple whitespaces with a single space
+                        re.sub(r'\s+', ' ', tag_description)
+
+                    notification_tags_doc += (f"{f'{tag_description}\n' if tag_description else ''}"
+                                              "| Field | Type | Description |\n"
+                                              "| ----- | ---- | ----------- |\n")
+
+                    pattern = r':param (\w+):\ *(.*?)$'
+
+                    # Process each line of the docstring
+                    for line in func.__doc__.split('\n'):
+                        line = line.strip()
+                        match = re.match(pattern, line)
+
+                        if match:
+                            param_name = match.group(1)
+                            description = match.group(2).strip()
+
+                            if description:
+                                docstring_data[param_name] = description
+
+                else:
+                    notification_tags_doc += ("| Field | Type | Description |\n" 
+                                              "| ----- | ---- | ----------- |\n")
+
+                exclude_params = inspect.signature(NotificationChannel.notify).parameters.keys()
+                for key, val in inspect.signature(func).parameters.items():
+                    if key not in exclude_params and not key.startswith('_'):
+                        notification_tags_doc += (f"| {key} "
+                                                  f"| {val.annotation.__name__ if val.annotation.__name__ != '_empty' else 'undefined'} "
+                                                  f"| {docstring_data.get(key, '')} |\n")
+
+        docs = (f"### Subscription Information\n"
+                f"Channel name: `{cls.__name__.lower()}`\n"
+                f"{notification_data_doc}\n"
+                f"{notification_tags_doc}")
+
+        return docs
 
     class Meta:
         abstract = True

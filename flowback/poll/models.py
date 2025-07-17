@@ -231,6 +231,12 @@ class Poll(BaseModel, NotifiableModel):
         if current_phase not in phases:
             raise ValidationError(f'Poll is not in {" or ".join(phases)}, currently in {current_phase}')
 
+    NOTIFICATION_DATA_FIELDS = (('poll_id', int),
+                                ('poll_title', str),
+                                ('group_id', int),
+                                ('group_name', str),
+                                ('group_image', str, 'The URL path to the image of the group'))
+
     ## Notification
     @property
     def notification_data(self) -> dict | None:
@@ -249,6 +255,12 @@ class Poll(BaseModel, NotifiableModel):
         """
         Notifies when a poll updates and deletes.
         Also notifies when poll area, prediction and proposal votes have been counted.
+        :param action:
+        :param message:
+        :param work_group_id:
+        :param work_group_name:
+        :param subscription_filters:
+        :return:
         """
         params = locals()
         params.pop('self')

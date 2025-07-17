@@ -171,7 +171,7 @@ class GroupDeleteApi(APIView):
         return Response(status=status.HTTP_200_OK)
 
 
-@extend_schema(tags=['group'])
+@extend_schema(tags=['group'], description=Group.notification_docs())
 class GroupNotificationSubscribeAPI(NotificationSubscribeTemplateAPI):
     lazy_action = group_notification_subscribe
 

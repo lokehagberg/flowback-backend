@@ -86,6 +86,7 @@ class NotificationSubscribeTemplateAPI(APIView):
     """
     lazy_action = NotificationChannel.subscribe
     notification_channel: NotificationChannel = None
+    description = "Subscribe to a notification channel."
 
     class Pagination(LimitOffsetPagination):
         default_limit = 25
