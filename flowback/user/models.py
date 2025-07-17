@@ -156,6 +156,9 @@ class Report(BaseModel):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     title = models.CharField(max_length=255)
     description = models.TextField()
+    group_id = models.IntegerField(null=True, blank=True)
+    post_id = models.IntegerField(null=True, blank=True)
+    post_type = models.CharField(max_length=50, null=True, blank=True)
 
 
 class UserChatInvite(BaseModel):

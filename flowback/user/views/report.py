@@ -13,7 +13,7 @@ class ReportCreateAPI(APIView):
     class InputSerializer(serializers.ModelSerializer):
         class Meta:
             model = Report
-            fields = ('title', 'description',)
+            fields = ('title', 'description', 'group_id', 'post_id', 'post_type')
 
     def post(self, request):
         serializer = self.InputSerializer(data=request.data)
