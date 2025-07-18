@@ -48,6 +48,12 @@ class GroupThreadListAPI(APIView):
         score = serializers.IntegerField(default=0)
         user_vote = serializers.BooleanField(allow_null=True)
         work_group = WorkGroupSerializer()
+        
+        created_by = GroupUserSerializer()
+        group_joined = serializers.BooleanField(required=False)
+        group_id = serializers.IntegerField(source='created_by.group_id')
+        group_name = serializers.CharField(source='created_by.group.name')
+        group_image = serializers.ImageField(source='created_by.group.image')
 
     def get(self, request):
         serializer = self.FilterSerializer(data=request.query_params)

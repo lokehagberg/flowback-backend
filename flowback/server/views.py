@@ -37,6 +37,9 @@ class ServerReportListAPI(APIView):
     class OutputSerializer(serializers.Serializer):
         title = serializers.CharField()
         description = serializers.CharField()
+        group_id = serializers.IntegerField()
+        post_id = serializers.IntegerField()
+        post_type = serializers.CharField()
 
     def get(self, request):
         reports = reports_list(fetched_by=request.user)
