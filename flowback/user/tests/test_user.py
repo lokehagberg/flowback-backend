@@ -105,7 +105,9 @@ class UserTest(APITestCase):
         # TODO Test with workgroup
 
         GroupThreadFactory.create_batch(size=2)
-        PollFactory.create_batch(size=5, created_by=group_user)
+        polls = PollFactory.create_batch(size=5, created_by=group_user)
+        polls[1].pinned = True
+        polls[1].save()
 
         PollFactory.create_batch(size=5, created_by=group_user_two)
         GroupThreadFactory.create_batch(size=5, created_by=group_user_two)
@@ -119,6 +121,13 @@ class UserTest(APITestCase):
         GroupThreadFactory.create_batch(size=5, created_by=group_user_three)
 
         response = generate_request(api=UserHomeFeedAPI, user=group_user.user)
+
+        response_pinned_test = generate_request(api=UserHomeFeedAPI,
+                                                user=group_user.user,
+                                                data=dict(order_by='pinned,created_at_desc'))
+
+        self.assertEqual(response_pinned_test.data['count'], response.data['count'])
+        self.assertEqual(response_pinned_test.data['results'][0]['pinned'], True)
 
         # Check if order_by is for created_at, in descending order
         for x in range(1, response.data['count']):

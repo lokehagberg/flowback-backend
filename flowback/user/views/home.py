@@ -2,6 +2,7 @@ from drf_spectacular.utils import extend_schema
 from rest_framework import serializers
 from rest_framework.views import APIView
 
+from flowback.common.filters import NumberInFilter
 from flowback.common.pagination import get_paginated_response, LimitOffsetPagination
 from flowback.group.serializers import GroupUserSerializer
 from flowback.user.selectors import user_home_feed
@@ -17,10 +18,13 @@ class UserHomeFeedAPI(APIView):
         order_by = serializers.CharField(required=False)
         related_model = serializers.ChoiceField(required=False, choices=['poll', 'thread'])
         id = serializers.IntegerField(required=False)
-        work_group_id = serializers.IntegerField(required=False)
+        created_by_group_user_id = serializers.IntegerField(required=False, source='created_by_id')
+
+        work_group_ids = NumberInFilter(required=False)
         title__icontains = serializers.CharField(required=False)
         group_joined = serializers.BooleanField(required=False, allow_null=True, default=None)
         user_vote = serializers.BooleanField(required=False, allow_null=True, default=None)
+        pinned = serializers.BooleanField(required=False, allow_null=True, default=None)
         group_ids = serializers.CharField(required=False)
 
 
@@ -36,7 +40,10 @@ class UserHomeFeedAPI(APIView):
         description = serializers.CharField(allow_null=True, default=None)
         related_model = serializers.CharField()
         group_joined = serializers.BooleanField()
-        user_vote = serializers.BooleanField(allow_null=True, default=None)
+        user_vote = serializers.BooleanField(allow_null=True,
+                                             default=None,
+                                             help_text="Whether the user voted on a Poll, or in case of group threads, "
+                                                       "the user's vote where None is not voted on.")
 
     def get(self, request):
         serializer = self.FilterSerializer(data=request.query_params)
