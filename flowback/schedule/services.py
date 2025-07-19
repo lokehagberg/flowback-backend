@@ -180,6 +180,7 @@ class ScheduleManager:
                      description: str = None,
                      work_group_id: int = None,
                      assignee_ids: list[int] = None,
+                     reminders: list[int] = None,
                      meeting_link: str = None) -> ScheduleEvent:
 
         self.validate_origin_name(origin_name=origin_name)
@@ -193,7 +194,8 @@ class ScheduleManager:
                             work_group_id=work_group_id,
                             description=description,
                             assignee_ids=assignee_ids,
-                            meeting_link=meeting_link)
+                            meeting_link=meeting_link,
+                            reminders=reminders)
 
     def update_event(self, *, schedule_origin_id: int, event_id: int, data) -> ScheduleEvent:
         get_object(ScheduleEvent, id=event_id,

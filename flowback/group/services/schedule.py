@@ -13,6 +13,7 @@ def group_schedule_event_create(*,
                                 group_id: int,
                                 title: str,
                                 work_group_id: int = None,
+                                reminders: list[int] = None,
                                 **data) -> ScheduleEvent:
     group_user = group_user_permissions(user=user_id, group=group_id, work_group=work_group_id)
     event = group_schedule.create_event(schedule_id=group_user.group.schedule.id,
@@ -20,6 +21,7 @@ def group_schedule_event_create(*,
                                         origin_id=group_user.group.id,
                                         origin_name='group',
                                         work_group_id=work_group_id,
+                                        reminders=reminders
                                         **data)
 
     notify_group_schedule_event(message="A new event has been created",

@@ -158,6 +158,7 @@ def user_schedule_event_create(*,
                                title: str,
                                start_date: timezone.datetime,
                                description: str = None,
+                               reminders: list[int] = None,
                                end_date: timezone.datetime = None) -> ScheduleEvent:
     user = get_object(User, id=user_id)
     return user_schedule.create_event(schedule_id=user.schedule.id,
@@ -166,7 +167,8 @@ def user_schedule_event_create(*,
                                       end_date=end_date,
                                       origin_id=user.id,
                                       origin_name='user',
-                                      description=description)
+                                      description=description,
+                                      reminders=reminders)
 
 
 def user_schedule_event_update(*, user_id: int, event_id: int, **data):
