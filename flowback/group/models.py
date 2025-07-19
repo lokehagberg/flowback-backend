@@ -408,6 +408,7 @@ class GroupThread(BaseModel):
     active = models.BooleanField(default=True)
     attachments = models.ForeignKey(FileCollection, on_delete=models.CASCADE, null=True, blank=True)
     work_group = models.ForeignKey(WorkGroup, on_delete=models.SET_NULL, null=True, blank=True)
+    public = models.BooleanField(default=True)
 
 
 # Likes and Dislikes for Group Thread
