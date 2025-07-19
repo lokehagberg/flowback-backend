@@ -7,8 +7,8 @@ from rest_framework.exceptions import ValidationError
 from flowback.comment.models import Comment
 from flowback.common.filters import NumberInFilter
 from flowback.common.services import get_object
-from flowback.group.models import Group, GroupUser, GroupThread
-from flowback.poll.models import Poll, PollPredictionStatement
+from flowback.group.models import Group, GroupUser, GroupThread, GroupThreadVote
+from flowback.poll.models import Poll, PollPredictionStatement, PollVoting
 from flowback.schedule.selectors import schedule_event_list
 from flowback.kanban.selectors import kanban_entry_list
 from flowback.user.models import User, UserChatInvite
@@ -85,6 +85,8 @@ class UserHomeFeedFilter(django_filters.FilterSet):
     description = django_filters.CharFilter(lookup_expr='icontains')
     related_model = django_filters.CharFilter(lookup_expr='exact')
     group_joined = django_filters.BooleanFilter(lookup_expr='exact')
+    user_vote = django_filters.BooleanFilter(lookup_expr='exact')
+    pinned = django_filters.BooleanFilter(lookup_expr='exact')
     group_ids = NumberInFilter(field_name='created_by__group_id')
 
 
@@ -107,6 +109,7 @@ def user_home_feed(*, fetched_by: User, filters=None):
                       'description',
                       'related_model',
                       'group_joined',
+                      'user_vote',
                       'pinned']
 
     q = (Q(created_by__group__groupuser__user__in=[fetched_by])
@@ -122,9 +125,12 @@ def user_home_feed(*, fetched_by: User, filters=None):
         & Q(created_by__group__groupuser__user=fetched_by)
         & Q(created_by__group__groupuser__is_admin=True))
 
+    group_thread_vote = GroupThreadVote.objects.filter(thread_id=OuterRef('id'),
+                                                       created_by__user=fetched_by).values('vote')
     thread_qs = thread_qs.annotate(related_model=models.Value('thread', models.CharField()),
                                    group_id=F('created_by__group_id'),
-                                   group_joined=Exists(joined_groups))
+                                   group_joined=Exists(joined_groups),
+                                   user_vote=Subquery(group_thread_vote))
     thread_qs = thread_qs.values(*related_fields)
     thread_qs = UserHomeFeedFilter(filters, thread_qs).qs
 
@@ -148,9 +154,12 @@ def user_home_feed(*, fetched_by: User, filters=None):
         & Q(created_by__group__groupuser__user=fetched_by)
         & ~Q(created_by__group__groupuser__user__in=[fetched_by])
         & Q(created_by__group__groupuser__is_admin=True))
+
+    poll_user_vote = PollVoting.objects.filter(poll_id=OuterRef('id'), created_by__user=fetched_by)
     poll_qs = poll_qs.annotate(related_model=models.Value('poll', models.CharField()),
                                group_id=F('created_by__group_id'),
-                               group_joined=Exists(joined_groups))
+                               group_joined=Exists(joined_groups),
+                               user_vote=Exists(poll_user_vote))
     poll_qs = poll_qs.values(*related_fields)
     poll_qs = UserHomeFeedFilter(filters, poll_qs).qs
 

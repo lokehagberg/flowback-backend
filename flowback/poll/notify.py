@@ -7,10 +7,6 @@ def notify_poll(message: str,
                 action: NotificationChannel.Action,
                 poll: Poll) -> NotificationObject:
     users = None
-    channel = poll.notification_channel
-    if channel is None:
-        return None
-    
     if poll.work_group:
         users = list(poll.work_group.group_users.values_list('user_id', flat=True))
 
