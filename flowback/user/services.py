@@ -156,10 +156,13 @@ def user_notification_subscribe(*, user: User, tags: list[str]):
 def user_schedule_event_create(*,
                                user_id: int,
                                title: str,
-                               start_date: timezone.datetime,
                                description: str = None,
+                               start_date: timezone.datetime,
+                               end_date: timezone.datetime = None,
+                               repeat_frequency: str = None,
                                reminders: list[int] = None,
-                               end_date: timezone.datetime = None) -> ScheduleEvent:
+                               **kwargs
+                               ) -> ScheduleEvent:
     user = get_object(User, id=user_id)
     return user_schedule.create_event(schedule_id=user.schedule.id,
                                       title=title,
@@ -168,6 +171,7 @@ def user_schedule_event_create(*,
                                       origin_id=user.id,
                                       origin_name='user',
                                       description=description,
+                                      repeat_frequency=repeat_frequency,
                                       reminders=reminders)
 
 
@@ -337,7 +341,7 @@ def user_chat_channel_update(*, user_id: int, channel_id: int, **data: dict):
 def report_create(*, user_id: int, title: str, description: str, group_id:int, post_id:int, post_type:str):
     user = get_object(User, id=user_id)
 
-    report = Report(user=user, title=title, description=description, group_id=group_id, 
+    report = Report(user=user, title=title, description=description, group_id=group_id,
                     post_id=post_id, post_type=post_type)
     report.full_clean()
     report.save()
