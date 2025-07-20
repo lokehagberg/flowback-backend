@@ -78,7 +78,7 @@ group_patterns = [
 
     path('<int:group_id>/list', WorkGroupListAPI.as_view(), name='work_group_list'),
     path('workgroup/<int:work_group_id>/list', WorkGroupUserListAPI.as_view(), name='work_group_user_list'),
-    path('workgroup/<int:work_group_id>/joinrequest/list',
+    path('<int:group_id>/workgroup/<int:work_group_id>/joinrequest/list',
          WorkGroupUserJoinRequestListAPI.as_view(),
          name='work_group_user_list'),
     path('<int:group_id>/workgroup/create', WorkGroupCreateAPI.as_view(), name='work_group_create'),
