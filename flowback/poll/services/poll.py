@@ -68,7 +68,7 @@ def poll_create(*, user_id: int,
 
     elif work_group_id is not None:
         raise ValidationError("Work groups are only assignable to date polls")
-    
+
     collection = None
     if attachments:
         collection = upload_collection(user_id=user_id,
@@ -152,9 +152,9 @@ def poll_delete(*, user_id: int, poll_id: int) -> None:
 
     poll.delete()
 
-    notify_poll(poll=poll,
-                action=NotificationChannel.Action.DELETED,
-                message="Poll has been deleted")
+    notify_group_poll(poll=poll,
+                      action=NotificationChannel.Action.DELETED,
+                      message="Poll has been deleted")
 
 
 def poll_fast_forward(*, user_id: int, poll_id: int, phase: str):
