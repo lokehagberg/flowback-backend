@@ -38,6 +38,9 @@ def group_thread_create(user_id: int,
     thread.full_clean()
     thread.save()
 
+    # Self-vote the thread
+    group_thread_vote_update(user_id=user_id, thread_id=thread.id, vote=True)
+
     # Notify users when a thread is created
     notify_group_thread(message="A new thread has been posted",
                         action=NotificationChannel.Action.CREATED,

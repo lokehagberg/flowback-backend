@@ -3,7 +3,7 @@ from django.db.models import Exists, OuterRef, Subquery, Count, Q
 from django.db.models.functions import Coalesce
 from rest_framework.exceptions import PermissionDenied
 
-from flowback.group.models import WorkGroup, WorkGroupUser, WorkGroupUserJoinRequest
+from flowback.group.models import WorkGroup, WorkGroupUser, WorkGroupUserJoinRequest, Group
 from flowback.group.selectors.permission import group_user_permissions
 from flowback.user.models import User
 
@@ -71,10 +71,9 @@ def work_group_user_list(*, work_group_id: int, fetched_by: User, filters=None):
 
 
 class BaseWorkGroupUserJoinRequestFilter(django_filters.FilterSet):
-    user_id = django_filters.CharFilter(field_name='group_user__user_id', lookup_expr='exact')
-    group_user_id = django_filters.CharFilter(lookup_expr='exact')
-
-    username = django_filters.CharFilter(field_name='group_user__user__username', lookup_expr='icontains')
+    user_id = django_filters.NumberFilter(field_name='group_user__user_id', lookup_expr='exact')
+    username = django_filters.NumberFilter(field_name='group_user__user__username', lookup_expr='icontains')
+    work_group_id = django_filters.NumberFilter(field_name='work_group_id', lookup_expr='exact')
 
     class Meta:
         model = WorkGroupUserJoinRequest
@@ -82,24 +81,26 @@ class BaseWorkGroupUserJoinRequestFilter(django_filters.FilterSet):
                       group_user_id=['exact'])
 
 
-def work_group_user_join_request_list(*, work_group_id: int, fetched_by: User, filters=None):
+def work_group_user_join_request_list(*, group_id: int, fetched_by: User, filters=None):
     filters = filters or {}
 
-    work_group = WorkGroup.objects.get(id=work_group_id)
+    group = Group.objects.get(id=group_id)
 
     # Won't need to check if group_user is in work_group due to admin/moderator requirement
     group_user_is_admin = group_user_permissions(user=fetched_by,
-                                                 group=work_group.group,
+                                                 group=group,
                                                  permissions=['admin'],
                                                  raise_exception=False)
 
-    work_group_user_is_moderator = WorkGroupUser.objects.filter(id=work_group_id,
-                                                                group_user__user__in=[fetched_by],
-                                                                is_moderator=True).exists()
+    if not group_user_is_admin:
+        work_group_filter = WorkGroup.objects.filter(id=OuterRef('work_group_id'),
+                                                     work_group__group_id=group_id,
+                                                     workgroupuser__group_user__user__in=[fetched_by],
+                                                     workgroupuser__is_moderator=True)
 
-    if group_user_is_admin or work_group_user_is_moderator:
-        qs = WorkGroupUserJoinRequest.objects.filter(work_group_id=work_group_id)
+        qs = WorkGroupUserJoinRequest.objects.filter(work_group_id__in=Subquery(work_group_filter))
 
-        return BaseWorkGroupFilter(filters, qs).qs
+    else:
+        qs = WorkGroupUserJoinRequest.objects.filter(work_group__group_id=group_id)
 
-    raise PermissionDenied("Requires admin or work group moderator permission")
+    return BaseWorkGroupFilter(filters, qs).qs

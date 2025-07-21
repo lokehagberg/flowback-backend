@@ -273,9 +273,10 @@ class WorkGroupUserJoinRequestListAPI(APIView):
 
     class FilterSerializer(serializers.Serializer):
         id = serializers.IntegerField(required=False)
+        username = serializers.CharField(required=False)
         user_id = serializers.IntegerField(required=False)
         group_user_id = serializers.IntegerField(required=False)
-        username = serializers.CharField(required=False)
+        work_group = serializers.IntegerField(required=False)
 
     class OutputSerializer(serializers.Serializer):
         id = serializers.IntegerField()
@@ -283,11 +284,11 @@ class WorkGroupUserJoinRequestListAPI(APIView):
         work_group_name = serializers.CharField(source="work_group.name")
         group_user = GroupUserSerializer()
 
-    def get(self, request, work_group_id: int):
+    def get(self, request, group_id: int):
         serializer = self.FilterSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
 
-        work_group_join_requests = work_group_user_join_request_list(work_group_id=work_group_id,
+        work_group_join_requests = work_group_user_join_request_list(group_id=group_id,
                                                                      fetched_by=request.user,
                                                                      filters=serializer.validated_data)
 
