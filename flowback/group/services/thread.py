@@ -16,7 +16,7 @@ def group_thread_create(user_id: int,
                         description: str = None,
                         attachments: list = None,
                         work_group_id: int = None,
-                        public:bool = True):
+                        public: bool = True):
     group_user = group_user_permissions(user=user_id, group=group_id, work_group=work_group_id)
 
     if pinned:
