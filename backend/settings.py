@@ -20,6 +20,8 @@ env = environ.Env(DEBUG=(bool, True),
                   SECURE_PROXY_SSL_HEADERS=(bool, False),
                   DJANGO_SECRET=str,
                   FLOWBACK_URL=(str, None),
+                  URL_USER_CREATE=(str, None),
+                  URL_USER_FORGOT_PASSWORD=(str, None),
                   INSTANCE_NAME=(str, 'Flowback'),
                   PG_SERVICE=(str, 'flowback'),
                   PG_PASS=(str, '.flowback_pgpass'),
@@ -95,7 +97,10 @@ TESTING = sys.argv[1:2] == ['test']
 
 
 FLOWBACK_URL = env('FLOWBACK_URL')
+URL_USER_CREATE = env('URL_USER_CREATE')
+URL_USER_FORGOT_PASSWORD = env('URL_USER_FORGOT_PASSWORD')
 INSTANCE_NAME = env('INSTANCE_NAME')
+
 PG_SERVICE = env('PG_SERVICE')
 PG_PASS = env('PG_PASS')
 GIT_HASH = "Unavailable"  # TODO fix or remove, it breaks docker compose backend
