@@ -1,4 +1,5 @@
 from backend.settings import (DEBUG,
+                              VERSION,
                               FLOWBACK_KANBAN_LANES,
                               FLOWBACK_ALLOW_GROUP_CREATION,
                               FLOWBACK_ALLOW_DYNAMIC_POLL,
@@ -12,6 +13,7 @@ from backend.settings import (DEBUG,
 def get_public_config():
     data = dict(
         DEBUG=DEBUG,
+        VERSION=VERSION,
         FLOWBACK_KANBAN_LANES=FLOWBACK_KANBAN_LANES,
         FLOWBACK_ALLOW_GROUP_CREATION=FLOWBACK_ALLOW_GROUP_CREATION,
         FLOWBACK_ALLOW_DYNAMIC_POLL=FLOWBACK_ALLOW_DYNAMIC_POLL,
