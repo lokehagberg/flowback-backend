@@ -7,6 +7,7 @@ from django.utils import timezone
 
 from flowback.common.services import get_object
 from flowback.group.models import GroupTags, GroupUser, GroupUserDelegatePool
+from flowback.group.selectors.tags import group_tags_list
 from flowback.notification.models import NotificationChannel
 from flowback.poll.models import Poll, PollAreaStatement, PollPredictionBet, PollPredictionStatement, \
     PollDelegateVoting, PollVotingTypeRanking, PollProposal, PollVoting, \
@@ -323,7 +324,7 @@ def poll_prediction_bet_count(poll_id: int, debug_msg: bool = False):
 
 @shared_task
 def poll_proposal_vote_count(poll_id: int) -> None:
-    poll = get_object(Poll, id=poll_id)
+    poll = Poll.objects.get(id=poll_id)
     group = poll.created_by.group
     total_proposals = poll.pollproposal_set.count()
 
@@ -461,7 +462,8 @@ def poll_proposal_vote_count(poll_id: int) -> None:
         print(f"Total Group Users: {total_group_users}")
         print(f"Quorum: {quorum}")
         poll.status = 1 if poll.participants > total_group_users * quorum else -1
-        poll.interval_mean_absolute_correctness = group_tags_interval_mean_absolute_correctness(tag_id=poll.tag_id)
+        poll.interval_mean_absolute_correctness = group_tags_list(group_id=poll.created_by.group_id,
+                                                                  filters=dict(id=poll.tag_id)).first().imac
         poll.result = True
         poll.save()
 
