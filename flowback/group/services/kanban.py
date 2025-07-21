@@ -8,6 +8,7 @@ from flowback.notification.models import NotificationChannel
 
 group_kanban = KanbanManager(origin_type='group')
 
+
 def group_kanban_entry_create(*,
                               group_id: int,
                               fetched_by_id: int,
@@ -70,8 +71,8 @@ def group_kanban_entry_update(*,
         data["work_group_id"] = None
     
     new_kanban_entry = group_kanban.kanban_entry_update(origin_id=group_id,
-                                              entry_id=entry_id,
-                                              data=data)
+                                                        entry_id=entry_id,
+                                                        data=data)
 
     # Notify Users
     if data.get('assignee_id', None) and data['assignee_id'] != previous_kanban_entry.assignee_id:
