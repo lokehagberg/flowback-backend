@@ -11,7 +11,7 @@ from django.utils import timezone
 
 from rest_framework.exceptions import ValidationError
 
-from backend.settings import DEFAULT_FROM_EMAIL, FLOWBACK_URL, EMAIL_HOST
+from backend.settings import DEFAULT_FROM_EMAIL, URL_USER_CREATE, URL_USER_FORGOT_PASSWORD, EMAIL_HOST
 from flowback.chat.models import MessageChannel, MessageChannelParticipant
 from flowback.chat.services import message_channel_create, message_channel_join
 from flowback.common.services import model_update, get_object
@@ -38,9 +38,9 @@ def user_create(*, username: str, email: str) -> OnboardUser | None:
     user = OnboardUser.objects.create(email=email, username=username)
 
     link = f'Use this code to create your account: {user.verification_code}'
-    if FLOWBACK_URL:
-        link = f"Use this link to create your account: {FLOWBACK_URL}/create_account"\
-               f"?email={email}&verification_code={user.verification_code}"
+    if URL_USER_CREATE:
+        link = (f"Use this link to create your account: {URL_USER_CREATE}"
+                f"?email={email}&verification_code={user.verification_code}")
 
     if EMAIL_HOST:
         send_mail('Flowback Verification Code', link, DEFAULT_FROM_EMAIL, [email])
@@ -82,9 +82,9 @@ def user_forgot_password(*, email: str) -> PasswordReset:
 
     link = f'Use this code to reset your account password: {password_reset.verification_code}'
 
-    if FLOWBACK_URL:
-        link = f'''Use this link to reset your account password: {FLOWBACK_URL}/forgot_password/
-                       ?email={email}&verification_code={password_reset.verification_code}'''
+    if URL_USER_FORGOT_PASSWORD:
+        link = (f'Use this link to reset your account password: {URL_USER_FORGOT_PASSWORD}'
+                f'?email={email}&verification_code={password_reset.verification_code}')
 
     if EMAIL_HOST:
         send_mail('Flowback Verification Code', link, DEFAULT_FROM_EMAIL, [email])
@@ -338,7 +338,7 @@ def user_chat_channel_update(*, user_id: int, channel_id: int, **data: dict):
         return channel
 
 
-def report_create(*, user_id: int, title: str, description: str, group_id:int, post_id:int, post_type:str):
+def report_create(*, user_id: int, title: str, description: str, group_id: int, post_id: int, post_type: str):
     user = get_object(User, id=user_id)
 
     report = Report(user=user, title=title, description=description, group_id=group_id,

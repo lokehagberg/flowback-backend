@@ -26,6 +26,7 @@ class ServerConfigListAPI(APIView):
                                                             help_text="Default groups id's that users join")
         FLOWBACK_DISABLE_DEFAULT_USER_REGISTRATION = serializers.BooleanField(
             help_text="If users can register or not")
+        VERSION = serializers.CharField(help_text="Flowback version, updated manually")
         GIT_HASH = serializers.CharField(help_text="The latest commit hash associated with this repository")
 
     def get(self, request):
