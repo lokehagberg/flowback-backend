@@ -59,6 +59,18 @@ class PollTest(APITestCase):
         self.assertEqual(response.data['results'][1]['total_proposals'], 12)
         self.assertEqual(response.data['results'][1]['total_predictions'], 15)
 
+    def test_list_polls_hide_users(self):
+        self.group.hide_poll_users = True
+        self.group.save()
+
+        response = generate_request(api=PollListApi,
+                                    data=dict(order_by='pinned,start_date_asc'),
+                                    user=self.group_user_creator.user)
+
+        self.assertTrue(all([not x['created_by'] for x in response.data['results']]),
+                        [[bool(x['created_by']), x['group_id']] for x in response.data['results']])
+
+
     def test_create_poll(self):
         factory = APIRequestFactory()
         user = self.group_user_creator.user
