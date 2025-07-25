@@ -29,7 +29,7 @@ class UserHomeFeedAPI(APIView):
 
 
     class OutputSerializer(serializers.Serializer):
-        created_by = GroupUserSerializer(hide_relevant_users=True)
+        created_by = GroupUserSerializer()
         created_at = serializers.DateTimeField()
         updated_at = serializers.DateTimeField()
         group_id = serializers.IntegerField()
