@@ -66,7 +66,7 @@ def group_kanban_entry_update(*,
 
     if 'assignee_id' in data.keys() and data['assignee_id'] is not None:
         group_user_permissions(user=data['assignee_id'], group=group_id)
-
+    
     new_kanban_entry = group_kanban.kanban_entry_update(origin_id=group_id,
                                                         entry_id=entry_id,
                                                         data=data)
