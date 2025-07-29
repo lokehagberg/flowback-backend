@@ -28,7 +28,12 @@ class GroupUserSerializer(serializers.Serializer):
         super().__init__(*args, **kwargs)
 
     def to_representation(self, instance):
-        if self.hide_relevant_users and GroupUser.objects.get(id=instance).group.hide_poll_users:
+        if isinstance(instance, int):
+            group_user = GroupUser.objects.get(id=instance)
+        else:
+            group_user = instance
+
+        if self.hide_relevant_users and group_user.group.hide_poll_users:
             return None
 
         return super().to_representation(instance)
