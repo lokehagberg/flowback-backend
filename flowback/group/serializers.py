@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from flowback.group.models import Group
+from flowback.group.models import Group, GroupUser
 from flowback.user.serializers import BasicUserSerializer
 
 
@@ -28,7 +28,7 @@ class GroupUserSerializer(serializers.Serializer):
         super().__init__(*args, **kwargs)
 
     def to_representation(self, instance):
-        if self.hide_relevant_users and instance.group.hide_poll_users:
+        if self.hide_relevant_users and GroupUser.objects.get(id=instance).group.hide_poll_users:
             return None
 
         return super().to_representation(instance)

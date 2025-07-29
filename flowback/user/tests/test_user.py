@@ -109,8 +109,8 @@ class UserTest(APITestCase):
         polls[1].pinned = True
         polls[1].save()
 
-        PollFactory.create_batch(size=5, created_by=group_user_two)
-        GroupThreadFactory.create_batch(size=5, created_by=group_user_two)
+        PollFactory.create_batch(size=5, created_by=group_user_two, public=True)
+        GroupThreadFactory.create_batch(size=5, created_by=group_user_two, public=True)
 
         polls = PollFactory.create_batch(size=5, created_by=group_user_three)
         poll_with_comments = polls[0] # Testing total comments aggregate
@@ -142,7 +142,7 @@ class UserTest(APITestCase):
                                                     id=response.data['results'][x]['id']).exists())
 
         self.assertEqual(response.status_code, 200, response.data)
-        self.assertEqual(response.data['count'], 10)
+        self.assertEqual(response.data['count'], 15)
 
     def test_user_home_feed_visibility(self):
         # Create public group with 5 polls and 10 threads
@@ -152,14 +152,14 @@ class UserTest(APITestCase):
         group_public_workgroup = group_user_public_workgroupuser.work_group
         group_user_public_admin = GroupUser.objects.get(user=group_public.created_by)
         group_user_public = GroupUserFactory(group=group_public)
-        public_threads = GroupThreadFactory.create_batch(size=5, created_by=group_user_public)
-        public_polls = PollFactory.create_batch(size=5, created_by=group_user_public)
+        public_threads = GroupThreadFactory.create_batch(size=5, created_by=group_user_public, public=True)
+        public_polls = PollFactory.create_batch(size=5, created_by=group_user_public, public=True)
         public_threads_workgroup = GroupThreadFactory.create_batch(size=5,
                                                                    created_by=group_user_public,
                                                                    work_group=group_public_workgroup)
 
         # Create private group with 5 polls and 10 threads
-        group_private = GroupFactory(public=False)
+        group_private = GroupFactory(public=False, hide_poll_users=True)
         group_user_private_workgroupuser = WorkGroupUserFactory(work_group__group=group_private,
                                                                 group_user__group=group_private)
         group_user_private_workgroup = group_user_private_workgroupuser.work_group
@@ -180,18 +180,24 @@ class UserTest(APITestCase):
                         [i['pinned'] for i in response.data['results']])  # Placeholder test for pinned
         self.assertTrue(all([i['pinned'] for i in response.data['results'][:4]]),
                         [i['pinned'] for i in response.data['results'][:4]])  # Placeholder test for order_by
+        self.assertTrue(all([x['created_by'] is None
+                             for x in response.data['results']
+                             if x['group_id'] == group_user_private.group.id]),
+                        [x['created_by'] is None
+                         for x in response.data['results']
+                         if x['group_id'] == group_user_private.group.id])  # Placeholder test for hide_poll_users
         self.assertEqual(response.status_code, 200, response.data)
-        self.assertEqual(response.data['count'], 15)
+        self.assertEqual(response.data['count'], 20)
 
         ## Admin
         response = generate_request(api=UserHomeFeedAPI, user=group_user_private_admin.user)
         self.assertEqual(response.status_code, 200, response.data)
-        self.assertEqual(response.data['count'], 20)
+        self.assertEqual(response.data['count'], 25)
 
         ## WorkGroup User
         response = generate_request(api=UserHomeFeedAPI, user=group_user_private_workgroupuser.group_user.user)
         self.assertEqual(response.status_code, 200, response.data)
-        self.assertEqual(response.data['count'], 20)
+        self.assertEqual(response.data['count'], 25)
 
         # Private testing
 
