@@ -24,7 +24,7 @@ class GroupUserTest(APITestCase):
         # Basic test
         response = generate_request(api=GroupUserListApi,
                                     user=user,
-                                    url_params=dict(self.group.id))
+                                    url_params=dict(group_id=self.group.id))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['count'], 4)
         self.assertEqual(response.data['results'][0].get('delegate_pool_id'), None)
@@ -35,7 +35,7 @@ class GroupUserTest(APITestCase):
         # Test delegates only
         response = generate_request(api=GroupUserListApi,
                                     user=user,
-                                    url_params=dict(self.group.id),
+                                    url_params=dict(group_id=self.group.id),
                                     data=dict(is_delegate=True))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['count'], 1)
