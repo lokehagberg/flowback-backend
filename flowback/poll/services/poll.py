@@ -116,10 +116,13 @@ def poll_update(*, user_id: int, poll_id: int, data) -> Poll:
     poll = get_object(Poll, id=poll_id)
     group_user = group_user_permissions(user=user_id, group=poll.created_by.group.id)
 
-    if data.get('pinned') is not None and not group_user.is_admin:
-        raise ValidationError('Permission denied')
-
     non_side_effect_fields = ['title', 'description', 'pinned']
+
+    if data.get('pinned') is None:
+        data.pop('pinned')
+
+    elif data.get('pinned') is not None and not group_user.is_admin:
+        raise ValidationError('Permission denied')
 
     poll, has_updated = model_update(instance=poll,
                                      fields=non_side_effect_fields,

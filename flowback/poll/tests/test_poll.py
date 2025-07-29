@@ -30,8 +30,9 @@ class PollTest(APITestCase):
          self.group_user_three) = GroupUserFactory.create_batch(3, group=self.group)
         (self.poll_one,
          self.poll_two,
-         self.poll_three) = [PollFactory(created_by=x) for x in [self.group_user_creator, self.group_user_one,
-                                                                 self.group_user_two]]
+         self.poll_three) = [PollFactory(created_by=x, pinned=False) for x in
+                             [self.group_user_creator, self.group_user_one,
+                              self.group_user_two]]
         segment = FileSegmentFactory()
         self.poll_three.attachments = segment.collection
         self.poll_three.save()
@@ -69,7 +70,6 @@ class PollTest(APITestCase):
 
         self.assertTrue(all([not x['created_by'] for x in response.data['results']]),
                         [[bool(x['created_by']), x['group_id']] for x in response.data['results']])
-
 
     def test_create_poll(self):
         factory = APIRequestFactory()
@@ -129,12 +129,12 @@ class PollTest(APITestCase):
         user = self.group_user_one.user
         view = PollUpdateAPI.as_view()
 
-        data = dict(title='new_title', description='new_description', pinned=False)
+        data = dict(title='new_title', description='new_description')
         request = factory.post('', data=data)
         force_authenticate(request, user)
 
         response = view(request, poll=self.poll_two.id)
-        self.assertTrue(response.status_code == 200, response.rendered_content)
+        self.assertEqual(response.status_code, 200, response.rendered_content)
 
         self.poll_two.refresh_from_db()
         self.assertTrue(self.poll_two.title == 'new_title')

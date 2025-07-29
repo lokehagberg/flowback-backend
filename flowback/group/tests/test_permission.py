@@ -7,8 +7,6 @@ from flowback.group.tests.factories import GroupFactory, GroupUserFactory, Group
 
 
 class GroupPermissionTest(APITestCase):
-    reset_sequences = True
-
     def setUp(self):
         self.group = GroupFactory()
         self.group_creator = GroupUser.objects.get(user=self.group.created_by, group=self.group)
