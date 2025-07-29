@@ -26,6 +26,8 @@ class TestKanban(APITestCase):
             group=self.group,
             is_admin=False
         )
+        self.unprivileged_group_user.permission = GroupPermissionsFactory(create_kanban_task=False)
+        self.unprivileged_group_user.save()
 
         # Create a work group for testing
         self.work_group = WorkGroupFactory(group=self.group)
@@ -79,11 +81,12 @@ class TestKanban(APITestCase):
         }
 
         # This should fail validation
-        with self.assertRaises(Exception):
-            generate_request(api=GroupKanbanEntryCreateAPI,
-                             user=self.user,
-                             data=data,
-                             url_params=dict(group_id=self.group.id))
+        response = generate_request(api=GroupKanbanEntryCreateAPI,
+                                    user=self.user,
+                                    data=data,
+                                    url_params=dict(group_id=self.group.id))
+
+        self.assertEqual(response.status_code, 400)
 
     def test_kanban_entry_create_failure_unauthorized_user(self):
         data = {
@@ -94,11 +97,12 @@ class TestKanban(APITestCase):
         }
 
         # This should raise a PermissionDenied exception
-        with self.assertRaises(PermissionDenied):
-            generate_request(api=GroupKanbanEntryCreateAPI,
-                             user=self.unprivileged_user,
-                             data=data,
-                             url_params=dict(group_id=self.group.id))
+        response = generate_request(api=GroupKanbanEntryCreateAPI,
+                                    user=self.unprivileged_user,
+                                    data=data,
+                                    url_params=dict(group_id=self.group.id))
+
+        self.assertEqual(response.status_code, 403)
 
     def test_kanban_entry_update(self):
         # Create an entry to update
