@@ -67,7 +67,7 @@ class PollListApi(APIView):
             file = serializers.CharField()
             file_name = serializers.CharField()
 
-        created_by = GroupUserSerializer(allow_null=True, hide_relevant_users=True)
+        created_by = GroupUserSerializer()
         group_joined = serializers.BooleanField(required=False)
         group_id = serializers.IntegerField(source='created_by.group_id')
         group_name = serializers.CharField(source='created_by.group.name')

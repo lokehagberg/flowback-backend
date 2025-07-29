@@ -22,17 +22,6 @@ class GroupUserSerializer(serializers.Serializer):
     group_name = serializers.CharField(required=False, source='group.name')
     group_image = serializers.CharField(required=False, source='group.image')
 
-    def __init__(self, *args, hide_relevant_users=False, **kwargs):
-        self.hide_relevant_users = hide_relevant_users
-
-        super().__init__(*args, **kwargs)
-
-    def to_representation(self, instance):
-        if self.hide_relevant_users and instance.group.hide_poll_users:
-            return None
-
-        return super().to_representation(instance)
-
 
 class WorkGroupSerializer(serializers.Serializer):
     id = serializers.IntegerField()
