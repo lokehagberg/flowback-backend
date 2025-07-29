@@ -81,6 +81,8 @@ class PollDelegateTests(APITestCase):
             data=dict(group_id=self.group.id, delegate_pool_id=self.delegate.pool.id)
         )
 
+        print(response.data['results'])
+
         self.assertEqual(response.status_code, 200)
         # Should return polls where this delegate has voted
         self.assertGreaterEqual(len(response.data['results']), 1)

@@ -21,7 +21,7 @@ class GroupNotificationTest(APITransactionTestCase):
 
     def test_group_notify_group(self):
         message = "Hello everyone"
-        self.group.notify_group(message=message)
+        self.group.notify_group(message=message, action=NotificationObject.Action.CREATED)
 
         self.assertTrue(NotificationObject.objects.filter(channel__content_type__model="group",
                                                           channel__object_id=self.group.id,
@@ -68,8 +68,8 @@ class GroupNotificationTest(APITransactionTestCase):
                 channel=self.group.notification_channel).count(), 5)
 
         # Send notification
-        self.group.notify_group(message="Hello everyone!")
-        self.group.notify_group(message="Hi there!")
+        self.group.notify_group(message="Hello everyone!", action=NotificationObject.Action.CREATED)
+        self.group.notify_group(message="Hi there!", action=NotificationObject.Action.CREATED)
 
         self.assertEqual(NotificationObject.objects.count(), 2)
         self.assertEqual(Notification.objects.count(), 10)
@@ -105,8 +105,8 @@ class GroupNotificationTest(APITransactionTestCase):
         [self.group.notification_channel.subscribe(user=u.user,
                                                    tags=['group']) for u in group_users]
 
-        notification_one = self.group.notify_group(message="Hello everyone!")
-        notification_two = self.group.notify_group(message="Hi there!")
+        notification_one = self.group.notify_group(message="Hello everyone!", action=NotificationObject.Action.CREATED)
+        notification_two = self.group.notify_group(message="Hi there!", action=NotificationObject.Action.CREATED)
 
         # Test updating notification
         response = generate_request(api=NotificationUpdateAPI,
