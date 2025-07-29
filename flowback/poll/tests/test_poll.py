@@ -85,7 +85,37 @@ class PollTest(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
+    def test_create_poll_notification(self):
+        subscriber = self.group_user_one
+        poll_creator = self.group_user_two
 
+        # Subscribe group_user_one to the group notification channel
+        self.group.notification_channel.subscribe(user=subscriber.user, tags=['poll'])
+
+        data = dict(title='notification test poll', description='testing notifications',
+                    poll_type=4, public=True, tag=self.group_tag.id,
+                    pinned=False, dynamic=False, attachments=[SimpleUploadedFile('test.jpg', b'test')],
+                    **generate_poll_phase_kwargs('base'))
+
+        # Use generate_request to create the poll
+        response = generate_request(
+            api=PollCreateAPI,
+            data=data,
+            url_params=dict(group_id=self.group.id),
+            user=poll_creator.user,
+        )
+
+        # Check response status
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        # Check if group_user_one received a notification
+        Notification.objects.get(
+            user=subscriber.user,
+            notification_object__channel=self.group.notification_channel,
+            notification_object__tag="poll",
+            notification_object__data__poll_id=response.data,
+            notification_object__action=NotificationObject.Action.CREATED,
+        )
 
     def test_create_poll_below_phase_space_minimum(self):
         phases = generate_poll_phase_kwargs('base')
@@ -214,36 +244,3 @@ class PollTest(APITestCase):
 
         self.assertTrue(response.status_code == 200)
         self.assertTrue(not Poll.objects.filter(id=poll.id).exists())
-
-
-    def test_poll_notification(self):
-        subscriber = self.group_user_one
-        poll_creator = self.group_user_two
-
-        # Subscribe group_user_one to the group notification channel
-        self.group.notification_channel.subscribe(user=subscriber.user, tags=['poll'])
-        
-        data = dict(title='notification test poll', description='testing notifications', 
-                    poll_type=4, public=True, tag=self.group_tag.id,
-                    pinned=False, dynamic=False, attachments=[SimpleUploadedFile('test.jpg', b'test')],
-                    **generate_poll_phase_kwargs('base'))
-                    
-        # Use generate_request to create the poll
-        response = generate_request(
-            api=PollCreateAPI,
-            data=data,
-            url_params=dict(group_id=self.group.id),
-            user=poll_creator.user,
-        )
-        
-        # Check response status
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        
-        # Check if group_user_one received a notification
-        Notification.objects.get(
-            user=subscriber.user,
-            notification_object__channel=self.group.notification_channel,
-            notification_object__tag="poll",
-            notification_object__data__poll_id=response.data,
-            notification_object__action=NotificationObject.Action.CREATED,
-        )
