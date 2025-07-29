@@ -68,7 +68,7 @@ class PollPredictionStatementTest(APITestCase):
         factory = APIRequestFactory()
         view = PollPredictionStatementListAPI.as_view()
 
-        request = factory.get('', data=dict(proposals='1,3'))
+        request = factory.get('', data=dict(proposals=f'{self.proposal_one},{self.proposal_three}'))
         force_authenticate(request, user=self.user_prediction_caster_one.user)
         response = view(request, group_id=self.group.id)
         self.assertEqual(response.status_code, 200, msg=response.data)
@@ -81,7 +81,7 @@ class PollPredictionStatementTest(APITestCase):
         self.assertEqual(self.proposal_one.poll.created_by.group,
                          self.user_prediction_caster_one.group, "Proposal is not in same"
                                                                 " group as predictor")
-        self.assertEqual(len(json.loads(response.rendered_content)['results']), 1,
+        self.assertEqual(len(response.data['results']), 1,
                          'Incorrect amount of prediction statements returned')
 
     # PredictionBet Statements
