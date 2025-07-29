@@ -76,7 +76,7 @@ def poll_proposal_delete(*, user_id: int, proposal_id: int) -> None:
     group_user = group_user_permissions(user=user_id, group=proposal.created_by.group)
 
     if proposal.created_by == group_user and group_user.check_permission(delete_proposal=True):
-        proposal.poll.check_phase('proposal', 'dynamic')
+        proposal.poll.check_phase('proposal', 'dynamic', 'schedule')
 
     elif not (group_user.check_permission(force_delete_permission=True) or group_user.is_admin):
         raise ValidationError("Deleting other users proposals needs either "

@@ -166,7 +166,7 @@ class ProposalTest(APITestCase):
         event_id = proposal.pollproposaltypeschedule.event.id
 
         response = self.proposal_delete(proposal, user)
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 200, response.data)
         self.assertFalse(ScheduleEvent.objects.filter(id=event_id).exists())
 
     def test_proposal_schedule_delete_no_permission(self):
