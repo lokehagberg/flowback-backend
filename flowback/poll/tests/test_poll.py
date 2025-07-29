@@ -17,6 +17,7 @@ from ...files.tests.factories import FileSegmentFactory
 from ...group.models import GroupUser
 from ...group.tests.factories import GroupFactory, GroupUserFactory, GroupTagsFactory
 from ...notification.models import NotificationChannel, NotificationObject, Notification
+from ...notification.views import NotificationListAPI
 from ...user.models import User
 
 
@@ -105,17 +106,25 @@ class PollTest(APITestCase):
             user=poll_creator.user,
         )
 
-        # Check response status
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-        # Check if group_user_one received a notification
-        Notification.objects.get(
+        # Check if the subscriber received a notification
+        notification = Notification.objects.get(
             user=subscriber.user,
             notification_object__channel=self.group.notification_channel,
             notification_object__tag="poll",
             notification_object__data__poll_id=response.data,
             notification_object__action=NotificationObject.Action.CREATED,
         )
+
+        # Also check if the API returns the Notification
+        response = generate_request(NotificationListAPI,
+                                    data=dict(order_by='timestamp_desc',
+                                              object_id=notification.notification_object.id),
+                                    user=subscriber.user)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data['count'], 1)
 
     def test_create_poll_below_phase_space_minimum(self):
         phases = generate_poll_phase_kwargs('base')
