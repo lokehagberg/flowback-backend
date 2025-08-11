@@ -16,6 +16,7 @@ from ...common.tests import generate_request
 from ...files.tests.factories import FileSegmentFactory
 from ...group.models import GroupUser
 from ...group.tests.factories import GroupFactory, GroupUserFactory, GroupTagsFactory
+from ...group.views.group import GroupNotificationSubscribeAPI
 from ...notification.models import NotificationChannel, NotificationObject, Notification
 from ...notification.views import NotificationListAPI
 from ...user.models import User
@@ -75,7 +76,7 @@ class PollTest(APITestCase):
     def test_create_poll(self):
         factory = APIRequestFactory()
         user = self.group_user_creator.user
-        view = PollCreateAPI.as_view()
+        view = ~PollCreateAPI.as_view()
 
         data = dict(title='test title', description='test description', poll_type=4, public=True, tag=self.group_tag.id,
                     pinned=False, dynamic=False, attachments=[SimpleUploadedFile('test.jpg', b'test')],
@@ -91,7 +92,18 @@ class PollTest(APITestCase):
         poll_creator = self.group_user_two
 
         # Subscribe group_user_one to the group notification channel
-        self.group.notification_channel.subscribe(user=subscriber.user, tags=['poll'])
+        generate_request(GroupNotificationSubscribeAPI,
+                         data=dict(tags=['poll']),
+                         user=subscriber.user,
+                         url_params=dict(group_id=self.group.id))
+
+        # Check there's no notifications ahead of the test
+        response = generate_request(NotificationListAPI,
+                                    data=dict(order_by='timestamp_desc'),
+                                    user=subscriber.user)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data['count'], 0)
 
         data = dict(title='notification test poll', description='testing notifications',
                     poll_type=4, public=True, tag=self.group_tag.id,
