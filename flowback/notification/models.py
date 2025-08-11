@@ -197,8 +197,11 @@ class NotificationChannel(BaseModel, TreeNode):
 
         # A patchwork for django image fields due to them returning <ImageFieldFile: None> when empty
         for k, v in data.items():
-            if isinstance(v, ImageFieldFile) and not v:
-                data[k] = None
+            if isinstance(v, ImageFieldFile):
+                if not v:
+                    data[k] = None
+                else:
+                    data[k] = v.url
 
         extra_fields = dict(timestamp=timestamp)  # Dict of fields that has defaults in NotificationObject model
         notification_object = NotificationObject(channel=self,

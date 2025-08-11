@@ -189,7 +189,7 @@ class PollCreateAPI(APIView):
         serializer = self.InputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         poll = poll_create(user_id=request.user.id, group_id=group_id, **serializer.validated_data)
-        return Response(status=status.HTTP_200_OK, data=dict(poll_id=poll.id))
+        return Response(status=status.HTTP_200_OK, data=poll.id)
 
 
 @extend_schema(tags=['poll'])
