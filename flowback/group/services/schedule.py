@@ -21,7 +21,7 @@ def group_schedule_event_create(*,
                                         origin_id=group_user.group.id,
                                         origin_name='group',
                                         work_group_id=work_group_id,
-                                        reminders=reminders
+                                        reminders=reminders,
                                         **data)
 
     notify_group_schedule_event(message="A new event has been created",
