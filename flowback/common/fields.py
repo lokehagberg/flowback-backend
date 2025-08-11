@@ -9,7 +9,11 @@ class CharacterSeparatedField(serializers.ListField):
         super().__init__(**kwargs)
 
     def to_internal_value(self, data):
-        data = data.split(self.separator)
+        if isinstance(data, str):
+            data = data.split(self.separator)
+        elif not isinstance(data, list):
+            raise serializers.ValidationError(f"Invalid input type, "
+                                              f"field expects a string separated by: {self.separator}")
         return super().to_internal_value(data)
 
     def get_value(self, dictionary):
