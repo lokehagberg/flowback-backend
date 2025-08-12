@@ -40,6 +40,11 @@ class NotificationObject(BaseModel):
         if self.tag not in self.channel.tags:
             raise ValidationError('Invalid tag, must be in channel tags')
 
+        for k, v in self.data.items():
+            print(f"{k}: {type(v)}, {v}")
+        if self.data and any([isinstance(v, ImageFieldFile) for v in self.data.values()]):
+            raise TypeError('Data must be a dictionary of primitive types')
+
     @classmethod
     def post_save(cls, instance, created, *args, **kwargs):
         """
@@ -149,7 +154,17 @@ class NotificationChannel(BaseModel, TreeNode):
     @property
     def data(self) -> dict | None:
         if self.content_object.notification_data is not None:
-            return self.content_object.notification_data
+            data = self.content_object.notification_data
+
+            # Patch to fix django's immaculate ImageFieldFile serialization for JSONField
+            for k, v in data.items():
+                if isinstance(v, ImageFieldFile):
+                    if not v:
+                        data[k] = None
+                    else:
+                        data[k] = v.url
+
+            return data
 
         else:
             return None
