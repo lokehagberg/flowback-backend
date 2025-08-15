@@ -317,7 +317,8 @@ class GroupUser(BaseModel):
         KanbanSubscription.objects.filter(kanban_id=instance.user.kanban_id,
                                           target_id=instance.group.kanban_id).delete()
         instance.chat_participant.delete()
-        instance.group.notification_channel.subscribe(user=instance.user)
+        if instance.group.notification_channel:
+            instance.group.notification_channel.unsubscribe(user=instance.user)
 
     class Meta:
         unique_together = ('user', 'group')
