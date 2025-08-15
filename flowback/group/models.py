@@ -204,7 +204,6 @@ class Group(BaseModel, NotifiableModel):
         instance.schedule.delete()
         instance.kanban.delete()
         instance.chat.delete()
-        instance.notification_channel.delete()
 
 
 pre_save.connect(Group.pre_save, sender=Group)
