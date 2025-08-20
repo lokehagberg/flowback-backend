@@ -165,7 +165,7 @@ class ScheduleManager:
                     raise_exception=raise_exception)
 
         if schedule_origin_id is not None:
-            data['schedule_origin_id'] = schedule_origin_id
+            data['schedule__origin_id'] = schedule_origin_id
 
         return get_object(ScheduleEvent, **data)
 

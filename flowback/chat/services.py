@@ -1,6 +1,5 @@
 from django.contrib.admin import action
 from django.shortcuts import get_object_or_404
-from django.utils.datetime_safe import datetime
 from rest_framework.exceptions import ValidationError
 
 from flowback.chat.models import MessageChannel, Message, MessageChannelParticipant, MessageFileCollection, \

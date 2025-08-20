@@ -1,4 +1,5 @@
 import inspect
+import json
 import re
 from datetime import timedelta, datetime
 from inspect import getfullargspec, isclass
@@ -40,8 +41,6 @@ class NotificationObject(BaseModel):
         if self.tag not in self.channel.tags:
             raise ValidationError('Invalid tag, must be in channel tags')
 
-        for k, v in self.data.items():
-            print(f"{k}: {type(v)}, {v}")
         if self.data and any([isinstance(v, ImageFieldFile) for v in self.data.values()]):
             raise TypeError('Data must be a dictionary of primitive types')
 
@@ -186,13 +185,21 @@ class NotificationChannel(BaseModel, TreeNode):
         """
         Creates a new notification. If called by a 'notify_*' function,
         args prefixed with '_' won't be used for documentation.
+
+        Example usage within a model:
+
+        .. code-block:: python
+
+        def notify_upvote(self, action: NotificationObject.Action, user: User):
+                self.channel.notify(**locals())
+
         :param action: Check NotificationObject.Action for more information
         :param message: A text containing the message.
         :param tag: Optional tag for the notification. If not provided,
          the tag will take the calling function name (without the 'notify_' prefix) if it exists, otherwise
          it raises an error.
         :param timestamp: Timestamp when this notification becomes active. Defaults to timezone.now().
-        :param data: Additional data to pass to the notification.
+        :param data: Additional data to pass to the notification. Note that it'll always pop 'self' from the data to work with locals().
         :param subscription_filters: List of NotificationSubscription filters to pass onto the delivery of notifications.
         :param subscription_q_filters: List of NotificationSubscription Q filters to pass onto the delivery of notifications.
         """
