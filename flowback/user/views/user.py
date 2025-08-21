@@ -25,7 +25,7 @@ class UserCreateApi(APIView):
     class InputSerializer(serializers.ModelSerializer):
         class Meta:
             model = OnboardUser
-            fields = 'username', 'email'
+            fields = 'email'
 
     def post(self, request):
         serializer = self.InputSerializer(data=request.data)
@@ -40,6 +40,7 @@ class UserCreateVerifyApi(APIView):
     permission_classes = [AllowAny]
 
     class InputSerializer(serializers.Serializer):
+        username = serializers.CharField()
         verification_code = serializers.UUIDField()
         password = serializers.CharField()
 

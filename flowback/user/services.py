@@ -25,8 +25,8 @@ user_schedule = ScheduleManager(schedule_origin_name='user')
 user_kanban = KanbanManager(origin_type='user')
 
 
-def user_create(*, username: str, email: str) -> OnboardUser | None:
-    users = User.objects.filter(Q(email=email) | Q(username=username))
+def user_create(*, email: str) -> OnboardUser | None:
+    users = User.objects.filter(Q(email=email))
     if users.exists():
         for user in users:
             if user.email == email:
@@ -35,7 +35,7 @@ def user_create(*, username: str, email: str) -> OnboardUser | None:
             else:
                 raise ValidationError('Username already exists.')
 
-    user = OnboardUser.objects.create(email=email, username=username)
+    user = OnboardUser.objects.create(email=email)
 
     link = f'Use this code to create your account: {user.verification_code}'
     if URL_USER_CREATE:
@@ -47,18 +47,18 @@ def user_create(*, username: str, email: str) -> OnboardUser | None:
 
     else:
         logging.info("Email host not configured. Email not sent, but code was sent to the console.")
-        print(f"Verification code for '{user.username}': {user.verification_code}")
+        print(f"Verification code for '{user.email}': {user.verification_code}")
 
-        return user
+    return user
 
 
-def user_create_verify(*, verification_code: str, password: str):
+def user_create_verify(*, username: str, verification_code: str, password: str):
     onboard_user = get_object_or_404(OnboardUser, verification_code=verification_code)
 
     if User.objects.filter(email=onboard_user.email).exists():
         raise ValidationError('Email already registered')
 
-    elif User.objects.filter(username=onboard_user.username).exists():
+    elif User.objects.filter(username=username).exists():
         raise ValidationError('Username already registered')
 
     elif onboard_user.is_verified:
@@ -70,7 +70,7 @@ def user_create_verify(*, verification_code: str, password: str):
                  fields=['is_verified'],
                  data=dict(is_verified=True))
 
-    return User.objects.create_user(username=onboard_user.username,
+    return User.objects.create_user(username=username,
                                     email=onboard_user.email,
                                     password=password)
 
