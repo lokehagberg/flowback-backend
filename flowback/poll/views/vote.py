@@ -93,6 +93,10 @@ class DelegatePollVoteListAPI(APIView):
         poll_id = serializers.IntegerField()
         poll_title = serializers.CharField(source='poll.title')
         poll_description = serializers.CharField(source='poll.description', allow_null=True)
+        poll_interval_mean_absolute_correctness = serializers.DecimalField(
+            max_digits=12, decimal_places=9,
+            source='poll.interval_mean_absolute_correctness',
+            allow_null=True)
         vote = serializers.SerializerMethodField()
 
         class VoteRankingOutputSerializer(serializers.Serializer):
