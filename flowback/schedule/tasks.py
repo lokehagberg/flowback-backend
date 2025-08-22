@@ -1,5 +1,4 @@
 from celery import shared_task
-from defusedxml.xmlrpc import defused_gzip_decode
 from django_celery_beat.models import PeriodicTask
 
 from flowback.schedule.models import ScheduleEvent
