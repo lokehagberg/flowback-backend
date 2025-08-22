@@ -33,7 +33,8 @@ class TestSchedule(TestCase):
         )
         self.assertEqual(event.assignees.count(), 10)
 
-        update_event(event_id=event.id, data=dict(assignee_ids=[x.id for x in self.group_users[-5:]]))
+        update_event(event_id=event.id, data=dict(assignee_ids=[x.id for x in self.group_users[-5:]],
+                                                  repeat_frequency=ScheduleEvent.Frequency.DAILY))
         self.assertEqual(event.assignees.count(), 5)
 
     def test_event_notify(self):
