@@ -14,7 +14,11 @@ def create_notification_channels_for_users(apps, schema_editor):
     ContentType = apps.get_model('contenttypes', 'ContentType')
     
     # Get the ContentType for User model
-    user_content_type = ContentType.objects.get(app_label='user', model='user')
+    try:
+        user_content_type = ContentType.objects.get(app_label='user', model='user')
+    except ContentType.DoesNotExist:
+        raise ValueError("ContentType for User model not found")
+
     
     # Find all users
     all_users = User.objects.all()
