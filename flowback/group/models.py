@@ -156,7 +156,7 @@ class Group(BaseModel, NotifiableModel):
     @classmethod
     def pre_save(cls, instance, raw, using, update_fields, *args, **kwargs):
         if instance.pk is None:
-            channel = MessageChannel(origin_name='group')
+            channel = MessageChannel(origin_name='group', title=instance.name)
             channel.save()
 
             instance.chat = channel
@@ -180,10 +180,12 @@ class Group(BaseModel, NotifiableModel):
                 update_fields = [field.name for field in update_fields]
 
             if 'name' in update_fields:
+                instance.chat.title = instance.name
                 instance.schedule.name = instance.name
                 instance.kanban.name = instance.name
                 instance.schedule.save()
                 instance.kanban.save()
+                instance.chat.save()
 
     @classmethod
     def user_post_save(cls, instance: User, created: bool, *args, **kwargs):
