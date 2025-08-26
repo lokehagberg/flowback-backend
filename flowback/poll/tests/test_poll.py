@@ -76,7 +76,7 @@ class PollTest(APITestCase):
     def test_create_poll(self):
         factory = APIRequestFactory()
         user = self.group_user_creator.user
-        view = ~PollCreateAPI.as_view()
+        view = PollCreateAPI.as_view()
 
         data = dict(title='test title', description='test description', poll_type=4, public=True, tag=self.group_tag.id,
                     pinned=False, dynamic=False, attachments=[SimpleUploadedFile('test.jpg', b'test')],

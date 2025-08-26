@@ -28,6 +28,44 @@ class GroupFolder(BaseModel):
         return f'{self.id} - {self.name}'
 
 
+# Permission class for each Group
+class GroupPermissions(BaseModel):
+    role_name = models.TextField(default='default')
+    author = models.ForeignKey('Group', on_delete=models.CASCADE, null=True, blank=True)
+    invite_user = models.BooleanField(default=False)
+    create_poll = models.BooleanField(default=True)
+    poll_fast_forward = models.BooleanField(default=False)
+    poll_quorum = models.BooleanField(default=False)
+    allow_vote = models.BooleanField(default=True)
+    send_group_email = models.BooleanField(default=False)
+    allow_delegate = models.BooleanField(default=True)
+    kick_members = models.BooleanField(default=False)
+    ban_members = models.BooleanField(default=False)
+
+    create_proposal = models.BooleanField(default=True)
+    update_proposal = models.BooleanField(default=True)
+    delete_proposal = models.BooleanField(default=True)
+
+    prediction_statement_create = models.BooleanField(default=True)
+    prediction_statement_delete = models.BooleanField(default=True)
+
+    prediction_bet_create = models.BooleanField(default=True)
+    prediction_bet_update = models.BooleanField(default=True)
+    prediction_bet_delete = models.BooleanField(default=True)
+
+    create_kanban_task = models.BooleanField(default=True)
+    update_kanban_task = models.BooleanField(default=True)
+    delete_kanban_task = models.BooleanField(default=True)
+
+    force_delete_poll = models.BooleanField(default=False)
+    force_delete_proposal = models.BooleanField(default=False)
+    force_delete_comment = models.BooleanField(default=False)
+
+    @staticmethod
+    def negate_field_perms():
+        return ['id', 'created_at', 'updated_at', 'role_name', 'author']
+
+
 class Group(BaseModel, NotifiableModel):
     created_by = models.ForeignKey(User, on_delete=models.CASCADE)
     active = models.BooleanField(default=True)
@@ -41,9 +79,7 @@ class Group(BaseModel, NotifiableModel):
     # Determines the default permission for every user get when they join
     # TODO return basic permissions by default if field is NULL
     default_permission = models.OneToOneField('GroupPermissions',
-                                              null=True,
-                                              blank=True,
-                                              on_delete=models.SET_NULL)
+                                              on_delete=models.CASCADE)
 
     name = models.TextField(unique=True)
     description = models.TextField(null=True, blank=True)
@@ -158,17 +194,29 @@ class Group(BaseModel, NotifiableModel):
         if instance.pk is None:
             channel = MessageChannel(origin_name='group', title=instance.name)
             channel.save()
+            default_permission = GroupPermissions(group=instance)
+            default_permission.save()
 
             instance.chat = channel
+            instance.default_permission = default_permission
 
     @classmethod
     def post_save(cls, instance, created, update_fields, *args, **kwargs):
         if created:
             schedule = Schedule(name=instance.name, origin_name='group', origin_id=instance.id)
             schedule.save()
+
             kanban = Kanban(name=instance.name, origin_type='group', origin_id=instance.id)
             kanban.save()
-            group_user = GroupUser(user=instance.created_by, group=instance, is_admin=True)
+
+            instance.default_permission.name = instance.name
+            instance.default_permission.group = instance
+            instance.default_permission.save()
+
+            group_user = GroupUser(user=instance.created_by,
+                                   group=instance,
+                                   permission=instance.default_permission,
+                                   is_admin=True)
             group_user.save()
 
             instance.schedule = schedule
@@ -214,44 +262,6 @@ post_save.connect(Group.user_post_save, sender=User)
 post_delete.connect(Group.post_delete, sender=Group)
 
 
-# Permission class for each Group
-class GroupPermissions(BaseModel):
-    role_name = models.TextField()
-    author = models.ForeignKey('Group', on_delete=models.CASCADE)
-    invite_user = models.BooleanField(default=False)
-    create_poll = models.BooleanField(default=True)
-    poll_fast_forward = models.BooleanField(default=False)
-    poll_quorum = models.BooleanField(default=False)
-    allow_vote = models.BooleanField(default=True)
-    send_group_email = models.BooleanField(default=False)
-    allow_delegate = models.BooleanField(default=True)
-    kick_members = models.BooleanField(default=False)
-    ban_members = models.BooleanField(default=False)
-
-    create_proposal = models.BooleanField(default=True)
-    update_proposal = models.BooleanField(default=True)
-    delete_proposal = models.BooleanField(default=True)
-
-    prediction_statement_create = models.BooleanField(default=True)
-    prediction_statement_delete = models.BooleanField(default=True)
-
-    prediction_bet_create = models.BooleanField(default=True)
-    prediction_bet_update = models.BooleanField(default=True)
-    prediction_bet_delete = models.BooleanField(default=True)
-
-    create_kanban_task = models.BooleanField(default=True)
-    update_kanban_task = models.BooleanField(default=True)
-    delete_kanban_task = models.BooleanField(default=True)
-
-    force_delete_poll = models.BooleanField(default=False)
-    force_delete_proposal = models.BooleanField(default=False)
-    force_delete_comment = models.BooleanField(default=False)
-
-    @staticmethod
-    def negate_field_perms():
-        return ['id', 'created_at', 'updated_at', 'role_name', 'author']
-
-
 # Permission Tags for each group, and for user to put on delegators
 class GroupTags(BaseModel):
     name = models.TextField()
@@ -270,7 +280,7 @@ class GroupUser(BaseModel):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     group = models.ForeignKey(Group, on_delete=models.CASCADE)
     is_admin = models.BooleanField(default=False)
-    permission = models.ForeignKey(GroupPermissions, null=True, blank=True, on_delete=models.SET_NULL)
+    permission = models.ForeignKey(GroupPermissions, on_delete=models.SET_NULL, null=True)
     chat_participant = models.ForeignKey(MessageChannelParticipant, on_delete=models.PROTECT)
     active = models.BooleanField(default=True)
 
@@ -279,12 +289,7 @@ class GroupUser(BaseModel):
         if self.permission:
             user_permissions = model_to_dict(self.permission)
         else:
-            if self.group.default_permission:
-                user_permissions = model_to_dict(self.group.default_permission)
-            else:
-                fields = [field for field in GroupPermissions._meta.get_fields() if not (field.auto_created
-                                                                                         or field.name in GroupPermissions.negate_field_perms())]
-                user_permissions = {field.name: field.default for field in fields}
+            user_permissions = model_to_dict(self.group.default_permission)
 
         def validate_perms():
             for perm, val in permissions.items():

@@ -48,7 +48,7 @@ def group_update(*, user: int, group_id: int, data) -> Group:
 
     # Check if group_permission exists to allow for a new default_permission
     if default_permission := data.get('default_permission'):
-        data['default_permission'] = get_object(GroupPermissions, id=default_permission, author_id=group_id)
+        data['default_permission'] = GroupPermissions.objects.get(id=default_permission, author_id=group_id)
 
     group, has_updated = model_update(instance=group_user.group,
                                          fields=non_side_effect_fields,

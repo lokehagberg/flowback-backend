@@ -4,27 +4,8 @@ import django_filters
 from django.forms import model_to_dict
 from rest_framework.exceptions import ValidationError, PermissionDenied
 
-from flowback.common.services import get_object
 from flowback.group.models import Group, GroupUser, WorkGroup, WorkGroupUser, GroupPermissions
 from flowback.user.models import User
-
-
-def group_default_permissions(*, group: Union[Group, int]):
-    if isinstance(group, int):
-        group = get_object(Group, id=group)
-
-    if group.default_permission:
-        return model_to_dict(group.default_permission)
-
-    fields = GroupPermissions._meta.get_fields()
-    fields = [field for field in fields if not field.auto_created
-              and field.name not in GroupPermissions.negate_field_perms()]
-
-    defaults = dict()
-    for field in fields:
-        defaults[field.name] = field.default
-
-    return defaults
 
 
 def group_user_permissions(*,
@@ -38,7 +19,7 @@ def group_user_permissions(*,
     permissions = permissions or []
     work_group_moderator_check = False
 
-    # Setup initial values for the function
+    # Set up initial values for the function
     if isinstance(user, int):
         user = User.objects.get(id=user, is_active=True)
 
@@ -69,8 +50,9 @@ def group_user_permissions(*,
 
     # Logic behind checking permissions
     admin = group_user.is_admin
-    user_permissions = model_to_dict(group_user.permission) if group_user.permission else group_default_permissions(
-        group=group_user.group)
+    user_permissions = (model_to_dict(group_user.permission)
+                        if group_user.permission
+                        else model_to_dict(group_user.group.default_permission))
 
     # Check if admin permission is present
     if 'admin' in permissions:
