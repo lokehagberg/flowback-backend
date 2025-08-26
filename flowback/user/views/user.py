@@ -25,7 +25,7 @@ class UserCreateApi(APIView):
     class InputSerializer(serializers.ModelSerializer):
         class Meta:
             model = OnboardUser
-            fields = 'email'
+            fields = ('email',)
 
     def post(self, request):
         serializer = self.InputSerializer(data=request.data)
