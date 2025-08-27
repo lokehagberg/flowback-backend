@@ -40,6 +40,8 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='groupuser',
             name='permission',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, to='group.grouppermissions'),
+            field=models.ForeignKey(on_delete=django.db.models.deletion.PROTECT,
+                                    to='group.grouppermissions',
+                                    null=True),
         ),
     ]
