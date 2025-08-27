@@ -20,4 +20,10 @@ class Migration(migrations.Migration):
             name='role_name',
             field=models.TextField(default='default'),
         ),
+        migrations.AlterField(
+            model_name='grouppermissions',
+            name='author',
+            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE,
+                                    to='group.group'),
+        ),
     ]
