@@ -31,11 +31,6 @@ class Migration(migrations.Migration):
         ),
         migrations.RunPython(set_group_users_default_permissions_and_chat_titles),
         migrations.AlterField(
-            model_name='group',
-            name='default_permission',
-            field=models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, to='group.grouppermissions'),
-        ),
-        migrations.AlterField(
             model_name='groupuser',
             name='permission',
             field=models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, to='group.grouppermissions'),
