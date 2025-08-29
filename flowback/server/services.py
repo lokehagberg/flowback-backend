@@ -6,13 +6,14 @@ from backend.settings import (DEBUG,
                               FLOWBACK_GROUP_ADMIN_USER_LIST_ACCESS_ONLY,
                               FLOWBACK_DEFAULT_GROUP_JOIN,
                               FLOWBACK_DISABLE_DEFAULT_USER_REGISTRATION,
-                              GIT_HASH,
+                              GIT_HASH, DEBUG_REGISTER_BYPASS_EMAIL_VERIFICATION,
                               )
 
 
 def get_public_config():
     data = dict(
         DEBUG=DEBUG,
+        DEBUG_REGISTER_BYPASS_EMAIL_VERIFICATION=DEBUG_REGISTER_BYPASS_EMAIL_VERIFICATION,
         VERSION=VERSION,
         FLOWBACK_KANBAN_LANES=FLOWBACK_KANBAN_LANES,
         FLOWBACK_ALLOW_GROUP_CREATION=FLOWBACK_ALLOW_GROUP_CREATION,

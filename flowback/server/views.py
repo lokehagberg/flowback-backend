@@ -14,6 +14,8 @@ class ServerConfigListAPI(APIView):
 
     class OutputSerializer(serializers.Serializer):
         DEBUG = serializers.BooleanField(help_text="Backend debug mode")
+        DEBUG_REGISTER_BYPASS_EMAIL_VERIFICATION = serializers.BooleanField(
+            help_text="Requires DEBUG to be enabled, sends verification_code along with UserCreateAPI")
         FLOWBACK_KANBAN_LANES = serializers.ListField(
             child=serializers.CharField(),
             help_text="List of kanban lanes, when using the kanban list APIs, the kanban lanes represent the position "
