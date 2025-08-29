@@ -194,7 +194,7 @@ class Group(BaseModel, NotifiableModel):
         if instance.pk is None:
             channel = MessageChannel(origin_name='group', title=instance.name)
             channel.save()
-            default_permission = GroupPermissions(group=instance)
+            default_permission = GroupPermissions(author=instance)
             default_permission.save()
 
             instance.chat = channel
