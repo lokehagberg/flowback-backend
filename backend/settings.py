@@ -7,6 +7,7 @@ from pathlib import Path
 VERSION = "1"
 
 env = environ.Env(DEBUG=(bool, True),
+                  DEBUG_REGISTER_BYPASS_EMAIL_VERIFICATION=(bool, False),
                   LOGGING=(str, 'NONE'),
                   SECURE_PROXY_SSL_HEADERS=(bool, False),
                   DJANGO_SECRET=str,
@@ -84,6 +85,7 @@ if not SECRET_KEY:
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env('DEBUG')
+DEBUG_REGISTER_BYPASS_EMAIL_VERIFICATION = DEBUG and env('DEBUG_REGISTER_BYPASS_EMAIL_VERIFICATION')
 TESTING = sys.argv[1:2] == ['test']
 
 

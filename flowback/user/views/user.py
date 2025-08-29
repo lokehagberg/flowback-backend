@@ -5,6 +5,7 @@ from rest_framework import serializers, status
 from rest_framework.permissions import AllowAny
 from tutorial.quickstart.serializers import UserSerializer
 
+from backend.settings import DEBUG_REGISTER_BYPASS_EMAIL_VERIFICATION
 from flowback.common.pagination import LimitOffsetPagination, get_paginated_response
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -31,9 +32,13 @@ class UserCreateApi(APIView):
         serializer = self.InputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        user_create(**serializer.validated_data)
+        onboard_user = user_create(**serializer.validated_data)
 
-        return Response(status=status.HTTP_200_OK)
+        data = None
+        if DEBUG_REGISTER_BYPASS_EMAIL_VERIFICATION:
+            data = onboard_user.verification_code
+
+        return Response(status=status.HTTP_200_OK, data=data)
 
 
 class UserCreateVerifyApi(APIView):
