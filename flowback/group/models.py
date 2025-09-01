@@ -194,7 +194,7 @@ class Group(BaseModel, NotifiableModel):
         if instance.pk is None:
             channel = MessageChannel(origin_name='group', title=instance.name)
             channel.save()
-            default_permission = GroupPermissions(author=instance)
+            default_permission = GroupPermissions()
             default_permission.save()
 
             instance.chat = channel
@@ -210,7 +210,7 @@ class Group(BaseModel, NotifiableModel):
             kanban.save()
 
             instance.default_permission.name = instance.name
-            instance.default_permission.group = instance
+            instance.default_permission.author = instance
             instance.default_permission.save()
 
             group_user = GroupUser(user=instance.created_by,
