@@ -66,13 +66,15 @@ def user_create_verify(*, username: str, verification_code: str, password: str):
 
     validate_password(password)
 
+    user = User.objects.create_user(username=username,
+                                    email=onboard_user.email,
+                                    password=password)
+
     model_update(instance=onboard_user,
                  fields=['is_verified'],
                  data=dict(is_verified=True))
 
-    return User.objects.create_user(username=username,
-                                    email=onboard_user.email,
-                                    password=password)
+    return user
 
 
 def user_forgot_password(*, email: str) -> PasswordReset:
