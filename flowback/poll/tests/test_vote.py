@@ -217,8 +217,6 @@ class PollVoteTest(APITestCase):
 
 
 class PollDelegateVoteTest(APITestCase):
-    reset_sequences = True
-
     def setUp(self):
         self.group = GroupFactory()
         self.group_user_creator = GroupUserFactory(group=self.group)

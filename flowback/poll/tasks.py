@@ -334,16 +334,20 @@ def poll_proposal_vote_count(poll_id: int) -> None:
     # Count delegators participating in poll
     mandate = GroupUserDelegatePool.objects.filter(polldelegatevoting__poll=poll).aggregate(
         mandate=Count('groupuserdelegator',
-                      filter=~Q(groupuserdelegator__delegator__pollvoting__poll=poll
-                                ) & Q(groupuserdelegator__tags__in=[poll.tag]
-                                      ) & Q(groupuserdelegator__delegator__active=True)
+                      filter=~Q(groupuserdelegator__delegator__pollvoting__poll=poll)
+                             & Q(groupuserdelegator__tags__in=[poll.tag])
+                             & Q(groupuserdelegator__delegator__active=True)
+                             & Q(Q(groupuserdelegator__delegator__permission__isnull=False) & Q(groupuserdelegator__delegator__permission__allow_vote=True)
+                                 | Q(groupuserdelegator__delegator__permission__isnull=True) & Q(groupuserdelegator__delegator__group__default_permission__allow_vote=True))
                       ))['mandate']
 
     mandate_subquery = GroupUserDelegatePool.objects.filter(id=OuterRef('author_delegate__created_by')).annotate(
         mandate=Count('groupuserdelegator',
-                      filter=~Q(groupuserdelegator__delegator__pollvoting__poll=poll
-                                ) & Q(groupuserdelegator__tags__in=[poll.tag]
-                                      ) & Q(groupuserdelegator__delegator__active=True)
+                      filter=~Q(groupuserdelegator__delegator__pollvoting__poll=poll)
+                             & Q(groupuserdelegator__tags__in=[poll.tag])
+                             & Q(groupuserdelegator__delegator__active=True)
+                             & Q(~Q(groupuserdelegator__delegator__permission__isnull=False) & Q(groupuserdelegator__delegator__permission__allow_vote=True)
+                                 | Q(groupuserdelegator__delegator__permission__isnull=True) & Q(groupuserdelegator__delegator__group__default_permission__allow_vote=True))
                       )).values('mandate')
 
     # Count mandate for each delegate, save it to PollDelegateVoting account
