@@ -268,9 +268,14 @@ def user_get_chat_channel(fetched_by: User, target_user_ids: int | list[int], pr
 
         title = ""
         for i, u in enumerate(target_users):
-            if len(title + u.username) > 80:
-                title += f" and {target_users.count() - i} other{'s' if target_users.count() != 1 else ''}..."
-                ", ".join([title, u.username])
+            if len(title + u.username) > 50:
+                title += (f"{' and' if title else ''} "
+                          f"{target_users.count() - i} "
+                          f"other{'s' if target_users.count() - i != 1 else ''}...")
+                break
+
+            else:
+                title += f", {u.username}" if i > 0 else u.username
 
         channel = message_channel_create(origin_name=f"{User.message_channel_origin}"
                                                      f"{'_group' if target_users.count() > 2 else ''}",
