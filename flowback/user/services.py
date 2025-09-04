@@ -35,7 +35,8 @@ def user_create(*, email: str) -> OnboardUser | None:
             else:
                 raise ValidationError('Username already exists.')
 
-    user, created = OnboardUser.objects.update_or_create(email=email)
+    user, created = OnboardUser.objects.update_or_create(email=email, defaults=dict(is_verified=False,
+                                                                                    verification_code=uuid.uuid4().hex))
 
     link = f'Use this code to create your account: {user.verification_code}'
     if URL_USER_CREATE:
@@ -149,6 +150,7 @@ def user_delete(*, user_id: int) -> None:
 
         user.schedule.delete()
         user.kanban.delete()
+        OnboardUser.objects.filter(email=user.email).delete()
 
 
 def user_notification_subscribe(*, user: User, tags: list[str]):
