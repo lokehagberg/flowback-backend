@@ -105,7 +105,7 @@ class WorkGroupTest(APITestCase):
 
         response = generate_request(api=WorkGroupUserJoinRequestListAPI,
                                     user=work_group_user_one.group_user.user,
-                                    url_params=dict(work_group_id=work_group_one.id))
+                                    url_params=dict(group_id=self.group_one.id))
 
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         self.assertEqual(response.data['count'], 1)

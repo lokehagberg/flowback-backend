@@ -94,9 +94,9 @@ def work_group_user_join_request_list(*, group_id: int, fetched_by: User, filter
 
     if not group_user_is_admin:
         work_group_filter = WorkGroup.objects.filter(id=OuterRef('work_group_id'),
-                                                     work_group__group_id=group_id,
+                                                     group_id=group_id,
                                                      workgroupuser__group_user__user__in=[fetched_by],
-                                                     workgroupuser__is_moderator=True)
+                                                     workgroupuser__is_moderator=True).values('id')
 
         qs = WorkGroupUserJoinRequest.objects.filter(work_group_id__in=Subquery(work_group_filter))
 
