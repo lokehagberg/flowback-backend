@@ -27,7 +27,7 @@ user_kanban = KanbanManager(origin_type='user')
 
 def user_create(*, email: str) -> OnboardUser | None:
     email = email.lower()
-    users = User.objects.filter(Q(email=email))
+    users = User.objects.filter(email=email)
     if users.exists():
         for user in users:
             if user.email == email:
