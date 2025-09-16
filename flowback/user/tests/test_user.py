@@ -50,6 +50,7 @@ class UserTest(APITestCase):
                                  user.schedule]))
 
     def test_user_create(self):
+        user_create(email="test@example.com")  # Test twice for unique conflicts
         onboard_user = user_create(email="test@example.com")
         user = user_create_verify(username="test_user",
                                   verification_code=str(onboard_user.verification_code),

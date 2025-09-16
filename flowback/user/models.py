@@ -151,9 +151,10 @@ post_delete.connect(User.post_delete, sender=User)
 
 
 class OnboardUser(BaseModel):
-    email = models.EmailField(max_length=120)
-    verification_code = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    email = models.EmailField(max_length=120, unique=True)
+    verification_code = models.UUIDField(default=uuid.uuid4, editable=False)
     is_verified = models.BooleanField(default=False)
+
 
 
 class PasswordReset(BaseModel):
