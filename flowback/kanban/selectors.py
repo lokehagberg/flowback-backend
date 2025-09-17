@@ -9,13 +9,13 @@ from flowback.group.selectors import group_user_permissions
 
 
 class BaseKanbanEntryFilter(django_filters.FilterSet):
-    group = django_filters.NumberFilter(field_name='created_by__group_id')
+    group_id = django_filters.NumberFilter(field_name='created_by__group_id')
 
     class Meta:
         model = KanbanEntry
         fields = dict(title=['icontains'],
                       description=['icontains'],
-                      tag=['exact', 'in'],
+                      tag=['exact'],
                       )
 
 

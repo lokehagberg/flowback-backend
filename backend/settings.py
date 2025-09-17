@@ -77,6 +77,7 @@ INSTALLED_APPS = [
     'flowback.group',
     'flowback.poll',
     'flowback.chat',
+    'flowback.kanban',
 ] + env('INTEGRATIONS')
 
 REST_FRAMEWORK = {
