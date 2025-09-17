@@ -1,7 +1,7 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from flowback.common.models import BaseModel
-from flowback.group.models import Group, GroupUser
+from flowback.group.models import Group, GroupUser, GroupUserDelegatePool
 
 
 # Create your models here.
@@ -42,6 +42,16 @@ class PollProposal(BaseModel):
 
 class PollVoting(BaseModel):
     created_by = models.ForeignKey(GroupUser, on_delete=models.CASCADE)
+
+    proposal = models.ForeignKey(PollProposal, on_delete=models.CASCADE)
+    value = models.IntegerField(null=True, blank=True)
+
+    class Meta:
+        unique_together = ('created_by', 'proposal')
+
+
+class PollDelegateVoting(BaseModel):
+    created_by = models.ForeignKey(GroupUserDelegatePool, on_delete=models.CASCADE)
 
     proposal = models.ForeignKey(PollProposal, on_delete=models.CASCADE)
     value = models.IntegerField(null=True, blank=True)
