@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from flowback.common.pagination import LimitOffsetPagination, get_paginated_response
 
-from flowback.group.models import GroupUserDelegator, GroupUserDelegatePool, GroupTags
+from flowback.group.models import GroupUserDelegator, GroupTags
 from flowback.group.selectors import group_user_delegate_list, group_user_delegate_pool_list
 from flowback.group.services import group_user_delegate, group_user_delegate_update, group_user_delegate_remove, \
     group_user_delegate_pool_create, group_user_delegate_pool_delete
@@ -36,9 +36,6 @@ class GroupUserDelegatePoolListApi(APIView):
         pools = group_user_delegate_pool_list(group=group,
                                               fetched_by=request.user,
                                               filters=filter_serializer.validated_data)
-
-        groupdata = GroupUserDelegatePool.objects.first()
-        print(groupdata.groupuserdelegate_set.all())
 
         return get_paginated_response(
             pagination_class=self.Pagination,

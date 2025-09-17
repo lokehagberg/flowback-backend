@@ -12,7 +12,7 @@ from flowback.group.selectors import group_user_permissions
 from flowback.common.services import model_update, get_object
 
 
-def group_create(*, user: int, name: str, description: str, image: str, cover_image: str,
+def group_create(*, user: int, name: str, description: str, image: str, cover_image: str, hide_poll_users: bool,
                  public: bool, direct_join: bool) -> Group:
 
     user = get_object(User, id=user)
@@ -21,7 +21,7 @@ def group_create(*, user: int, name: str, description: str, image: str, cover_im
         raise ValidationError('Permission denied')
 
     group = Group(created_by=user, name=name, description=description, image=image,
-                  cover_image=cover_image, public=public, direct_join=direct_join)
+                  cover_image=cover_image, hide_poll_users=hide_poll_users, public=public, direct_join=direct_join)
     group.full_clean()
     group.save()
     GroupUser.objects.create(user=user, group=group, is_admin=True)
@@ -31,8 +31,8 @@ def group_create(*, user: int, name: str, description: str, image: str, cover_im
 
 def group_update(*, user: int, group: int, data) -> Group:
     user = group_user_permissions(group=group, user=user, permissions=['admin'])
-    non_side_effect_fields = ['name', 'description', 'image', 'cover_image', 'public',
-                              'direct_join', 'default_permission']
+    non_side_effect_fields = ['name', 'description', 'image', 'cover_image', 'hide_poll_users',
+                              'public', 'direct_join', 'default_permission']
 
     # Check if group_permission exists to allow for a new default_permission
     if default_permission := data.get('default_permission'):

@@ -16,9 +16,11 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from backend.settings import DEBUG, MEDIA_URL, MEDIA_ROOT
+from flowback.kanban.urls import kanban_patterns
+from flowback.poll.views import PollUserScheduleListAPI, PollListApi
 from flowback.user.urls import user_patterns
 from flowback.group.urls import group_patterns
-from flowback.poll.urls import poll_patterns, PollListApi
+from flowback.poll.urls import poll_patterns
 from flowback.chat.urls import chat_patterns
 from django.conf.urls.static import static
 
@@ -28,7 +30,10 @@ urlpatterns = [
     path('group/', include((group_patterns, 'group'))),
     path('chat/', include((chat_patterns, 'chat'))),
     path('group/<int:group>/poll/', include((poll_patterns, 'poll'))),
-    path('home/polls', PollListApi.as_view(), name='home_polls')
+    path('group/<int:group_id>/kanban/', include((kanban_patterns, 'kanban'))),
+    path('home/kanban', include((kanban_patterns, 'home_kanban'))),
+    path('home/polls', PollListApi.as_view(), name='home_polls'),
+    path('poll/user/schedule', PollUserScheduleListAPI.as_view(), name='poll_user_schedule')
 ]
 
 if DEBUG:
