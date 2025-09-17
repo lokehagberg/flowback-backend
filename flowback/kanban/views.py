@@ -30,6 +30,7 @@ class KanbanEntryListApi(APIView):
 
         assignee = UserSerializer(read_only=True)
         created_by = UserSerializer(read_only=True)
+        group_id = serializers.IntegerField(source='created_by.group.id')
 
         class Meta:
             model = KanbanEntry
