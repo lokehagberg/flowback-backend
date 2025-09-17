@@ -8,7 +8,7 @@ from flowback.common.pagination import LimitOffsetPagination, get_paginated_resp
 from flowback.poll.models import Poll, PollProposal, PollVotingTypeRanking
 from flowback.poll.selectors import poll_list, poll_proposal_list, poll_vote_list, poll_delegates_list
 from flowback.poll.services import poll_create, poll_update, poll_delete, poll_proposal_create, poll_proposal_delete, \
-    poll_proposal_vote_update
+    poll_proposal_vote_update, poll_proposal_delegate_vote_update
 
 
 class PollListApi(APIView):
@@ -221,3 +221,16 @@ class PollDelegatesListAPI(APIView):
             request=request,
             view=self
         )
+
+
+# TODO change serializer based upon poll type
+class PollProposalDelegateVoteUpdateAPI(APIView):
+    class InputSerializerRanking(serializers.Serializer):
+        votes = serializers.ListField(child=serializers.IntegerField())
+
+    def post(self, request, group: int, poll: int):
+        serializer = self.InputSerializerRanking(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        poll_proposal_delegate_vote_update(user_id=request.user.id, group_id=group,
+                                           poll_id=poll, data=serializer.validated_data)
+        return Response(status=status.HTTP_200_OK)
