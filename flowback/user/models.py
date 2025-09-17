@@ -72,6 +72,12 @@ class OnboardUser(BaseModel):
     is_verified = models.BooleanField(default=False)
 
 
+class PasswordReset(BaseModel):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    verification_code = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    is_verified = models.BooleanField(default=False)
+
+
 class Group(BaseModel):
     created_by = models.ForeignKey(User, on_delete=models.CASCADE)
     active = models.BooleanField(default=True)

@@ -5,7 +5,8 @@ from rest_framework.views import APIView
 
 from flowback.user.models import OnboardUser, User
 from flowback.user.selectors import get_user, user_list
-from flowback.user.services import user_create, user_create_verify, user_update
+from flowback.user.services import (user_create, user_create_verify, user_forgot_password,
+                                    user_forgot_password_verify, user_update)
 
 
 class UserCreateApi(APIView):
@@ -25,6 +26,7 @@ class UserCreateApi(APIView):
 
 class UserCreateVerifyApi(APIView):
     class InputSerializer(serializers.Serializer):
+        email = serializers.EmailField()
         verification_code = serializers.UUIDField()
         password = serializers.CharField()
 
@@ -35,6 +37,34 @@ class UserCreateVerifyApi(APIView):
         user_create_verify(**serializer.validated_data)
 
         return Response(status=status.HTTP_201_CREATED)
+
+
+class UserForgotPasswordApi(APIView):
+    class InputSerializer(serializers.Serializer):
+        email = serializers.EmailField()
+
+    def post(self, request):
+        serializer = self.InputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        user_forgot_password(**serializer.validated_data)
+
+        return Response(status=status.HTTP_200_OK)
+
+
+class UserForgotPasswordVerifyApi(APIView):
+    class InputSerializer(serializers.Serializer):
+        email = serializers.EmailField()
+        verification_code = serializers.UUIDField()
+        password = serializers.CharField()
+
+    def post(self, request):
+        serializers = self.InputSerializer(data=request.data)
+        serializers.is_valid(raise_exception=True)
+
+        user_forgot_password_verify(**serializers.validated_data)
+
+        return Response(status=status.HTTP_200_OK)
 
 
 class UserListApi(APIView):
