@@ -1,5 +1,7 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
+from rest_framework.exceptions import ValidationError
+
 from flowback.common.models import BaseModel
 from flowback.group.models import Group, GroupUser, GroupUserDelegatePool, GroupTags
 import pgtrigger
@@ -36,6 +38,10 @@ class Poll(BaseModel):
     # Optional dynamic counting support
     participants = models.IntegerField(default=0)
     dynamic = models.BooleanField()
+
+    def clean(self):
+        if self.start_date > self.end_date:
+            raise ValidationError("Poll start date is after poll end date")
 
 
 class PollProposal(BaseModel):
