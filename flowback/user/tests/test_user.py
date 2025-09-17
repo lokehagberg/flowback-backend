@@ -2,7 +2,7 @@ import json
 import math
 
 from rest_framework import status
-from rest_framework.test import APITransactionTestCase, APIRequestFactory, force_authenticate
+from rest_framework.test import APITestCase, APIRequestFactory, force_authenticate
 
 from flowback.chat.models import MessageChannel, MessageChannelParticipant
 from flowback.chat.tests.factories import MessageChannelFactory
@@ -11,16 +11,17 @@ from flowback.common.tests import generate_request
 from flowback.group.models import GroupThread, GroupUser
 from flowback.group.tests.factories import GroupThreadFactory, GroupUserFactory, GroupFactory, WorkGroupFactory, \
     WorkGroupUserFactory
+from flowback.notification.models import NotificationObject, Notification, NotificationSubscription, NotificationChannel
 from flowback.poll.models import Poll
 from flowback.poll.tests.factories import PollFactory
 from flowback.user.models import User, UserChatInvite
 from flowback.user.services import user_create, user_create_verify
 from flowback.user.tests.factories import UserFactory
 from flowback.user.views.home import UserHomeFeedAPI
-from flowback.user.views.user import UserDeleteAPI, UserGetChatChannelAPI, UserUpdateApi, UserChatInviteAPI, UserGetApi
+from flowback.user.views.user import UserDeleteAPI, UserGetChatChannelAPI, UserUpdateApi, UserChatInviteAPI, UserGetApi, UserNotificationSubscribeAPI
 
 
-class UserTest(APITransactionTestCase):
+class UserTest(APITestCase):
     def setUp(self):
         (self.user_one,
          self.user_two,
@@ -49,8 +50,11 @@ class UserTest(APITransactionTestCase):
                                  user.schedule]))
 
     def test_user_create(self):
-        code = user_create(username="test_user", email="test@example.com")
-        user = user_create_verify(verification_code=code, password="password123")
+        user_create(email="test@example.com")  # Test twice for unique conflicts
+        onboard_user = user_create(email="test@example.com")
+        user = user_create_verify(username="test_user",
+                                  verification_code=str(onboard_user.verification_code),
+                                  password="TestPassword!=27")
 
         self.assertTrue(User.objects.filter(id=user.id).exists())
 
@@ -104,10 +108,12 @@ class UserTest(APITransactionTestCase):
         # TODO Test with workgroup
 
         GroupThreadFactory.create_batch(size=2)
-        PollFactory.create_batch(size=5, created_by=group_user)
+        polls = PollFactory.create_batch(size=5, created_by=group_user)
+        polls[1].pinned = True
+        polls[1].save()
 
-        PollFactory.create_batch(size=5, created_by=group_user_two)
-        GroupThreadFactory.create_batch(size=5, created_by=group_user_two)
+        PollFactory.create_batch(size=5, created_by=group_user_two, public=True)
+        GroupThreadFactory.create_batch(size=5, created_by=group_user_two, public=True)
 
         polls = PollFactory.create_batch(size=5, created_by=group_user_three)
         poll_with_comments = polls[0] # Testing total comments aggregate
@@ -118,6 +124,13 @@ class UserTest(APITransactionTestCase):
         GroupThreadFactory.create_batch(size=5, created_by=group_user_three)
 
         response = generate_request(api=UserHomeFeedAPI, user=group_user.user)
+
+        response_pinned_test = generate_request(api=UserHomeFeedAPI,
+                                                user=group_user.user,
+                                                data=dict(order_by='pinned,created_at_desc'))
+
+        self.assertEqual(response_pinned_test.data['count'], response.data['count'])
+        self.assertEqual(response_pinned_test.data['results'][0]['pinned'], True)
 
         # Check if order_by is for created_at, in descending order
         for x in range(1, response.data['count']):
@@ -132,7 +145,7 @@ class UserTest(APITransactionTestCase):
                                                     id=response.data['results'][x]['id']).exists())
 
         self.assertEqual(response.status_code, 200, response.data)
-        self.assertEqual(response.data['count'], 17)
+        self.assertEqual(response.data['count'], 15)
 
     def test_user_home_feed_visibility(self):
         # Create public group with 5 polls and 10 threads
@@ -142,14 +155,14 @@ class UserTest(APITransactionTestCase):
         group_public_workgroup = group_user_public_workgroupuser.work_group
         group_user_public_admin = GroupUser.objects.get(user=group_public.created_by)
         group_user_public = GroupUserFactory(group=group_public)
-        public_threads = GroupThreadFactory.create_batch(size=5, created_by=group_user_public)
-        public_polls = PollFactory.create_batch(size=5, created_by=group_user_public)
+        public_threads = GroupThreadFactory.create_batch(size=5, created_by=group_user_public, public=True)
+        public_polls = PollFactory.create_batch(size=5, created_by=group_user_public, public=True)
         public_threads_workgroup = GroupThreadFactory.create_batch(size=5,
                                                                    created_by=group_user_public,
                                                                    work_group=group_public_workgroup)
 
         # Create private group with 5 polls and 10 threads
-        group_private = GroupFactory(public=False)
+        group_private = GroupFactory(public=False, hide_poll_users=True)
         group_user_private_workgroupuser = WorkGroupUserFactory(work_group__group=group_private,
                                                                 group_user__group=group_private)
         group_user_private_workgroup = group_user_private_workgroupuser.work_group
@@ -170,18 +183,24 @@ class UserTest(APITransactionTestCase):
                         [i['pinned'] for i in response.data['results']])  # Placeholder test for pinned
         self.assertTrue(all([i['pinned'] for i in response.data['results'][:4]]),
                         [i['pinned'] for i in response.data['results'][:4]])  # Placeholder test for order_by
+        self.assertTrue(all([x['created_by'] is None
+                             for x in response.data['results']
+                             if x['group_id'] == group_user_private.group.id]),
+                        [x['created_by'] is None
+                         for x in response.data['results']
+                         if x['group_id'] == group_user_private.group.id])  # Placeholder test for hide_poll_users
         self.assertEqual(response.status_code, 200, response.data)
-        self.assertEqual(response.data['count'], 15)
+        self.assertEqual(response.data['count'], 20)
 
         ## Admin
         response = generate_request(api=UserHomeFeedAPI, user=group_user_private_admin.user)
         self.assertEqual(response.status_code, 200, response.data)
-        self.assertEqual(response.data['count'], 20)
+        self.assertEqual(response.data['count'], 25)
 
         ## WorkGroup User
         response = generate_request(api=UserHomeFeedAPI, user=group_user_private_workgroupuser.group_user.user)
         self.assertEqual(response.status_code, 200, response.data)
-        self.assertEqual(response.data['count'], 20)
+        self.assertEqual(response.data['count'], 25)
 
         # Private testing
 
@@ -236,6 +255,7 @@ class UserTest(APITransactionTestCase):
                                     data=dict(target_user_ids=[u.id for u in participants]),
                                     user=self.user_one)
 
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         channel_id = response.data['id']
         self.assertEqual(UserChatInvite.objects.all().count(), len(participants))
         self.assertEqual(MessageChannelParticipant.objects.filter(channel_id=channel_id, active=True).count(),
@@ -280,3 +300,97 @@ class UserTest(APITransactionTestCase):
 
     def test_user_get_chat_channel_invite_group(self):
         self.user_get_chat_channel_invite(participants=25)
+
+    def test_notify_user_chat(self):
+        """Test the notify_chat method in the User model"""
+        # Create a user and a message channel
+        user = UserFactory()
+        message_channel = MessageChannelFactory()
+        message_channel_title = "Test Channel"
+        message = "Test message"
+        action = NotificationChannel.Action.CREATED
+
+        # Call the notify_chat method
+        notification = user.notify_chat(
+            action=action,
+            message=message,
+            message_channel_id=message_channel.id,
+            message_channel_title=message_channel_title
+        )
+
+        # Verify the notification was created
+        self.assertIsNotNone(notification)
+        self.assertEqual(notification.action, action)
+        self.assertEqual(notification.message, message)
+        self.assertEqual(notification.channel, user.notification_channel)
+        self.assertEqual(notification.tag, "chat")
+
+        # Verify the notification data
+        self.assertEqual(notification.data["message_channel_id"], message_channel.id)
+        self.assertEqual(notification.data["message_channel_title"], message_channel_title)
+
+        # Verify the notification is in the database
+        db_notification = NotificationObject.objects.get(
+            channel=user.notification_channel,
+            action=action,
+            message=message,
+            tag="chat"
+        )
+        self.assertEqual(db_notification.id, notification.id)
+
+    def test_user_notification_subscribe_api(self):
+        """Test the UserNotificationSubscribeAPI endpoint"""
+        # Create a user
+        user = UserFactory()
+
+        # Make a POST request to the UserNotificationSubscribeAPI endpoint
+        response = generate_request(
+            api=UserNotificationSubscribeAPI,
+            data=dict(tags='chat'),
+            user=user
+        )
+
+        # Verify the response status code
+        self.assertEqual(response.status_code, 200)
+
+        # Verify that the user is subscribed to the notification channel
+        subscription = NotificationSubscription.objects.get(
+            user=user,
+            channel=user.notification_channel
+        )
+        self.assertEqual(set(subscription.tags), {'chat'})
+
+        # Send a notification to the user
+        notification = user.notify_chat(
+            action=NotificationChannel.Action.CREATED,
+            message="Test notification",
+            message_channel_id=1,
+            message_channel_title="Test Channel"
+        )
+
+        # Verify that the user receives the notification
+        user_notifications = Notification.objects.filter(
+            user=user,
+            notification_object__channel=user.notification_channel,
+            notification_object__tag="chat"
+        )
+        self.assertEqual(user_notifications.count(), 1)
+        self.assertEqual(user_notifications.first().notification_object, notification)
+
+        # Test unsubscribing (empty tags list)
+        response = generate_request(
+            api=UserNotificationSubscribeAPI,
+            user=user
+        )
+
+        # Verify the response status code
+        self.assertEqual(response.status_code, 200, response.data)
+
+        # Verify that the user is unsubscribed from the notification channel
+        self.assertEqual(
+            NotificationSubscription.objects.filter(
+                user=user,
+                channel=user.notification_channel
+            ).count(),
+            0
+        )

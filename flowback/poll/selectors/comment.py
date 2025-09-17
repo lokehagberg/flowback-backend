@@ -1,8 +1,8 @@
 from flowback.comment.selectors import comment_list, comment_ancestor_list
 from flowback.common.services import get_object
-from flowback.poll.models import Poll, PollDelegateVoting
+from flowback.poll.models import Poll
 from flowback.user.models import User
-from flowback.group.selectors import group_user_permissions
+from flowback.group.selectors.permission import group_user_permissions
 
 
 def poll_comment_list(*, fetched_by: User, poll_id: int, filters=None):

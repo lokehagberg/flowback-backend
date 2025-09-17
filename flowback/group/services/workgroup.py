@@ -2,7 +2,7 @@ from rest_framework.exceptions import ValidationError, PermissionDenied
 
 from flowback.common.services import model_update
 from flowback.group.models import WorkGroup, WorkGroupUser, WorkGroupUserJoinRequest
-from flowback.group.selectors import group_user_permissions
+from flowback.group.selectors.permission import group_user_permissions
 
 
 def work_group_create(*, user_id: int, group_id: int, name: str, direct_join: bool) -> WorkGroup:

@@ -11,11 +11,12 @@ from django.utils import timezone
 
 from rest_framework.exceptions import ValidationError
 
-from backend.settings import DEFAULT_FROM_EMAIL, FLOWBACK_URL, EMAIL_HOST
+from backend.settings import DEFAULT_FROM_EMAIL, URL_USER_CREATE, URL_USER_FORGOT_PASSWORD, EMAIL_HOST
 from flowback.chat.models import MessageChannel, MessageChannelParticipant
 from flowback.chat.services import message_channel_create, message_channel_join
 from flowback.common.services import model_update, get_object
 from flowback.kanban.services import KanbanManager
+from flowback.notification.models import NotificationChannel
 from flowback.schedule.models import ScheduleEvent
 from flowback.schedule.services import ScheduleManager, unsubscribe_schedule
 from flowback.user.models import User, OnboardUser, PasswordReset, Report, UserChatInvite
@@ -24,8 +25,9 @@ user_schedule = ScheduleManager(schedule_origin_name='user')
 user_kanban = KanbanManager(origin_type='user')
 
 
-def user_create(*, username: str, email: str) -> OnboardUser | None:
-    users = User.objects.filter(Q(email=email) | Q(username=username))
+def user_create(*, email: str) -> OnboardUser | None:
+    email = email.lower()
+    users = User.objects.filter(email=email)
     if users.exists():
         for user in users:
             if user.email == email:
@@ -34,30 +36,31 @@ def user_create(*, username: str, email: str) -> OnboardUser | None:
             else:
                 raise ValidationError('Username already exists.')
 
-    user = OnboardUser.objects.create(email=email, username=username)
+    user, created = OnboardUser.objects.update_or_create(email=email, defaults=dict(is_verified=False,
+                                                                                    verification_code=uuid.uuid4().hex))
 
     link = f'Use this code to create your account: {user.verification_code}'
-    if FLOWBACK_URL:
-        link = f'''Use this link to create your account: {FLOWBACK_URL}/create_account/
-                   ?email={email}&verification_code={user.verification_code}'''
+    if URL_USER_CREATE:
+        link = (f"Use this link to create your account: {URL_USER_CREATE}"
+                f"?email={email}&verification_code={user.verification_code}")
 
     if EMAIL_HOST:
         send_mail('Flowback Verification Code', link, DEFAULT_FROM_EMAIL, [email])
 
     else:
         logging.info("Email host not configured. Email not sent, but code was sent to the console.")
-        print(f"Verification code for '{user.username}': {user.verification_code}")
+        print(f"Verification code for '{user.email}': {user.verification_code}")
 
-        return user
+    return user
 
 
-def user_create_verify(*, verification_code: str, password: str):
+def user_create_verify(*, username: str, verification_code: str, password: str):
     onboard_user = get_object_or_404(OnboardUser, verification_code=verification_code)
 
     if User.objects.filter(email=onboard_user.email).exists():
         raise ValidationError('Email already registered')
 
-    elif User.objects.filter(username=onboard_user.username).exists():
+    elif User.objects.filter(username=username).exists():
         raise ValidationError('Username already registered')
 
     elif onboard_user.is_verified:
@@ -65,13 +68,15 @@ def user_create_verify(*, verification_code: str, password: str):
 
     validate_password(password)
 
+    user = User.objects.create_user(username=username,
+                                    email=onboard_user.email,
+                                    password=password)
+
     model_update(instance=onboard_user,
                  fields=['is_verified'],
                  data=dict(is_verified=True))
 
-    return User.objects.create_user(username=onboard_user.username,
-                                    email=onboard_user.email,
-                                    password=password)
+    return user
 
 
 def user_forgot_password(*, email: str) -> PasswordReset:
@@ -81,9 +86,9 @@ def user_forgot_password(*, email: str) -> PasswordReset:
 
     link = f'Use this code to reset your account password: {password_reset.verification_code}'
 
-    if FLOWBACK_URL:
-        link = f'''Use this link to reset your account password: {FLOWBACK_URL}/forgot_password/
-                       ?email={email}&verification_code={password_reset.verification_code}'''
+    if URL_USER_FORGOT_PASSWORD:
+        link = (f'Use this link to reset your account password: {URL_USER_FORGOT_PASSWORD}'
+                f'?email={email}&verification_code={password_reset.verification_code}')
 
     if EMAIL_HOST:
         send_mail('Flowback Verification Code', link, DEFAULT_FROM_EMAIL, [email])
@@ -146,14 +151,23 @@ def user_delete(*, user_id: int) -> None:
 
         user.schedule.delete()
         user.kanban.delete()
+        OnboardUser.objects.filter(email=user.email).delete()
+
+
+def user_notification_subscribe(*, user: User, tags: list[str]):
+    user.notification_channel.subscribe(user=user, tags=tags)
 
 
 def user_schedule_event_create(*,
                                user_id: int,
                                title: str,
-                               start_date: timezone.datetime,
                                description: str = None,
-                               end_date: timezone.datetime = None) -> ScheduleEvent:
+                               start_date: timezone.datetime,
+                               end_date: timezone.datetime = None,
+                               repeat_frequency: str = None,
+                               reminders: list[int] = None,
+                               **kwargs
+                               ) -> ScheduleEvent:
     user = get_object(User, id=user_id)
     return user_schedule.create_event(schedule_id=user.schedule.id,
                                       title=title,
@@ -161,7 +175,9 @@ def user_schedule_event_create(*,
                                       end_date=end_date,
                                       origin_id=user.id,
                                       origin_name='user',
-                                      description=description)
+                                      description=description,
+                                      repeat_frequency=repeat_frequency,
+                                      reminders=reminders)
 
 
 def user_schedule_event_update(*, user_id: int, event_id: int, **data):
@@ -216,15 +232,18 @@ def user_kanban_entry_delete(*, user_id: int, entry_id: int):
 
 
 def user_get_chat_channel(fetched_by: User, target_user_ids: int | list[int], preview: bool = False) -> MessageChannel:
+    if len(target_user_ids) > 25:
+        raise ValidationError("Cannot invite more than 25 users to group.")
+
     if isinstance(target_user_ids, int):
         target_user_ids = [target_user_ids]
 
     if fetched_by.id not in target_user_ids:
         target_user_ids.append(fetched_by.id)
 
-    target_users = User.objects.filter(id__in=target_user_ids, is_active=True)
+    target_users = User.objects.filter(id__in=target_user_ids, is_active=True).all()
 
-    if not len(target_users) == len(target_user_ids):
+    if not target_users.count() == len(target_user_ids):
         raise ValidationError("Not every user requested do exist")
 
     if len(target_user_ids) == 1 and fetched_by.id == target_user_ids[0]:
@@ -235,7 +254,7 @@ def user_get_chat_channel(fetched_by: User, target_user_ids: int | list[int], pr
         channel = MessageChannel.objects.annotate(count=Count('users')).filter(
             count=target_users.count())
 
-        for u in target_users.all():
+        for u in target_users:
             channel = channel.filter(users=u.id)
 
         channel = channel.first()
@@ -243,35 +262,50 @@ def user_get_chat_channel(fetched_by: User, target_user_ids: int | list[int], pr
         if not channel:
             raise MessageChannel.DoesNotExist
 
-        for u in target_users.all():
+        for u in target_users:
             UserChatInvite.objects.filter(user=u, message_channel=channel, rejected=True).update(rejected=None)
 
     except MessageChannel.DoesNotExist:
         if preview:
             raise ValidationError("MessageChannel does not exist between the participants")
 
-        title = f"{', '.join([u.username for u in target_users])}"
+        title = ""
+        for i, u in enumerate(target_users):
+            if len(title + u.username) > 50:
+                title += (f"{' and' if title else ''} "
+                          f"{target_users.count() - i} "
+                          f"other{'s' if target_users.count() - i != 1 else ''}...")
+                break
+
+            else:
+                title += f", {u.username}" if i > 0 else u.username
+
         channel = message_channel_create(origin_name=f"{User.message_channel_origin}"
-                                                     f"{'_group' if len(target_users) > 2 else ''}",
-                                         title=title if len(target_users) > 1 else None)
+                                                     f"{'_group' if target_users.count() > 2 else ''}",
+                                         title=title if target_users.count() > 1 else None)
 
         # In the future, make this a bulk_create statement
         share_groups = False
 
-        if len(target_users) <= 2:
+        if target_users.count() <= 2:
             share_groups = User.objects.filter(group__groupuser__user__in=target_users).exists()
 
         for u in target_users:
             u_is_public = u.chat_status == User.PublicStatus.PUBLIC
             u_is_group_only = u.chat_status == User.PublicStatus.GROUP_ONLY
 
-            if (((u_is_public or (u_is_group_only and share_groups)) and len(target_users) <= 2)
+            if (((u_is_public or (u_is_group_only and share_groups)) and target_users.count() <= 2)
                     or u.id == fetched_by.id
                     or fetched_by.is_superuser == True):
                 message_channel_join(user_id=u.id, channel_id=channel.id)
 
             else:
                 if not channel.messagechannelparticipant_set.filter(user_id=u.id).exists():
+                    u.notify_chat(action=NotificationChannel.Action.CREATED,
+                                  message="You have been invited to join a chat group",
+                                  message_channel_id=channel.id,
+                                  message_channel_title=channel.title)
+
                     UserChatInvite.objects.update_or_create(user_id=u.id,
                                                             message_channel_id=channel.id,
                                                             rejected=False,
@@ -314,10 +348,11 @@ def user_chat_channel_update(*, user_id: int, channel_id: int, **data: dict):
         return channel
 
 
-def report_create(*, user_id: int, title: str, description: str):
+def report_create(*, user_id: int, title: str, description: str, group_id: int, post_id: int, post_type: str):
     user = get_object(User, id=user_id)
 
-    report = Report(user=user, title=title, description=description)
+    report = Report(user=user, title=title, description=description, group_id=group_id,
+                    post_id=post_id, post_type=post_type)
     report.full_clean()
     report.save()
 

@@ -1,15 +1,11 @@
 from pprint import pprint
 
-from django.test import TransactionTestCase
 from django.utils import timezone
 from rest_framework import status
-from rest_framework.test import APIRequestFactory, force_authenticate
+from rest_framework.test import APIRequestFactory, force_authenticate, APITestCase
 
 from ..models import (MessageChannel,
-                      Message,
-                      MessageChannelParticipant,
-                      MessageChannelTopic,
-                      MessageFileCollection)
+                      MessageChannelParticipant)
 
 from ..services import (message_create,
                         message_update,
@@ -32,9 +28,7 @@ from ...user.tests.factories import UserFactory
 # Create your tests here.
 
 
-class ChatTestHTTP(TransactionTestCase):
-    reset_sequences = True
-
+class ChatTestHTTP(APITestCase):
     def setUp(self):
         self.user_one = UserFactory()
         self.user_two = UserFactory()

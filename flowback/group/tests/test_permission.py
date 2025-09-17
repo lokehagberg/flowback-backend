@@ -1,14 +1,12 @@
 from rest_framework.exceptions import PermissionDenied
-from rest_framework.test import APITransactionTestCase
+from rest_framework.test import APITestCase
 
 from flowback.group.models import GroupUser
-from flowback.group.selectors import group_user_permissions
+from flowback.group.selectors.permission import group_user_permissions
 from flowback.group.tests.factories import GroupFactory, GroupUserFactory, GroupPermissionsFactory
 
 
-class GroupPermissionTest(APITransactionTestCase):
-    reset_sequences = True
-
+class GroupPermissionTest(APITestCase):
     def setUp(self):
         self.group = GroupFactory()
         self.group_creator = GroupUser.objects.get(user=self.group.created_by, group=self.group)

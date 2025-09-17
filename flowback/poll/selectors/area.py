@@ -1,9 +1,9 @@
 import django_filters
 from django.db import models
-from django.db.models import OuterRef, Subquery, Count
+from django.db.models import OuterRef, Subquery
 
 from flowback.common.services import get_object
-from flowback.group.selectors import group_user_permissions
+from flowback.group.selectors.permission import group_user_permissions
 from flowback.poll.models import PollAreaStatement, PollAreaStatementVote, Poll
 from flowback.user.models import User
 

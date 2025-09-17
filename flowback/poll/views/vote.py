@@ -92,11 +92,17 @@ class DelegatePollVoteListAPI(APIView):
     class OutputSerializer(serializers.Serializer):
         poll_id = serializers.IntegerField()
         poll_title = serializers.CharField(source='poll.title')
+        poll_description = serializers.CharField(source='poll.description', allow_null=True)
+        poll_interval_mean_absolute_correctness = serializers.DecimalField(
+            max_digits=12, decimal_places=9,
+            source='poll.interval_mean_absolute_correctness',
+            allow_null=True)
         vote = serializers.SerializerMethodField()
 
         class VoteRankingOutputSerializer(serializers.Serializer):
             proposal_id = serializers.IntegerField()
             proposal_title = serializers.CharField(source='proposal.title')
+            proposal_description = serializers.CharField(source='proposal.description')
             proposal_created_by_id = serializers.IntegerField(source='proposal.created_by.user_id')
             proposal_created_by_name = serializers.CharField(source='proposal.created_by.user.username')
             priority = serializers.IntegerField()
@@ -108,6 +114,7 @@ class DelegatePollVoteListAPI(APIView):
         class VoteCardinalOutputSerializer(serializers.Serializer):
             proposal_id = serializers.IntegerField()
             proposal_title = serializers.CharField(source='proposal.title')
+            proposal_description = serializers.CharField(source='proposal.description')
             proposal_created_by_id = serializers.IntegerField(source='proposal.created_by.user_id')
             proposal_created_by_name = serializers.CharField(source='proposal.created_by.user.username')
             score = serializers.IntegerField(allow_null=True)
@@ -119,6 +126,7 @@ class DelegatePollVoteListAPI(APIView):
         class VoteForAgainstOutputSerializer(serializers.Serializer):
             proposal_id = serializers.IntegerField()
             proposal_title = serializers.CharField(source='proposal.title')
+            proposal_description = serializers.CharField(source='proposal.description')
             proposal_created_by_id = serializers.IntegerField(source='proposal.created_by.user_id')
             proposal_created_by_name = serializers.CharField(source='proposal.created_by.user.username')
             score = serializers.IntegerField()

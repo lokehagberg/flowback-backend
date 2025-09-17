@@ -1,6 +1,6 @@
 from flowback.common.services import get_object
 from flowback.group.models import GroupUserInvite, GroupUser
-from flowback.group.selectors import group_user_permissions
+from flowback.group.selectors.permission import group_user_permissions
 
 
 def group_invite(*, user: int, group: int, to: int) -> GroupUserInvite:
@@ -49,7 +49,11 @@ def group_invite_accept(*, fetched_by: int, group: int, to: int = None) -> None:
 
 def group_invite_reject(*, fetched_by: id, group: int, to: int = None) -> None:
     if to:
-        get_object(GroupUser, 'User already joined', reverse=True, user_id=to, group_id=group)
+        get_object(GroupUser, 'User already joined',
+                   reverse=True,
+                   user_id=to,
+                   group_id=group,
+                   active=True)
         group_user_permissions(user=fetched_by, group=group, permissions=['invite_user', 'admin'])
         invite = get_object(GroupUserInvite, 'User has not been invited', user_id=to, group_id=group)
 

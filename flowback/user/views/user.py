@@ -5,16 +5,19 @@ from rest_framework import serializers, status
 from rest_framework.permissions import AllowAny
 from tutorial.quickstart.serializers import UserSerializer
 
+from backend.settings import DEBUG_REGISTER_BYPASS_EMAIL_VERIFICATION
 from flowback.common.pagination import LimitOffsetPagination, get_paginated_response
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from flowback.notification.views import NotificationSubscribeTemplateAPI
 from flowback.user.models import OnboardUser, User
 from flowback.user.selectors import get_user, user_list, user_chat_invite_list
 from flowback.user.serializers import BasicUserSerializer
 from flowback.user.services import (user_create, user_create_verify, user_forgot_password,
                                     user_forgot_password_verify, user_update, user_delete, user_get_chat_channel,
-                                    user_chat_invite, user_chat_channel_leave, user_chat_channel_update)
+                                    user_chat_invite, user_chat_channel_leave, user_chat_channel_update,
+                                    user_notification_subscribe)
 
 
 class UserCreateApi(APIView):
@@ -23,21 +26,26 @@ class UserCreateApi(APIView):
     class InputSerializer(serializers.ModelSerializer):
         class Meta:
             model = OnboardUser
-            fields = 'username', 'email'
+            fields = ('email',)
 
     def post(self, request):
         serializer = self.InputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        user_create(**serializer.validated_data)
+        onboard_user = user_create(**serializer.validated_data)
 
-        return Response(status=status.HTTP_200_OK)
+        data = None
+        if DEBUG_REGISTER_BYPASS_EMAIL_VERIFICATION:
+            data = onboard_user.verification_code
+
+        return Response(status=status.HTTP_200_OK, data=data)
 
 
 class UserCreateVerifyApi(APIView):
     permission_classes = [AllowAny]
 
     class InputSerializer(serializers.Serializer):
+        username = serializers.CharField()
         verification_code = serializers.UUIDField()
         password = serializers.CharField()
 
@@ -169,6 +177,12 @@ class UserDeleteAPI(APIView):
         user_delete(user_id=request.user.id)
 
         return Response(status=status.HTTP_200_OK)
+
+
+@extend_schema(description=User.notification_docs())
+class UserNotificationSubscribeAPI(NotificationSubscribeTemplateAPI):
+    lazy_action = user_notification_subscribe
+
 
 @extend_schema(description="Get/creates a message channel between user(s). "
                            "If there are more than two target_user_ids or the target_user_id has direct_message turned "

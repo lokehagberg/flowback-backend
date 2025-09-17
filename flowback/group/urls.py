@@ -1,10 +1,12 @@
 from django.urls import path
 
-from .views.group import GroupFolderListApi, GroupListApi, GroupDetailApi, GroupCreateApi, GroupUpdateApi, \
-    GroupDeleteApi, GroupMailApi, \
-    GroupNotificationSubscribeApi, WorkGroupListAPI, WorkGroupUserListAPI, WorkGroupUserJoinRequestListAPI, \
-    WorkGroupCreateAPI, WorkGroupUpdateAPI, WorkGroupDeleteAPI, WorkGroupUserJoinAPI, WorkGroupUserLeaveAPI, \
-    WorkGroupUserAddAPI, WorkGroupUserUpdateAPI, WorkGroupUserRemoveAPI
+from .views.group import (GroupFolderListApi, GroupListApi, GroupDetailApi, GroupCreateApi, GroupUpdateApi,
+                          GroupDeleteApi, GroupMailApi, WorkGroupListAPI, WorkGroupUserListAPI,
+                          WorkGroupUserJoinRequestListAPI,
+                          WorkGroupCreateAPI, WorkGroupUpdateAPI, WorkGroupDeleteAPI, WorkGroupUserJoinAPI,
+                          WorkGroupUserLeaveAPI,
+                          WorkGroupUserAddAPI, WorkGroupUserUpdateAPI, WorkGroupUserRemoveAPI,
+                          GroupNotificationSubscribeAPI)
 from .views.user import (GroupUserListApi,
                          GroupUserUpdateApi,
                          GroupJoinApi,
@@ -19,14 +21,14 @@ from .views.permission import (GroupPermissionListApi,
 from .views.tag import (GroupTagsListApi,
                         GroupTagsCreateApi,
                         GroupTagsUpdateApi,
-                        GroupTagsDeleteApi, GroupTagIntervalMeanAbsoluteCorrectnessAPI)
+                        GroupTagsDeleteApi)
 from .views.delegate import (GroupUserDelegateListApi,
                              GroupUserDelegateApi,
                              GroupUserDelegateUpdateApi,
                              GroupUserDelegateDeleteApi,
                              GroupUserDelegatePoolListApi,
                              GroupUserDelegatePoolCreateApi,
-                             GroupUserDelegatePoolDeleteApi)
+                             GroupUserDelegatePoolDeleteApi, GroupUserDelegatePoolNotificationSubscribeAPI)
 from .views.schedule import (GroupScheduleEventListAPI,
                              GroupScheduleEventCreateAPI,
                              GroupScheduleEventUpdateAPI,
@@ -42,8 +44,10 @@ from .views.thread import (GroupThreadListAPI,
                            GroupThreadCommentListAPI,
                            GroupThreadCommentCreateAPI,
                            GroupThreadCommentUpdateAPI,
-                           GroupThreadCommentDeleteAPI, GroupThreadNotificationSubscribeAPI, GroupThreadCommentVoteAPI,
-                           GroupThreadCommentAncestorListAPI, GroupThreadVoteUpdateAPI)
+                           GroupThreadCommentDeleteAPI,
+                           GroupThreadCommentVoteAPI,
+                           GroupThreadCommentAncestorListAPI,
+                           GroupThreadVoteUpdateAPI)
 from .views.comment import (GroupDelegatePoolCommentListAPI,
                             GroupDelegatePoolCommentCreateAPI,
                             GroupDelegatePoolCommentUpdateAPI,
@@ -54,10 +58,12 @@ group_patterns = [
     path('list', GroupListApi.as_view(), name='groups'),
     path('<int:group>/detail', GroupDetailApi.as_view(), name='group'),
     path('create', GroupCreateApi.as_view(), name='group_create'),
-    path('<int:group>/update', GroupUpdateApi.as_view(), name='group_update'),
+    path('<int:group_id>/update', GroupUpdateApi.as_view(), name='group_update'),
     path('<int:group>/delete', GroupDeleteApi.as_view(), name='group_delete'),
-    path('<int:group>/subscribe', GroupNotificationSubscribeApi.as_view()),
     path('<int:group>/mail', GroupMailApi.as_view(), name='group_mail'),
+    path('<int:group_id>/notification/subscribe',
+         GroupNotificationSubscribeAPI.as_view(),
+         name='group_notification_subscribe'),
 
     path('<int:group_id>/users', GroupUserListApi.as_view(), name='group_users'),
     path('<int:group>/user/update', GroupUserUpdateApi.as_view(), name='group_user_update'),
@@ -72,7 +78,7 @@ group_patterns = [
 
     path('<int:group_id>/list', WorkGroupListAPI.as_view(), name='work_group_list'),
     path('workgroup/<int:work_group_id>/list', WorkGroupUserListAPI.as_view(), name='work_group_user_list'),
-    path('workgroup/<int:work_group_id>/joinrequest/list',
+    path('<int:group_id>/workgroup/joinrequest/list',
          WorkGroupUserJoinRequestListAPI.as_view(),
          name='work_group_user_list'),
     path('<int:group_id>/workgroup/create', WorkGroupCreateAPI.as_view(), name='work_group_create'),
@@ -89,11 +95,10 @@ group_patterns = [
     path('<int:group>/permission/update', GroupPermissionUpdateApi.as_view(), name='group_permission_update'),
     path('<int:group>/permission/delete', GroupPermissionDeleteApi.as_view(), name='group_permission_delete'),
 
-    path('<int:group>/tags', GroupTagsListApi.as_view(), name='group_tags'),
+    path('<int:group_id>/tags', GroupTagsListApi.as_view(), name='group_tags'),
     path('<int:group>/tag/create', GroupTagsCreateApi.as_view(), name='group_tags_create'),
     path('<int:group>/tag/update', GroupTagsUpdateApi.as_view(), name='group_tags_update'),
     path('<int:group>/tag/delete', GroupTagsDeleteApi.as_view(), name='group_tags_delete'),
-    path('tag/<int:tag_id>/imac', GroupTagIntervalMeanAbsoluteCorrectnessAPI.as_view(), name='group_tag_imac'),
 
     path('<int:group>/delegates', GroupUserDelegateListApi.as_view(), name='group_user_delegates'),
     path('<int:group>/delegate/create', GroupUserDelegateApi.as_view(), name='group_user_delegate'),
@@ -106,7 +111,9 @@ group_patterns = [
     path('<int:group>/delegate/pool/delete',
          GroupUserDelegatePoolDeleteApi.as_view(),
          name='group_user_delegate_pool_delete'),
-
+    path('delegate/pool/<int:delegate_pool_id>/notification/subscribe',
+         GroupUserDelegatePoolNotificationSubscribeAPI.as_view(),
+         name='group_user_delegate_pool_notification_subscribe_api'),
     path('delegate/pool/<int:delegate_pool_id>/comment/list',
          GroupDelegatePoolCommentListAPI.as_view(),
          name='group_user_delegate_pool_list'),
@@ -139,9 +146,6 @@ group_patterns = [
     path('thread/<int:thread_id>/update', GroupThreadUpdateAPI.as_view(), name='group_thread_update'),
     path('thread/<int:thread_id>/delete', GroupThreadDeleteAPI.as_view(), name='group_thread_delete'),
     path('thread/<int:thread_id>/vote', GroupThreadVoteUpdateAPI.as_view(), name='group_thread_vote_update'),
-    path('thread/<int:thread_id>/subscribe',
-         GroupThreadNotificationSubscribeAPI.as_view(),
-         name='group_thread_subscribe'),
     path('thread/<int:thread_id>/comment/list',
          GroupThreadCommentListAPI.as_view(),
          name='group_thread_comment_list'),

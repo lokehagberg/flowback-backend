@@ -11,6 +11,7 @@ from rest_framework.exceptions import ValidationError
 
 from backend.settings import FLOWBACK_SCORE_VOTE_CEILING, FLOWBACK_SCORE_VOTE_FLOOR, DEBUG
 from flowback.files.models import FileCollection
+from flowback.notification.models import NotifiableModel, NotificationChannel
 from flowback.prediction.models import (PredictionBet,
                                         PredictionStatement,
                                         PredictionStatementSegment,
@@ -25,7 +26,7 @@ from flowback.schedule.services import create_schedule
 
 
 # Create your models here.
-class Poll(BaseModel):
+class Poll(BaseModel, NotifiableModel):
     class PollType(models.IntegerChoices):
         RANKING = 1, _('ranking')
         FOR_AGAINST = 2, _('for_against')
@@ -230,6 +231,74 @@ class Poll(BaseModel):
         if current_phase not in phases:
             raise ValidationError(f'Poll is not in {" or ".join(phases)}, currently in {current_phase}')
 
+    NOTIFICATION_DATA_FIELDS = (('poll_id', int),
+                                ('poll_title', str),
+                                ('group_id', int),
+                                ('group_name', str),
+                                ('group_image', str, 'The URL path to the image of the group'))
+
+    ## Notification
+    @property
+    def notification_data(self) -> dict | None:
+        return dict(poll_id=self.id,
+                    poll_title=self.title,
+                    group_id=self.created_by.group.id,
+                    group_name=self.created_by.group.name,
+                    group_image=self.created_by.group.image)
+
+    def notify_poll(self,
+                    action: NotificationChannel.Action,
+                    message: str,
+                    work_group_id: int,
+                    work_group_name: str,
+                    subscription_filters: dict):
+        """
+        Notifies when a poll updates and deletes.
+        Also notifies when poll area, prediction and proposal votes have been counted.
+        :param action:
+        :param message:
+        :param work_group_id:
+        :param work_group_name:
+        :param subscription_filters:
+        :return:
+        """
+        params = locals()
+        params.pop('self')
+
+        return self.notification_channel.notify(**params)
+
+    def notify_poll_phase(self,
+                          action: NotificationChannel.Action,
+                          message: str,
+                          work_group_id: int,
+                          work_group_name: str,
+                          current_phase: str,
+                          subscription_filters: dict):
+        """
+        Notifies when a poll does fast-forward
+        """
+        params = locals()
+        params.pop('self')
+
+        return self.notification_channel.notify(**params)
+
+    def notify_poll_comment(self,
+                            action: NotificationChannel.Action,
+                            message: str,
+                            work_group_id: int,
+                            work_group_name: str,
+                            subscription_filters: dict,
+                            exclude_subscription_filters: dict,
+                            comment_message: str):
+        """
+        Notifies about new comments
+        """
+        params = locals()
+        params.pop('self')
+
+        return self.notification_channel.notify(**params)
+
+    # Signals
     @classmethod
     def post_save(cls, instance, created, update_fields, **kwargs):
         if created and instance.poll_type == cls.PollType.SCHEDULE:

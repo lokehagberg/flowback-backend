@@ -1,26 +1,16 @@
 from rest_framework.exceptions import ValidationError
 from flowback.common.services import get_object, model_update
 from flowback.files.services import upload_collection
-from flowback.group.services.group import group_notification
-from flowback.notification.services import NotificationManager
+from flowback.group.notify import notify_group_poll
+from flowback.notification.models import NotificationChannel
 from flowback.poll.models import Poll, PollPhaseTemplate
-from flowback.group.selectors import group_user_permissions
+from flowback.group.selectors.permission import group_user_permissions
 from django.utils import timezone
 from datetime import datetime
 
+from flowback.poll.notify import notify_poll, notify_poll_phase
 from flowback.poll.tasks import poll_area_vote_count, poll_prediction_bet_count, poll_proposal_vote_count
-
-poll_notification = NotificationManager(sender_type='poll', possible_categories=['timeline',
-                                                                                 'poll',
-                                                                                 'comment_self',
-                                                                                 'comment_all'])
-
-
-def poll_notification_subscribe(*, user_id: int, poll_id: int, categories: list[str]):
-    poll = get_object(Poll, id=poll_id)
-    group_user_permissions(user=user_id, group=poll.created_by.group.id)
-
-    poll_notification.channel_subscribe(user_id=user_id, sender_id=poll.id, category=categories)
+from flowback.user.models import User
 
 
 def poll_create(*, user_id: int,
@@ -46,7 +36,10 @@ def poll_create(*, user_id: int,
                 quorum: int = None,
                 work_group_id: int = None
                 ) -> Poll:
-    group_user = group_user_permissions(user=user_id, group=group_id, permissions=['create_poll', 'admin'])
+    group_user = group_user_permissions(user=user_id,
+                                        group=group_id,
+                                        permissions=['create_poll', 'admin'],
+                                        work_group=work_group_id)
 
     if pinned and not group_user.is_admin:
         raise ValidationError('Permission denied')
@@ -73,9 +66,9 @@ def poll_create(*, user_id: int,
                   end_date]):
         raise ValidationError('Missing required parameter(s) for generic poll')
 
-    elif work_group_id != None:
+    elif work_group_id is not None:
         raise ValidationError("Work groups are only assignable to date polls")
-    
+
     collection = None
     if attachments:
         collection = upload_collection(user_id=user_id,
@@ -102,36 +95,19 @@ def poll_create(*, user_id: int,
                 dynamic=dynamic,
                 quorum=quorum,
                 work_group_id=work_group_id,
-                attachments=collection)
+                attachments=collection,
+                related_notification_channel=group_user.group.notification_channel)
 
     poll.full_clean()
     poll.save()
-
-    # Group notification
-    group_notification.create(sender_id=group_id,
-                              action=poll_notification.Action.update,
-                              category='poll',
-                              message=f'User {group_user.user.username} created poll {poll.title}',
-                              timestamp=start_date,
-                              related_id=poll.id)
 
     poll_area_vote_count.apply_async(kwargs=dict(poll_id=poll.id), eta=poll.area_vote_end_date)
     poll_prediction_bet_count.apply_async(kwargs=dict(poll_id=poll.id), eta=poll.prediction_bet_end_date)
     poll_proposal_vote_count.apply_async(kwargs=dict(poll_id=poll.id), eta=poll.end_date)
 
-    # Poll notification
-    for date, name, phase in poll.labels:
-        poll_notification.create(sender_id=poll.id,
-                                 action=poll_notification.Action.update,
-                                 category='timeline',
-                                 message=f'Poll {poll.title} has started {phase.replace("_", " ").capitalize()} phase')
-
-    if poll_type == Poll.PollType.SCHEDULE:
-        group_notification.create(sender_id=group_id,
-                                  action=group_notification.Action.update,
-                                  category='poll_schedule',
-                                  message=f'Poll {poll.title} has finished, group schedule has been updated',
-                                  related_id=poll.id)
+    notify_group_poll(message="A new poll has been posted",
+                      action=NotificationChannel.Action.CREATED,
+                      poll=poll)
 
     return poll
 
@@ -140,19 +116,25 @@ def poll_update(*, user_id: int, poll_id: int, data) -> Poll:
     poll = get_object(Poll, id=poll_id)
     group_user = group_user_permissions(user=user_id, group=poll.created_by.group.id)
 
-    if data.get('pinned') is not None and not group_user.is_admin:
-        raise ValidationError('Permission denied')
-
     non_side_effect_fields = ['title', 'description', 'pinned']
+
+    if data.get('pinned') is None:
+        data.pop('pinned')
+
+    elif data.get('pinned') is not None and not group_user.is_admin:
+        raise ValidationError('Permission denied')
 
     poll, has_updated = model_update(instance=poll,
                                      fields=non_side_effect_fields,
                                      data=data)
 
+    notify_poll(poll=poll,
+                action=NotificationChannel.Action.UPDATED,
+                message="Poll has been updated")
+
     return poll
 
 
-# TODO remove related notifications
 def poll_delete(*, user_id: int, poll_id: int) -> None:
     poll = get_object(Poll, id=poll_id)
     group_id = poll.created_by.group.id
@@ -168,35 +150,14 @@ def poll_delete(*, user_id: int, poll_id: int) -> None:
     else:
         group_user_permissions(group_user=group_user, permissions=['admin', 'force_delete_poll'])
 
-    # Remove future notifications
-    if poll.current_phase == 'waiting':
-        group_notification.delete(sender_id=group_id, category='poll', related_id=poll.id)
-
-    def delete_notifications_after(phase):
-        poll_notification.delete(sender_id=poll_id,
-                                 category='timeline',
-                                 timestamp__gt=phase)
-
-    match poll.current_phase:
-        case 'waiting':
-            delete_notifications_after(poll.proposal_end_date)
-        case 'proposal':
-            delete_notifications_after(poll.prediction_statement_end_date)
-        case 'area_vote':
-            delete_notifications_after(poll.area_vote_end_date)
-        case 'prediction_bet':
-            delete_notifications_after(poll.prediction_bet_end_date)
-        case 'delegate_vote':
-            delete_notifications_after(poll.delegate_vote_end_date)
-        case 'vote':
-            delete_notifications_after(poll.vote_end_date)
-        case 'result':
-            delete_notifications_after(poll.end_date)
-
     if poll.attachments:
         poll.attachments.delete()
 
     poll.delete()
+
+    notify_group_poll(poll=poll,
+                      action=NotificationChannel.Action.DELETED,
+                      message="Poll has been deleted")
 
 
 def poll_fast_forward(*, user_id: int, poll_id: int, phase: str):
@@ -247,13 +208,10 @@ def poll_fast_forward(*, user_id: int, poll_id: int, phase: str):
     else:
         poll_proposal_vote_count.apply_async(kwargs=dict(poll_id=poll.id), countdown=1)
 
-    poll_notification.shift(sender_id=poll_id,
-                            category='timeline',
-                            delta=time_difference)
-    group_notification.shift(sender_id=group_user.group.id,
-                             category='poll_schedule',
-                             related_id=poll.id,
-                             delta=time_difference)
+    notify_poll_phase(message=f"Poll has been fast forwarded "
+                              f"to {poll.current_phase.replace('_', ' ').capitalize()}",
+                      action=NotificationChannel.Action.UPDATED,
+                      poll=poll)
 
 
 def poll_phase_template_create(*, user_id: int,
@@ -315,3 +273,10 @@ def poll_phase_template_delete(*, user_id: int, template_id: int):
     group_user_permissions(user=user_id, group=template.created_by_group_user.group, permissions=['admin'])
 
     template.delete()
+
+
+def poll_notification_subscribe(*, user: User, poll_id: int, tags: list[str] = None):
+    poll = Poll.objects.get(id=poll_id)
+    group_user = group_user_permissions(user=user, group=poll.created_by.group, work_group=poll.work_group)
+
+    poll.notification_channel.subscribe(user=group_user.user, tags=tags)

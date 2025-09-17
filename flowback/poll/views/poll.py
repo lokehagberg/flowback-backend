@@ -8,14 +8,15 @@ from rest_framework.views import APIView, Response
 from flowback.common.pagination import LimitOffsetPagination, get_paginated_response
 
 from flowback.group.serializers import GroupUserSerializer
+from flowback.notification.views import NotificationSubscribeTemplateAPI
 from flowback.poll.models import Poll, PollProposal
 from flowback.poll.selectors.poll import poll_list, poll_phase_template_list
 from flowback.poll.selectors.proposal import poll_user_schedule_list
 from flowback.poll.selectors.vote import poll_delegates_list
 
-from flowback.poll.services.poll import poll_create, poll_update, poll_delete, poll_notification, \
-    poll_notification_subscribe, poll_fast_forward, poll_phase_template_create, poll_phase_template_update, \
-    poll_phase_template_delete
+from flowback.poll.services.poll import (poll_create, poll_update, poll_delete, poll_fast_forward,
+                                         poll_phase_template_create, poll_phase_template_update,
+                                         poll_phase_template_delete, poll_notification_subscribe)
 
 
 @extend_schema(tags=['home', 'poll'])
@@ -66,7 +67,7 @@ class PollListApi(APIView):
             file = serializers.CharField()
             file_name = serializers.CharField()
 
-        created_by = GroupUserSerializer()
+        created_by = GroupUserSerializer(allow_null=True, hide_relevant_users=True)
         group_joined = serializers.BooleanField(required=False)
         group_id = serializers.IntegerField(source='created_by.group_id')
         group_name = serializers.CharField(source='created_by.group.name')
@@ -78,7 +79,8 @@ class PollListApi(APIView):
         total_comments = serializers.IntegerField()
         total_proposals = serializers.IntegerField()
         total_predictions = serializers.IntegerField()
-        work_group_id = serializers.IntegerField()
+        work_group_id = serializers.IntegerField(allow_null=True)
+        work_group_name = serializers.CharField(source='work_group.name', allow_null=True)
 
         proposal_end_date = serializers.DateTimeField(required=False)
         prediction_statement_end_date = serializers.DateTimeField(required=False)
@@ -127,6 +129,7 @@ class PollListApi(APIView):
                       'interval_mean_absolute_correctness',
                       'attachments',
                       'work_group_id',
+                      'work_group_name',
                       'phase')
 
     def get(self, request, group_id: int = None):
@@ -142,18 +145,6 @@ class PollListApi(APIView):
             request=request,
             view=self
         )
-
-
-@extend_schema(tags=['poll'])
-class PollNotificationSubscribeApi(APIView):
-    class InputSerializer(serializers.Serializer):
-        categories = serializers.MultipleChoiceField(choices=poll_notification.possible_categories)
-
-    def post(self, request, poll: int):
-        serializer = self.InputSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        poll_notification_subscribe(user_id=request.user.id, poll_id=poll, **serializer.validated_data)
-        return Response(status=status.HTTP_200_OK)
 
 
 @extend_schema(tags=['poll'])
@@ -207,7 +198,7 @@ class PollCreateAPI(APIView):
 class PollUpdateAPI(APIView):
     class InputSerializer(serializers.Serializer):
         title = serializers.CharField(required=False)
-        pinned = serializers.BooleanField(required=False)
+        pinned = serializers.BooleanField(required=False, allow_null=True, default=None)
         description = serializers.CharField(required=False)
 
     def post(self, request, poll: int):
@@ -396,3 +387,8 @@ class PollPhaseTemplateDeleteAPI(APIView):
         poll_phase_template_delete(user_id=request.user.id, template_id=template_id)
 
         return Response(status=status.HTTP_200_OK)
+
+
+@extend_schema(tags=['poll'], description=Poll.notification_docs())
+class PollNotificationSubscribeAPI(NotificationSubscribeTemplateAPI):
+    lazy_action = poll_notification_subscribe

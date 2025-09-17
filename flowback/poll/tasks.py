@@ -1,6 +1,5 @@
 import random
 from celery import shared_task
-from django.contrib.postgres.aggregates import ArrayAgg
 from django.db import models
 from django.db.models import Count, Q, Sum, OuterRef, Case, When, F, Subquery
 from django.db.models.functions import Cast
@@ -8,13 +7,15 @@ from django.utils import timezone
 
 from flowback.common.services import get_object
 from flowback.group.models import GroupTags, GroupUser, GroupUserDelegatePool
-from flowback.group.selectors import group_tags_interval_mean_absolute_correctness
-from flowback.poll.models import Poll, PollAreaStatement, PollPredictionBet, PollPredictionStatementVote, \
-    PollPredictionStatement, PollDelegateVoting, PollVotingTypeRanking, PollProposal, PollVoting, \
+from flowback.group.selectors.tags import group_tags_list
+from flowback.notification.models import NotificationChannel
+from flowback.poll.models import Poll, PollAreaStatement, PollPredictionBet, PollPredictionStatement, \
+    PollDelegateVoting, PollVotingTypeRanking, PollProposal, PollVoting, \
     PollVotingTypeCardinal, PollVotingTypeForAgainst
 
 import numpy as np
 
+from flowback.poll.notify import notify_poll
 from flowback.schedule.services import create_event
 
 
@@ -34,12 +35,20 @@ def poll_area_vote_count(poll_id: int):
         # Clean all area tag votes, we won't need it anymore
         PollAreaStatement.objects.filter(poll=poll).delete()
 
+    notify_poll(message="Poll area phase has ended and results have been counted",
+                action=NotificationChannel.Action.UPDATED,
+                poll=poll)
+
     return poll
 
 
 @shared_task
-def poll_prediction_bet_count(poll_id: int):
+def poll_prediction_bet_count(poll_id: int, debug_msg: bool = False):
     # For one prediction, assuming no bias and stationary predictors
+
+    def dprint(*args, **kwargs):
+        if debug_msg:
+            print(*args, **kwargs)
 
     # Get every predictor participating in poll
     timestamp = timezone.now()  # Avoid new bets causing list to be offset
@@ -57,13 +66,13 @@ def poll_prediction_bet_count(poll_id: int):
                              When(pollpredictionstatementvote__vote=False, then=-1),
                              default=0,
                              output_field=models.IntegerField())),
-        outcome=Case(When(outcome_sum__gt=0, then=1),
-                     When(outcome_sum__lt=0, then=0),
-                     default=0.5,
-                     output_field=models.FloatField())
+        outcome_scores=Case(When(outcome_sum__gt=0, then=1),
+                            When(outcome_sum__lt=0, then=0),
+                            default=0.5,
+                            output_field=models.FloatField())
     ).order_by('-created_at').all()
 
-    previous_outcomes = list(statements.filter(~Q(poll=poll)).values_list('outcome', flat=True))
+    previous_outcomes = list(statements.filter(~Q(poll=poll)).values_list('outcome_scores', flat=True))
     previous_outcome_avg = 0 if len(previous_outcomes) == 0 else sum(previous_outcomes) / len(previous_outcomes)
     poll_statements = statements.filter(poll=poll).all().values_list('id', flat=True)
 
@@ -90,10 +99,9 @@ def poll_prediction_bet_count(poll_id: int):
 
         current_bets.append(current_bet)
 
-
         previous_bets.append(list(PollPredictionBet.objects.filter(
             Q(created_by=predictor,
-            prediction_statement__in=statements)
+              prediction_statement__in=statements)
             & ~Q(prediction_statement__poll=poll)).order_by('-prediction_statement__created_at').annotate(
             real_score=Cast(F('score'), models.FloatField()) / 5).values_list('real_score', flat=True)))
 
@@ -169,14 +177,14 @@ def poll_prediction_bet_count(poll_id: int):
     for i in range(len(previous_bets)):
         previous_bets[i] = [j for n, j in enumerate(previous_bets[i]) if n not in to_delete]
 
-    print("\n\n" + "#" * 50)
+    dprint("\n\n" + "#" * 50)
 
     # Assume previous_bets matches order of current_bets
-    print("Current Bets:", current_bets)
-    print("Previous Outcomes:", previous_outcomes)
-    print("Previous Bets:", previous_bets)
+    dprint("Current Bets:", current_bets)
+    dprint("Previous Outcomes:", previous_outcomes)
+    dprint("Previous Bets:", previous_bets)
 
-    print("Total Statement:", len(poll_statements))
+    dprint("Total Statement:", len(poll_statements))
 
     # Calculation below
     # for i, statement in enumerate(poll_statements):
@@ -188,7 +196,7 @@ def poll_prediction_bet_count(poll_id: int):
         # If there's no previous bets then do nothing
         if len(previous_bets) == 0 or len(previous_bets[0]) == 0:
             combined_bet = None if all(bets[i] is None for bets in current_bets) else (sum(main_bets)) / len(main_bets)
-            print(f"No previous bets found, returning {combined_bet}")
+            dprint(f"No previous bets found, returning {combined_bet}")
             PollPredictionStatement.objects.filter(id=statement).update(combined_bet=combined_bet)
 
             continue
@@ -198,7 +206,7 @@ def poll_prediction_bet_count(poll_id: int):
             continue
 
         previous_bets_trimmed = [previous_bets[j] for j in range(len(previous_bets)) if current_bets[j][i] is not None]
-        print("Previous Bets Trimmed:", previous_bets_trimmed)
+        dprint("Previous Bets Trimmed:", previous_bets_trimmed)
         for bets in previous_bets_trimmed:
             bets_trimmed = [i for i in bets if i is not None]
             bias_adjustments.append(0 if len(bets) == 0 else previous_outcome_avg - (sum(bets_trimmed) /
@@ -244,7 +252,7 @@ def poll_prediction_bet_count(poll_id: int):
         # The inverse only exists when the determinant is non-zero, this can be made sure of by changing small decimals
         if np.linalg.det(np_covariance_matrix) == 0:
             determinant_is_zero = True
-            print("Zero determinant")
+            dprint("Zero determinant")
 
             while determinant_is_zero:
                 for m in range(np_covariance_matrix.shape[0]):
@@ -271,9 +279,9 @@ def poll_prediction_bet_count(poll_id: int):
         bet_weights = nominator * (1 / denominator)
         transposed_bet_weights = np.transpose(bet_weights)
 
-        print("Transposed_bet_weights:", transposed_bet_weights)
-        print("Main bets:", main_bets)
-        print("Bias_adjustments:", bias_adjustments)
+        dprint("Transposed_bet_weights:", transposed_bet_weights)
+        dprint("Main bets:", main_bets)
+        dprint("Bias_adjustments:", bias_adjustments)
 
         # I am unsure if I should limit the bias adjusted bets or only limit the combined bet in the end,
         # I think this might make more sense but I have to think about this more
@@ -289,7 +297,7 @@ def poll_prediction_bet_count(poll_id: int):
             elif bias_adjusted_bet[j] > 1:
                 bias_adjusted_bet[j] = 1.0
 
-        print(f"Results: {np.matmul(transposed_bet_weights, bias_adjusted_bet)}")
+        dprint(f"Results: {np.matmul(transposed_bet_weights, bias_adjusted_bet)}")
         combined_bet = float(np.matmul(transposed_bet_weights, bias_adjusted_bet)[0])
 
         if combined_bet < 0:
@@ -300,14 +308,18 @@ def poll_prediction_bet_count(poll_id: int):
         # Sanity check
         check = np.matmul(transposed_bet_weights, row_one_vector)
         if (check[0] > 1 + small_decimal) or (0.99 + small_decimal > check[0]):
-            print(f"Error with weights: {check[0]:.4f}")
+            dprint(f"Error with weights: {check[0]:.4f}")
 
-        print(combined_bet)
+        dprint(combined_bet)
 
         PollPredictionStatement.objects.filter(id=statement).update(combined_bet=combined_bet)
 
     poll.status_prediction = 1
     poll.save()
+
+    notify_poll(message="Poll prediction phase has ended and results have been counted",
+                action=NotificationChannel.Action.UPDATED,
+                poll=poll)
 
 
 @shared_task
@@ -322,25 +334,29 @@ def poll_proposal_vote_count(poll_id: int) -> None:
     # Count delegators participating in poll
     mandate = GroupUserDelegatePool.objects.filter(polldelegatevoting__poll=poll).aggregate(
         mandate=Count('groupuserdelegator',
-                      filter=~Q(groupuserdelegator__delegator__pollvoting__poll=poll
-                                ) & Q(groupuserdelegator__tags__in=[poll.tag]
-                                      ) & Q(groupuserdelegator__delegator__active=True)
+                      filter=~Q(groupuserdelegator__delegator__pollvoting__poll=poll)
+                             & Q(groupuserdelegator__tags__in=[poll.tag])
+                             & Q(groupuserdelegator__delegator__active=True)
+                             & Q(Q(groupuserdelegator__delegator__permission__isnull=False) & Q(groupuserdelegator__delegator__permission__allow_vote=True)
+                                 | Q(groupuserdelegator__delegator__permission__isnull=True) & Q(groupuserdelegator__delegator__group__default_permission__allow_vote=True))
                       ))['mandate']
 
     mandate_subquery = GroupUserDelegatePool.objects.filter(id=OuterRef('author_delegate__created_by')).annotate(
         mandate=Count('groupuserdelegator',
-                      filter=~Q(groupuserdelegator__delegator__pollvoting__poll=poll
-                                ) & Q(groupuserdelegator__tags__in=[poll.tag]
-                                      ) & Q(groupuserdelegator__delegator__active=True)
+                      filter=~Q(groupuserdelegator__delegator__pollvoting__poll=poll)
+                             & Q(groupuserdelegator__tags__in=[poll.tag])
+                             & Q(groupuserdelegator__delegator__active=True)
+                             & Q(~Q(groupuserdelegator__delegator__permission__isnull=False) & Q(groupuserdelegator__delegator__permission__allow_vote=True)
+                                 | Q(groupuserdelegator__delegator__permission__isnull=True) & Q(groupuserdelegator__delegator__group__default_permission__allow_vote=True))
                       )).values('mandate')
 
     # Count mandate for each delegate, save it to PollDelegateVoting account
     total_mandate = PollDelegateVoting.objects.filter(id=OuterRef('id')).annotate(
         total_mandate=Count('created_by__groupuserdelegator',
-                      filter=~Q(created_by__groupuserdelegator__delegator__pollvoting__poll=poll
-                                ) & Q(created_by__groupuserdelegator__tags__in=[poll.tag]
-                                      ) & Q(created_by__groupuserdelegator__delegator__active=True)
-                      )).values('total_mandate')
+                            filter=~Q(created_by__groupuserdelegator__delegator__pollvoting__poll=poll
+                                      ) & Q(created_by__groupuserdelegator__tags__in=[poll.tag]
+                                            ) & Q(created_by__groupuserdelegator__delegator__active=True)
+                            )).values('total_mandate')
 
     PollDelegateVoting.objects.update(mandate=Subquery(total_mandate))
 
@@ -389,7 +405,8 @@ def poll_proposal_vote_count(poll_id: int) -> None:
             PollVotingTypeCardinal.objects.filter(author_delegate__isnull=False, proposal__poll=poll
                                                   ).update(score=F('raw_score') * Subquery(multiplier))
 
-            proposal_scores = PollProposal.objects.filter(id=OuterRef('id')).annotate(final_score=Sum('pollvotingtypecardinal__score')).values('final_score')
+            proposal_scores = PollProposal.objects.filter(id=OuterRef('id')).annotate(
+                final_score=Sum('pollvotingtypecardinal__score')).values('final_score')
             PollProposal.objects.update(score=Subquery(proposal_scores))
 
             poll.participants = (mandate + PollVoting.objects.filter(poll=poll).all().count()) or 1
@@ -449,6 +466,11 @@ def poll_proposal_vote_count(poll_id: int) -> None:
         print(f"Total Group Users: {total_group_users}")
         print(f"Quorum: {quorum}")
         poll.status = 1 if poll.participants > total_group_users * quorum else -1
-        poll.interval_mean_absolute_correctness = group_tags_interval_mean_absolute_correctness(tag_id=poll.tag_id)
+        poll.interval_mean_absolute_correctness = group_tags_list(group_id=poll.created_by.group_id,
+                                                                  filters=dict(id=poll.tag_id)).first().imac
         poll.result = True
         poll.save()
+
+        notify_poll(message="Poll has ended and results have been counted",
+                    action=NotificationChannel.Action.UPDATED,
+                    poll=poll)

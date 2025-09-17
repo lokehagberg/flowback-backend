@@ -1,6 +1,6 @@
 from django.utils import timezone
 from django.core.exceptions import ObjectDoesNotExist
-from rest_framework.test import APIRequestFactory, force_authenticate, APITransactionTestCase
+from rest_framework.test import APIRequestFactory, force_authenticate, APITestCase
 from .factories import PollFactory, PollProposalFactory, PollProposalTypeScheduleFactory
 
 from .utils import generate_poll_phase_kwargs
@@ -11,7 +11,7 @@ from ...schedule.models import ScheduleEvent
 from ...user.models import User
 
 
-class ProposalTest(APITransactionTestCase):
+class ProposalTest(APITestCase):
     def setUp(self):
         self.group = GroupFactory()
         self.group_tag = GroupTagsFactory(group=self.group)
@@ -166,7 +166,7 @@ class ProposalTest(APITransactionTestCase):
         event_id = proposal.pollproposaltypeschedule.event.id
 
         response = self.proposal_delete(proposal, user)
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 200, response.data)
         self.assertFalse(ScheduleEvent.objects.filter(id=event_id).exists())
 
     def test_proposal_schedule_delete_no_permission(self):

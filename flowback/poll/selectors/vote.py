@@ -1,11 +1,10 @@
 import django_filters
 
 from flowback.common.services import get_object
-from flowback.group.models import GroupUserDelegatePool
 from flowback.poll.models import Poll, PollVotingTypeRanking, PollDelegateVoting, \
     PollVotingTypeForAgainst, PollVotingTypeCardinal
 from flowback.user.models import User
-from flowback.group.selectors import group_user_permissions
+from flowback.group.selectors.permission import group_user_permissions
 
 
 class BaseDelegatePollVoteFilter(django_filters.FilterSet):

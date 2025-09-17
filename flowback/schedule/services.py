@@ -165,7 +165,7 @@ class ScheduleManager:
                     raise_exception=raise_exception)
 
         if schedule_origin_id is not None:
-            data['schedule_origin_id'] = schedule_origin_id
+            data['schedule__origin_id'] = schedule_origin_id
 
         return get_object(ScheduleEvent, **data)
 
@@ -180,6 +180,8 @@ class ScheduleManager:
                      description: str = None,
                      work_group_id: int = None,
                      assignee_ids: list[int] = None,
+                     reminders: list[int] = None,
+                     repeat_frequency: str = None,
                      meeting_link: str = None) -> ScheduleEvent:
 
         self.validate_origin_name(origin_name=origin_name)
@@ -193,13 +195,15 @@ class ScheduleManager:
                             work_group_id=work_group_id,
                             description=description,
                             assignee_ids=assignee_ids,
-                            meeting_link=meeting_link)
+                            meeting_link=meeting_link,
+                            reminders=reminders,
+                            repeat_frequency=repeat_frequency)
 
-    def update_event(self, *, schedule_origin_id: int, event_id: int, data):
+    def update_event(self, *, schedule_origin_id: int, event_id: int, data) -> ScheduleEvent:
         get_object(ScheduleEvent, id=event_id,
                    schedule__origin_id=schedule_origin_id,
                    schedule__origin_name=self.origin_name)
-        update_event(event_id=event_id, data=data)
+        return update_event(event_id=event_id, data=data)
 
     def delete_event(self, *, schedule_origin_id: int, event_id: int):
         get_object(ScheduleEvent, id=event_id,
