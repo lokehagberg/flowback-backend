@@ -27,9 +27,9 @@ class GroupUserListApi(APIView):
         username = serializers.CharField(source='user.username')
         profile_image = serializers.ImageField(source='user.profile_image')
         banner_image = serializers.ImageField(source='user.banner_image')
-        delegate = serializers.PrimaryKeyRelatedField(source='groupuserdelegate', read_only=True)
-        permission_id = serializers.IntegerField(source='permission', allow_null=True)
-        permission_name = serializers.CharField(source='permission.role_name', allow_null=True)
+        delegate = serializers.BooleanField()
+        permission_id = serializers.IntegerField(allow_null=True)
+        permission_name = serializers.CharField(source='permission.role_name', default='Member')
 
         class Meta:
             model = GroupUser
@@ -75,7 +75,7 @@ class GroupUserUpdateApi(APIView):
     class InputSerializer(serializers.Serializer):
         user = serializers.IntegerField(required=False)
         delegate = serializers.NullBooleanField(required=False, default=None)
-        permission = serializers.IntegerField(required=False, allow_null=True)
+        permission = serializers.IntegerField(required=False, allow_null=True, source='permission_id')
         is_admin = serializers.IntegerField(required=False)
 
     def post(self, request, group: int):

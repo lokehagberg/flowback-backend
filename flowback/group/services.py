@@ -6,7 +6,7 @@ from backend.settings import env
 from rest_framework.exceptions import ValidationError
 from flowback.user.models import User
 from flowback.group.models import Group, GroupUser, GroupUserInvite, GroupUserDelegator, GroupTags, GroupPermissions, \
-    GroupUserDelegate
+    GroupUserDelegate, GroupUserDelegatePool
 from flowback.group.selectors import group_user_permissions
 from flowback.common.services import model_update, get_object
 
@@ -35,7 +35,7 @@ def group_update(*, user: int, group: int, data) -> Group:
 
     # Check if group_permission exists to allow for a new default_permission
     if default_permission := data.get('default_permission'):
-        get_object(GroupPermissions, id=default_permission, author_id=group)
+        data['default_permission'] = get_object(GroupPermissions, id=default_permission, author_id=group)
 
     group, has_updated = model_update(instance=user.group,
                                       fields=non_side_effect_fields,
@@ -111,29 +111,15 @@ def group_join(*, user: int, group: int) -> Union[GroupUser, GroupUserInvite]:
 def group_user_update(*, user: int, group: int, fetched_by: int, data) -> GroupUser:
     user_to_update = group_user_permissions(group=group, user=fetched_by)
     non_side_effect_fields = []
-    custom_fields = []
-
-    # Custom delegate field
-    if user_to_update.user.id == user and data.get('delegate'):
-        get_object(GroupUserDelegate, 'User is already a delegate', reverse=True, user=user_to_update, group_id=group)
-        delegate = GroupUserDelegate(user=user_to_update, group_id=group)
-        delegate.full_clean()
-        custom_fields.append(delegate)
 
     # If user updates someone else (requires Admin)
     if group_user_permissions(group=group, user=fetched_by, raise_exception=False, permissions=['admin']):
         user_to_update = group_user_permissions(group=group, user=user)
-        non_side_effect_fields.extend(['permission', 'is_admin'])
+        non_side_effect_fields.extend(['permission_id', 'is_admin'])
 
     group_user, has_updated = model_update(instance=user_to_update,
                                            fields=non_side_effect_fields,
                                            data=data)
-
-    for field in custom_fields:
-        field.save()
-
-    if custom_fields:
-        group_user = get_object(GroupUser, user_id=user, group_id=group)
 
     return group_user
 
@@ -203,10 +189,10 @@ def group_tag_delete(*, user: int, group: int, tag: int) -> None:
     tag.delete()
 
 
-def group_user_delegate(*, user: int, group: int, delegate: int, tags: list[int] = None) -> GroupUserDelegator:
+def group_user_delegate(*, user: int, group: int, delegate_pool_id: int, tags: list[int] = None) -> GroupUserDelegator:
     tags = tags or []
     delegator = group_user_permissions(group=group, user=user)
-    delegate = get_object(GroupUserDelegate, 'Delegate does not exist', id=delegate, group=group)
+    delegate_pool = get_object(GroupUserDelegatePool, 'Delegate pool does not exist', id=delegate_pool_id, group=group)
 
     db_tags = GroupTags.objects.filter(id__in=tags, active=True).all()
 
@@ -223,7 +209,7 @@ def group_user_delegate(*, user: int, group: int, delegate: int, tags: list[int]
         raise ValidationError('Not all tags are available in the group')
 
     delegate_rel = GroupUserDelegator(group_id=group, delegator_id=delegator.id,
-                                      delegate_id=delegate.id)
+                                      delegate_pool_id=delegate_pool.id)
     delegate_rel.full_clean()
     delegate_rel.save()
     delegate_rel.tags.add(*db_tags)
@@ -231,18 +217,45 @@ def group_user_delegate(*, user: int, group: int, delegate: int, tags: list[int]
     return delegate_rel
 
 
-def group_user_delegate_remove(*, user_id: int, group_id: int, delegate_id: int) -> None:
-    delegator = group_user_permissions(group=group_id, user=user_id)
-    delegate = get_object(GroupUserDelegate, 'Delegate does not exist', id=delegate_id)
+def group_user_delegate_pool_create(*, user: int, group: int):
+    group_user = group_user_permissions(user=user, group=group)
 
-    delegate_rel = get_object(GroupUserDelegator, 'User to delegate relation does not exist',
-                              delegator=delegator, group_id=group_id, delegate=delegate)
+    # To avoid duplicates (for now)
+    get_object(GroupUserDelegate, reverse=True, group=group, user=group_user)
+
+    delegate_pool = GroupUserDelegatePool(group_id=group)
+    delegate_pool.full_clean()
+    delegate_pool.save()
+    user_delegate = GroupUserDelegate(group_id=group, user=group_user, pool=delegate_pool)
+    user_delegate.full_clean()
+    user_delegate.save()
+
+
+def group_user_delegate_pool_delete(*, user: int, group: int):
+    group_user = group_user_permissions(user=user, group=group)
+
+    delegate_user = get_object(GroupUserDelegate, user=group_user, group_id=group)
+    delegate_pool = get_object(GroupUserDelegatePool, id=delegate_user.pool_id)
+
+    delegate_pool.delete()
+
+
+def group_user_delegate_remove(*, user_id: int, group_id: int, delegate_pool_id: int) -> None:
+    delegator = group_user_permissions(group=group_id, user=user_id)
+    delegate_pool = get_object(GroupUserDelegatePool, 'Delegate pool does not exist', id=delegate_pool_id)
+
+    delegate_rel = get_object(GroupUserDelegator, 'User to delegate pool relation does not exist',
+                              delegator=delegator, group_id=group_id, delegate_pool=delegate_pool)
 
     delegate_rel.delete()
 
 
-def group_user_delegate_update(*, user_id: int, group_id: int, delegate_id: int, tags: list[int] = None) -> GroupUserDelegator:
-    group_user_delegate_remove(user_id=user_id, group_id=group_id, delegate_id=delegate_id)
-    new_delegate_rel = group_user_delegate(user=user_id, group=group_id, delegate=delegate_id, tags=tags)
+def group_user_delegate_update(*,
+                               user_id: int,
+                               group_id: int,
+                               delegate_pool_id: int,
+                               tags: list[int] = None) -> GroupUserDelegator:
+    group_user_delegate_remove(user_id=user_id, group_id=group_id, delegate_pool_id=delegate_pool_id)
+    new_delegate_rel = group_user_delegate(user=user_id, group=group_id, delegate_pool_id=delegate_pool_id, tags=tags)
 
     return new_delegate_rel

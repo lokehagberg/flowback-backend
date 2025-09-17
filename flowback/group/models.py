@@ -73,9 +73,14 @@ class GroupUserInvite(BaseModel):
         unique_together = ('user', 'group')
 
 
-class GroupUserDelegate(BaseModel):
-    user = models.OneToOneField(GroupUser, on_delete=models.DO_NOTHING)
+class GroupUserDelegatePool(BaseModel):
     group = models.ForeignKey(Group, on_delete=models.CASCADE)
+
+
+class GroupUserDelegate(BaseModel):
+    group = models.ForeignKey(Group, on_delete=models.CASCADE)
+    user = models.ForeignKey(GroupUser, on_delete=models.CASCADE)
+    pool = models.ForeignKey(GroupUserDelegatePool, on_delete=models.CASCADE)
 
     class Meta:
         unique_together = ('user', 'group')
@@ -84,9 +89,9 @@ class GroupUserDelegate(BaseModel):
 # Delegator to delegate relations
 class GroupUserDelegator(BaseModel):
     delegator = models.ForeignKey(GroupUser, on_delete=models.CASCADE, related_name='group_user_delegate_delegator')
-    delegate = models.ForeignKey('GroupUserDelegate', on_delete=models.CASCADE)
+    delegate_pool = models.ForeignKey(GroupUserDelegatePool, on_delete=models.CASCADE)
     group = models.ForeignKey(Group, on_delete=models.CASCADE)
     tags = models.ManyToManyField(GroupTags)
 
     class Meta:
-        unique_together = ('delegator', 'delegate', 'group')
+        unique_together = ('delegator', 'delegate_pool', 'group')

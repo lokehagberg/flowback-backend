@@ -19,7 +19,10 @@ from .views.tag import (GroupTagsListApi,
 from .views.delegate import (GroupUserDelegateListApi,
                              GroupUserDelegateApi,
                              GroupUserDelegateUpdateApi,
-                             GroupUserDelegateDeleteApi)
+                             GroupUserDelegateDeleteApi,
+                             GroupUserDelegatePoolListApi,
+                             GroupUserDelegatePoolCreateApi,
+                             GroupUserDelegatePoolDeleteApi)
 
 group_patterns = [
     path('list', GroupListApi.as_view(), name='groups'),
@@ -50,4 +53,11 @@ group_patterns = [
     path('<int:group>/delegate/create', GroupUserDelegateApi.as_view(), name='group_user_delegate'),
     path('<int:group>/delegate/update', GroupUserDelegateUpdateApi.as_view(), name='group_user_delegate_update'),
     path('<int:group>/delegate/delete', GroupUserDelegateDeleteApi.as_view(), name='group_user_delegate_delete'),
+    path('<int:group>/delegate/pools', GroupUserDelegatePoolListApi.as_view(), name='group_user_delegate_pools'),
+    path('<int:group>/delegate/pool/create',
+         GroupUserDelegatePoolCreateApi.as_view(),
+         name='group_user_delegate_pool_create'),
+    path('<int:group>/delegate/pool/delete',
+         GroupUserDelegatePoolDeleteApi.as_view(),
+         name='group_user_delegate_pool_delete'),
 ]
