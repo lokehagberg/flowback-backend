@@ -71,8 +71,8 @@ class PollCreateAPI(APIView):
     def post(self, request, group: int):
         serializer = self.InputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        poll_create(user_id=request.user.id, group_id=group, **serializer.validated_data)
-        return Response(status=status.HTTP_200_OK)
+        poll = poll_create(user_id=request.user.id, group_id=group, **serializer.validated_data)
+        return Response(status=status.HTTP_200_OK, data=poll.id)
 
 
 class PollUpdateAPI(APIView):
