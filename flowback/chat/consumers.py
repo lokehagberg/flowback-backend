@@ -45,7 +45,7 @@ class GroupChatConsumer(AsyncWebsocketConsumer):
         class OutputSerializer(serializers.ModelSerializer):
             class Meta:
                 model = User
-                fields = 'id', 'username', 'profile_image', 'created_at'
+                fields = 'id', 'username', 'profile_image'
 
         await self.group_channel_message(message)
 
@@ -119,7 +119,7 @@ class DirectChatConsumer(AsyncWebsocketConsumer):
         class OutputSerializer(serializers.ModelSerializer):
             class Meta:
                 model = User
-                fields = 'id', 'username', 'profile_image', 'created_at'
+                fields = 'id', 'username', 'profile_image'
 
         serializer = FilterSerializer(data=json.loads(text_data or '{}'))
         serializer.is_valid(raise_exception=True)
