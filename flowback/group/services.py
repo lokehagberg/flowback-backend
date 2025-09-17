@@ -139,7 +139,12 @@ def group_user_update(*, user: int, group: int, fetched_by: int, data) -> GroupU
 
 
 def group_leave(*, user: int, group: int) -> None:
-    group_user_permissions(group=group, user=user).delete()
+    user = group_user_permissions(group=group, user=user)
+
+    if user.user.id == user.group.created_by:
+        raise ValidationError("Creators aren't allowed to leave, deleting the group is an option")
+
+    user.delete()
 
 
 def group_invite(*, user: int, group: int, to: int) -> GroupUserInvite:
