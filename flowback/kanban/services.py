@@ -12,7 +12,7 @@ def kanban_entry_create(*,
                         tag: int) -> KanbanEntry:
     created_by = group_user_permissions(user=user_id, group=group_id)
     assignee = group_user_permissions(user=assignee_id, group=group_id)
-    kanban = KanbanEntry(created_by_id=created_by.user.id, assignee_id=assignee.user.id,
+    kanban = KanbanEntry(created_by_id=created_by.id, assignee_id=assignee.id,
                          title=title, description=description, tag=tag)
 
     kanban.full_clean()
