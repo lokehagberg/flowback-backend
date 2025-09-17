@@ -1,10 +1,10 @@
-from rest_framework import serializers
+from rest_framework import serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from flowback.chat.selectors import group_message_list, group_message_preview, direct_message_list, \
     direct_message_preview
-from flowback.chat.models import GroupMessage
+from flowback.chat.models import GroupMessage, DirectMessage
 from flowback.chat.services import direct_chat_timestamp, group_chat_timestamp
 from flowback.common.pagination import get_paginated_response, LimitOffsetPagination
 
@@ -65,6 +65,7 @@ class GroupMessagePreviewApi(APIView):
         user_id = serializers.IntegerField(source='group_user.user_id')
         username = serializers.CharField(source='group_user.user.username')
         profile_image = serializers.ImageField(source='group_user.user.profile_image')
+        timestamp = serializers.DateTimeField()
 
         class Meta:
             model = GroupMessage
@@ -134,9 +135,10 @@ class DirectMessagePreviewApi(APIView):
         target_username = serializers.CharField(source='target.username')
         target_id = serializers.IntegerField(source='target.id')
         profile_image = serializers.ImageField(source='user.profile_image')
+        timestamp = serializers.DateTimeField()
 
         class Meta:
-            model = GroupMessage
+            model = DirectMessage
             fields = ('username', 'user_id', 'target_username', 'target_id',
                       'profile_image', 'message', 'created_at', 'timestamp')
 
@@ -165,6 +167,7 @@ class DirectMessageTimestampApi(APIView):
         serializer.is_valid(raise_exception=True)
 
         direct_chat_timestamp(user_id=request.user.id, target=target, **serializer.validated_data)
+        return Response(status=status.HTTP_200_OK)
 
 
 class GroupMessageTimestampApi(APIView):
@@ -176,3 +179,4 @@ class GroupMessageTimestampApi(APIView):
         serializer.is_valid(raise_exception=True)
 
         group_chat_timestamp(user_id=request.user.id, group_id=group, **serializer.validated_data)
+        return Response(status=status.HTTP_200_OK)

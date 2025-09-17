@@ -72,10 +72,10 @@ def group_message_list(*, user: User, group: int, filters=None):
 
 def group_message_preview(*, user: User, filters=None):
     filters = filters or {}
-    subquery = GroupMessageUserData.objects.get(group_user=OuterRef('group_user')).values('timestamp')
+    subquery = GroupMessageUserData.objects.filter(group_user=OuterRef('group_user')).values('timestamp')
     qs = GroupMessage.objects.filter(group_user__user__in=[user]
                                      ).order_by('group_user__group_id', '-created_at')\
-        .annotate(timestamp=Subquery(subquery)).distinct('group_user__group_id').all()
+        .annotate(timestamp=Subquery(subquery[:1])).distinct('group_user__group_id').all()
     return BaseGroupMessagePreviewFilter(filters, qs).qs
 
 
@@ -88,9 +88,9 @@ def direct_message_list(*, user: User, target: int, filters=None):
 
 def direct_message_preview(*, user: User, filters=None):
     filters = filters or {}
-    subquery = DirectMessageUserData.objects.get(user=OuterRef('user')).values('timestamp')
+    subquery = DirectMessageUserData.objects.filter(user=OuterRef('user'), target=OuterRef('target')).values('timestamp')
     qs = DirectMessage.objects.filter(Q(user=user) | Q(target=user)
-                                      ).annotate(timestamp=Subquery(subquery)
+                                      ).annotate(timestamp=Subquery(subquery[:1])
                                                  ).order_by('user', 'target', 'created_at').distinct('user', 'target')
 
     return BaseDirectMessagePreviewFilter(filters, qs).qs

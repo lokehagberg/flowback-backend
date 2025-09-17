@@ -8,7 +8,7 @@ from flowback.group.models import GroupUser
 
 
 class GroupMessage(BaseModel):
-    group_user = models.ForeignKey(GroupUser, on_delete=models.CASCADE, unique=True)
+    group_user = models.ForeignKey(GroupUser, on_delete=models.CASCADE)
     message = models.TextField()
 
 
@@ -28,8 +28,8 @@ class DirectMessage(BaseModel):
 
 
 class DirectMessageUserData(BaseModel):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    target = models.ForeignKey(User, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='directmessageuserdata_user')
+    target = models.ForeignKey(User, on_delete=models.CASCADE, related_name='directmessageuserdata_target')
     timestamp = models.DateTimeField()
 
     def clean(self):

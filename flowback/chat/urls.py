@@ -6,12 +6,11 @@ from .views import GroupMessageListApi, GroupMessagePreviewApi, DirectMessageLis
 
 chat_patterns = [
     path('group/<int:group>', GroupMessageListApi.as_view(), name='chat-group-list'),
-    path('group/<int:group>/timestamp', GroupMessageListApi.as_view(), name='chat-group-list'),
     path('group/preview', GroupMessagePreviewApi.as_view(), name='chat-group-preview'),
+    path('group/<int:group>/timestamp', GroupMessageTimestampApi.as_view(), name='chat-group-timestamp'),
     path('direct/<int:target>', DirectMessageListApi.as_view(), name='chat-dm-list'),
+    path('direct/preview', DirectMessagePreviewApi.as_view(), name='chat-dm-preview'),
     path('direct/<int:target>/timestamp', DirectMessageTimestampApi.as_view(), name='chat-dm-timestamp'),
-    path('group/<int:group>/timestamp', DirectMessageTimestampApi.as_view(), name='chat-group-timestamp'),
-
 ]
 
 chat_ws_patterns = [
