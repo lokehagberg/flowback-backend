@@ -1,3 +1,5 @@
+import uuid
+
 from flowback.common.models import BaseModel
 from flowback.user.models import User
 from django.db import models
@@ -26,7 +28,7 @@ class Group(BaseModel):
     image = models.ImageField()
     cover_image = models.ImageField()
 
-    jitsi_room = models.TextField(unique=True)
+    jitsi_room = models.UUIDField(unique=True, default=uuid.uuid4)
 
 
 # Permission class for each Group

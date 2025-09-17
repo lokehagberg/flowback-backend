@@ -1,24 +1,43 @@
 # TODO groups, groupusers, groupinvites, groupuserinvites,
 #  groupdefaultpermission, grouppermissions, grouptags, groupuserdelegates
 import django_filters
-from typing import Union
+from typing import Union, Literal, overload
 from django.db.models import Q
 from flowback.common.services import get_object
 from flowback.user.models import User
 from flowback.group.models import Group, GroupUser, GroupUserInvite, GroupPermissions, GroupTags, GroupUserDelegate
 from rest_framework.exceptions import ValidationError
 
+#
+# @overload
+# def group_user_permissions(*
+#                            group: int,
+#                            user: Union[User, int],
+#                            permissions: list[str] = None,
+#                            raise_exception: Literal[True]) -> GroupUser:
+#     return group_user_permissions(group=group, user=user, permissions=permissions, raise_exception=True)
+#
+#
+# @overload
+# def group_user_permissions(*
+#                            group: int,
+#                            user: Union[User, int],
+#                            permissions: list[str] = None,
+#                            raise_exception: Literal[False]) -> Union[GroupUser, bool]:
+#     return group_user_permissions(group=group, user=user, permissions=permissions, raise_exception=False)
+
 
 def group_user_permissions(*,
-                           group: id,
+                           group: int,
                            user: Union[User, int],
                            permissions: list[str] = None,
-                           raise_exception=True) -> Union[GroupUser, bool]:
+                           raise_exception: bool = True) -> Union[GroupUser, bool]:
     if type(user) == int:
-        user = get_object(User, user_id=user)
+        user = get_object(User, id=user)
     permissions = permissions or []
     user = get_object(GroupUser, 'User is not in group', group=group, user=user)
-    user_permissions = user.permission.values()
+
+    user_permissions = user.permission.values() if user.permission else []
 
     # Check if admin permission is present
     if 'admin' in permissions or user.user.is_superuser:
@@ -55,12 +74,11 @@ class BaseGroupFilter(django_filters.FilterSet):
 
 
 class BaseGroupUserFilter(django_filters.FilterSet):
-    username = django_filters.CharFilter(field_name='user__username')
+    username__icontains = django_filters.CharFilter(field_name='user__username', lookup_expr='icontains')
 
     class Meta:
         model = GroupUser
         fields = dict(user_id=['exact'],
-                      username=['exact', 'icontains'],
                       is_delegate=['exact'],
                       is_admin=['exact'],
                       permission=['in'])
@@ -90,12 +108,13 @@ class BaseGroupTagsFilter(django_filters.FilterSet):
 
 class BaseGroupUserDelegateFilter(django_filters.FilterSet):
     delegate_name__icontains = django_filters.CharFilter(field_name='delegate__username__icontains')
+    tag_id = django_filters.NumberFilter(field_name='tags__tag_id')
     tag_name = django_filters.CharFilter(field_name='tags__tag_name')
     tag_name__icontains = django_filters.CharFilter(field_name='tags__tag_name', lookup_expr='icontains')
 
     class Meta:
         model = GroupUserDelegate
-        fields = ['delegate', 'tag']
+        fields = ['delegate']
 
 
 def group_get_visible_for(user: User):
