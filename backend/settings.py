@@ -17,7 +17,7 @@ from pathlib import Path
 env = environ.Env(DEBUG=(bool, False),
                   DJANGO_SECRET=str,
                   FLOWBACK_URL=(str, None),
-
+                  PG_SERVICE=(str, 'flowback'),
                   FLOWBACK_ALLOW_GROUP_CREATION=(bool, True),
 
                   EMAIL_HOST=(str, None),
@@ -42,6 +42,7 @@ SECRET_KEY = env('DJANGO_SECRET')
 DEBUG = True
 
 FLOWBACK_URL = env('FLOWBACK_URL')
+PG_SERVICE = env('PG_SERVICE')
 ALLOWED_HOSTS = [FLOWBACK_URL or '*']
 CORS_ALLOW_ALL_ORIGINS = not bool(FLOWBACK_URL)
 if not CORS_ALLOW_ALL_ORIGINS:
@@ -122,7 +123,7 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
         'OPTIONS': {
-            'service': 'flowback',
+            'service': PG_SERVICE,
             'passfile': '.flowback_pgpass',
         },
     }
