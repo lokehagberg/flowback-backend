@@ -54,12 +54,10 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'rest_framework.authtoken',
-    'drf_spectacular',
-    'flowback.user',
+    'flowback.user'
 ]
 
 REST_FRAMEWORK = {
-    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.TokenAuthentication'
     ],
@@ -69,16 +67,6 @@ REST_FRAMEWORK = {
 }
 
 AUTH_USER_MODEL = 'user.User'
-
-SPECTACULAR_SETTINGS = {
-    'TITLE': 'Flowback API',
-    'DESCRIPTION': 'Flowback is a decision-making platform '
-                   'that can guarantee the validity of votings '
-                   'to 100%. It is the organizational '
-                   'decision-making platform, and it is available '
-                   'for free.',
-    'VERSION': '1.0.0',
-}
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',

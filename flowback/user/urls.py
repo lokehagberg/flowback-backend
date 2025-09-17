@@ -4,7 +4,8 @@ from rest_framework.authtoken import views
 from .views import (UserCreateApi,
                     UserCreateVerifyApi,
                     UserListApi,
-                    UserGetApi)
+                    UserGetApi,
+                    UserUpdateApi)
 
 user_patterns = [
     path('register/', UserCreateApi.as_view(), name='register'),
@@ -13,4 +14,5 @@ user_patterns = [
     path('users/', UserListApi.as_view(), name='users'),
     path('user/', UserGetApi.as_view(), name='user'),
     path('user/<int:user_id>', UserGetApi.as_view(), name='user'),
+    path('user/update/', UserUpdateApi.as_view(), name='user_update')
 ]

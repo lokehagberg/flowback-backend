@@ -4,7 +4,7 @@ from rest_framework.validators import ValidationError
 from django.core.validators import ValidationError as CoreValidationError
 
 # Create your tests here.
-from flowback.user.models import OnboardUser, User
+from flowback.user.models import User
 from flowback.user.services import user_create, user_create_verify, user_update
 
 

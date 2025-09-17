@@ -1,4 +1,3 @@
-# Create your views here.
 from rest_framework import serializers, status
 from flowback.common.pagination import LimitOffsetPagination, get_paginated_response
 from rest_framework.response import Response
@@ -11,11 +10,9 @@ from flowback.user.services import user_create, user_create_verify, user_update
 
 class UserCreateApi(APIView):
     class InputSerializer(serializers.ModelSerializer):
-        link = serializers.CharField(required=False)
-
         class Meta:
             model = OnboardUser
-            fields = 'username', 'email', 'link'
+            fields = 'username', 'email'
 
     def post(self, request):
         serializer = self.InputSerializer(data=request.data)
@@ -51,7 +48,7 @@ class UserListApi(APIView):
     class OutputSerializer(serializers.ModelSerializer):
         class Meta:
             model = User
-            fields = 'id', 'username', 'profile_image', 'banner_image'
+            fields = 'id', 'username', 'profile_image'
 
     def get(self, request):
         filter_serializer = self.FilterSerializer(data=request.query_params)
@@ -70,7 +67,8 @@ class UserGetApi(APIView):
     class OutputSerializer(serializers.ModelSerializer):
         class Meta:
             model = User
-            fields = 'email', 'username', 'profile_image', 'banner_image', 'bio', 'website'
+            fields = 'id', 'email', 'username', 'profile_image', \
+                     'banner_image', 'bio', 'website'
 
     def get(self, request, user_id=None):
         serializer = self.OutputSerializer(get_user(user=user_id or request.user.id))
