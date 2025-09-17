@@ -40,7 +40,7 @@ SECRET_KEY = env('DJANGO_SECRET')
 DEBUG = True
 
 FLOWBACK_URL = env('FLOWBACK_URL')
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [FLOWBACK_URL]
 
 
 # Application definition
