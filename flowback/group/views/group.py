@@ -21,6 +21,7 @@ class GroupListApi(APIView):
 
     class OutputSerializer(serializers.ModelSerializer):
         joined = serializers.BooleanField()
+        member_count = serializers.IntegerField()
 
         class Meta:
             model = Group
@@ -32,7 +33,8 @@ class GroupListApi(APIView):
                       'description',
                       'image',
                       'cover_image',
-                      'joined')
+                      'joined',
+                      'member_count')
 
     def get(self, request):
         filter_serializer = self.FilterSerializer(data=request.query_params)
@@ -51,6 +53,8 @@ class GroupListApi(APIView):
 
 class GroupDetailApi(APIView):
     class OutputSerializer(serializers.ModelSerializer):
+        member_count = serializers.IntegerField()
+
         class Meta:
             model = Group
             fields = ('created_by',
@@ -62,6 +66,7 @@ class GroupDetailApi(APIView):
                       'description',
                       'image',
                       'cover_image',
+                      'member_count',
                       'jitsi_room')
 
     def get(self, request, group: int):

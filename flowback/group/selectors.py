@@ -2,7 +2,7 @@
 #  groupdefaultpermission, grouppermissions, grouptags, groupuserdelegates
 import django_filters
 from typing import Union
-from django.db.models import Q, Exists, OuterRef
+from django.db.models import Q, Exists, OuterRef, Count
 from django.forms import model_to_dict
 
 from flowback.common.services import get_object
@@ -140,15 +140,15 @@ def _group_get_visible_for(user: User):
 def group_list(*, fetched_by: User, filters=None):
     filters = filters or {}
     joined_groups = Group.objects.filter(id=OuterRef('pk'), groupuser__user__in=[fetched_by])
-    qs = _group_get_visible_for(user=fetched_by).annotate(joined=Exists(joined_groups)).all().distinct('id')
+    qs = _group_get_visible_for(user=fetched_by).annotate(joined=Exists(joined_groups),
+                                                          member_count=Count('groupuser')).order_by('created_at').all()
     qs = BaseGroupFilter(filters, qs).qs
-
     return qs
 
 
 def group_detail(*, fetched_by: User, group_id: int):
     group_user = group_user_permissions(group=group_id, user=fetched_by)
-    return group_user.group
+    return Group.objects.annotate(member_count=Count('groupuser')).get(id=group_user.group.id)
 
 
 def group_user_list(*, group: int, fetched_by: User, filters=None):
