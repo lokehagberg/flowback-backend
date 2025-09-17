@@ -136,15 +136,6 @@ class DirectChatConsumer(AsyncWebsocketConsumer):
             }
         )
 
-        await self.channel_layer.group_send(
-            await self.get_message_target(self.user.id),
-            {
-                'type': 'chat_message',
-                'user': OutputSerializer(self.user).data,
-                'message': data.get('message'),
-            }
-        )
-
     # Receive message from room group
     async def chat_message(self, content: dict):
 
