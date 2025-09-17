@@ -36,7 +36,7 @@ class BaseGroupMessagePreviewFilter(django_filters.FilterSet):
 
 
 class BaseDirectMessageFilter(django_filters.FilterSet):
-    o = django_filters.OrderingFilter(
+    order_by = django_filters.OrderingFilter(
         fields=(
             ('created_at', 'created_at_asc'),
             ('-created_at', 'created_at_desc')

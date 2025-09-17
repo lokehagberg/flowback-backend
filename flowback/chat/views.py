@@ -88,6 +88,7 @@ class DirectMessageListApi(APIView):
     class FilterSerializer(serializers.Serializer):
         id = serializers.IntegerField(required=False)
         target = serializers.IntegerField(required=False)
+        order_by = serializers.CharField(required=False)
         created_at__lt = serializers.DateTimeField(required=False)
         created_at__gt = serializers.DateTimeField(required=False)
 
@@ -126,7 +127,6 @@ class DirectMessagePreviewApi(APIView):
         message__icontains = serializers.CharField(required=False)
         created_at__lt = serializers.DateTimeField(required=False)
         created_at__gt = serializers.DateTimeField(required=False)
-        o = serializers.CharField(required=False)
 
     class OutputSerializer(serializers.ModelSerializer):
         username = serializers.CharField(source='user.username')
