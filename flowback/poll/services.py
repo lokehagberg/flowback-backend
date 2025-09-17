@@ -154,8 +154,7 @@ def poll_proposal_vote_count(*, poll_id: int) -> None:
                               Q(groupuserdelegator__tags__in=[poll.tag]))).values('mandate')
             delegate_votes = PollVotingTypeRanking.objects.filter(author_delegate__poll=poll).values('pk').annotate(
                 score=(total_proposals - (Count('author_delegate__pollvotingtyperanking') - F('priority'))) *
-                Subquery(subquery)
-            )
+                Subquery(subquery))
 
             # Set score to the same as priority for user votes
             user_votes = PollVotingTypeRanking.objects.filter(author__poll=poll
