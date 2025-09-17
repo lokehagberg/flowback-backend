@@ -75,3 +75,6 @@ class GroupUserDelegate(BaseModel):
     delegate = models.ForeignKey(GroupUser, on_delete=models.CASCADE, related_name='group_user_delegate_delegate')
     group = models.ForeignKey(Group, on_delete=models.CASCADE)
     tags = models.ManyToManyField(GroupTags)
+
+    class Meta:
+        unique_together = (('delegator', 'delegate', 'group'), ('delegator', 'group', 'tags'))

@@ -108,7 +108,8 @@ class UserGetApi(APIView):
                      'banner_image', 'bio', 'website'
 
     def get(self, request, user_id=None):
-        serializer = self.OutputSerializer(get_user(user=user_id or request.user.id))
+        user = get_user(user=user_id if user_id is not None else request.user.id)
+        serializer = self.OutputSerializer(user)
         return Response(serializer.data)
 
 

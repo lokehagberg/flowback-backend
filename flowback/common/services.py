@@ -29,12 +29,19 @@ def model_update(
     return instance, has_updated
 
 
-def get_object(model_or_queryset, error_message: str = None, reverse: bool = False, **kwargs):
+def get_object(model_or_queryset,
+               error_message: str = None,
+               reverse: bool = False,
+               raise_exception: bool = True,
+               **kwargs):
     try:
-        get_object_or_404(model_or_queryset, **kwargs)
+        data = get_object_or_404(model_or_queryset, **kwargs)
         if reverse:
             raise ValidationError(error_message)
+
+        return data
+
     except Http404:
-        if not error_message:
+        if not raise_exception:
             return None
-        raise ValidationError(error_message)
+        raise ValidationError(error_message or f'{model_or_queryset._meta.model_name} does not exist')

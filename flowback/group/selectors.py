@@ -98,28 +98,28 @@ def group_list(*, fetched_by: User, filters=None):
     return BaseGroupFilter(filters, qs).qs
 
 
-def group_user_list(*, group: id, fetched_by: User, filters=None):
+def group_user_list(*, group: int, fetched_by: User, filters=None):
     group_user_permissions(group=group, user=fetched_by)
     filters = filters or {}
     qs = GroupUser.objects.filter(group_id=group).all()
     return BaseGroupUserFilter(filters, qs).qs
 
 
-def group_user_invite_list(*, group: id, fetched_by: User, filters=None):
+def group_user_invite_list(*, group: int, fetched_by: User, filters=None):
     group_user_permissions(group=group, user=fetched_by, permissions=['invite_user'])
     filters = filters or {}
     qs = GroupUserInvite.objects.filter(group_id=group).all()
     return BaseGroupUserFilter(filters, qs).qs
 
 
-def group_permissions_list(*, group: id, fetched_by: User, filters=None):
+def group_permissions_list(*, group: int, fetched_by: User, filters=None):
     group_user_permissions(group=group, user=fetched_by)
     filters = filters or {}
     qs = GroupPermissions.objects.filter(group_id=group).all()
     return BaseGroupPermissionsFilter(qs, filters).qs
 
 
-def group_tags_list(*, group: id, fetched_by: User, filters=None):
+def group_tags_list(*, group: int, fetched_by: User, filters=None):
     filters = filters or {}
     group_user_permissions(group=group, user=fetched_by)
     query = Q(group_id=group, active=False)
@@ -128,3 +128,12 @@ def group_tags_list(*, group: id, fetched_by: User, filters=None):
 
     qs = GroupTags.objects.filter(query).all()
     return BaseGroupTagsFilter(qs, filters).qs
+
+
+def group_user_delegate_list(* group: int, fetched_by: User, filters=None):
+    filters = filters or {}
+    group_user_permissions(group=group, user=fetched_by)
+    query = Q(group_id=group, delegator_id=fetched_by)
+
+    qs = GroupUserDelegate.objects.filter(query).all()
+    return BaseGroupUserDelegateFilter(qs, filters).qs
