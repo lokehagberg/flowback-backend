@@ -3,6 +3,8 @@
 import django_filters
 from typing import Union, Literal, overload
 from django.db.models import Q
+from django.forms import model_to_dict
+
 from flowback.common.services import get_object
 from flowback.user.models import User
 from flowback.group.models import Group, GroupUser, GroupUserInvite, GroupPermissions, GroupTags, GroupUserDelegate
@@ -27,21 +29,41 @@ from rest_framework.exceptions import ValidationError
 #     return group_user_permissions(group=group, user=user, permissions=permissions, raise_exception=False)
 
 
+def group_default_permissions(*, group: int):
+    group = get_object(Group, id=group)
+    if group.default_permission:
+        return model_to_dict(group.default_permission)
+
+    fields = GroupPermissions._meta.get_fields()
+    fields = [field for field in fields if not field.auto_created
+              and field.name not in ['created_at', 'updated_at', 'role_name', 'author']]
+
+    defaults = dict()
+    for field in fields:
+        defaults[field.name] = field.default
+
+    return defaults
+
+
 def group_user_permissions(*,
                            group: int,
                            user: Union[User, int],
                            permissions: list[str] = None,
                            raise_exception: bool = True) -> Union[GroupUser, bool]:
+
+
+
     if type(user) == int:
         user = get_object(User, id=user)
     permissions = permissions or []
+    requires_permissions = bool(permissions)  # Avoids authentication if all permissions are removed before check
     user = get_object(GroupUser, 'User is not in group', group=group, user=user)
-
-    user_permissions = user.permission.values() if user.permission else []
+    perobj = GroupPermissions()
+    user_permissions = model_to_dict(user.permission) if user.permission else group_default_permissions(group=group)
 
     # Check if admin permission is present
-    if 'admin' in permissions or user.user.is_superuser:
-        if user.is_admin or user.group.created_by == user.user or user.is_superuser:
+    if 'admin' in permissions:
+        if user.is_admin or user.group.created_by == user.user or user.user.is_superuser:
             return user
 
         permissions.remove('admin')
@@ -54,7 +76,7 @@ def group_user_permissions(*,
         permissions.remove('creator')
 
     failed_permissions = [key for key in permissions if user_permissions[key] is False]
-    if failed_permissions:
+    if failed_permissions or (requires_permissions and not failed_permissions):
         if raise_exception:
             raise ValidationError('Permission denied')
         else:

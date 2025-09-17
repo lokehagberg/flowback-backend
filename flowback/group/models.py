@@ -70,6 +70,9 @@ class GroupUserInvite(BaseModel):
     group = models.ForeignKey(Group, on_delete=models.CASCADE)
     external = models.BooleanField()
 
+    class Meta:
+        unique_together = ('user', 'group')
+
 
 # Delegator to delegate relations
 # TODO Add signals to avoid user subscribing to the same user outside of services
