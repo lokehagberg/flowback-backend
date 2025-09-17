@@ -38,7 +38,7 @@ class GroupPermissions(BaseModel):
     author = models.ForeignKey('Group', on_delete=models.CASCADE)
     invite_user = models.BooleanField(default=False)
     create_poll = models.BooleanField(default=False)
-    allow_vote = models.BooleanField(default=False)
+    allow_vote = models.BooleanField(default=True)
     kick_members = models.BooleanField(default=False)
     ban_members = models.BooleanField(default=False)
 
