@@ -1,0 +1,1 @@
+# TODO add Poll (Create, Update, Delete), Proposal (Create, Update, Delete), Vote (Create, Update, Delete)
