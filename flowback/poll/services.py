@@ -247,7 +247,7 @@ def poll_proposal_vote_count(*, poll_id: int) -> None:
                              filter=Q(vote=False)) * Subquery(mandate_subquery)))
 
             # Set score to the same as priority for user votes
-            user_votes = PollVotingTypeForAgainst.objects.filter(author__poll=poll, vote=True).values('pk', 'score')
+            user_votes = PollVotingTypeForAgainst.objects.filter(author__poll=poll, vote=True).values('pk', 'vote')
 
             for i in user_votes:
                 PollVotingTypeForAgainst.objects.filter(id=i['pk']).update(score=int(i['vote']))
