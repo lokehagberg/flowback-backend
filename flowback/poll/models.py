@@ -1,5 +1,6 @@
 from django.db import models
 from django.db.models import Q, F
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from rest_framework.exceptions import ValidationError
 
@@ -45,11 +46,26 @@ class Poll(BaseModel):
     dynamic = models.BooleanField()
 
     def clean(self):
-        constraints = [models.CheckConstraint(check=Q(proposal_end_date__gte=F('start_date')),
+        labels = ((timezone.now(), 'current time'),
+                  (self.start_date, 'start date'),
+                  (self.proposal_end_date, 'proposal end date'),
+                  (self.prediction_end_date, 'prediction end date'),
+                  (self.delegate_vote_end_date, 'delegate vote end date'),
+                  (self.vote_end_date, 'vote end date'),
+                  (self.end_date, 'end date'))
+
+        for x in range(len(labels) - 1):
+            if labels[x][0] >= labels[x+1][0]:
+                raise ValidationError(f'{labels[x][1].title()} is greater than {labels[x+1][1]}')
+
+    class Meta:
+        constraints = [models.CheckConstraint(check=Q(start_date__gte=timezone.now()),
+                                              name='nowgreaterthanstartdate_check'),
+                       models.CheckConstraint(check=Q(proposal_end_date__gte=F('start_date')),
                                               name='proposalenddategreaterthanstartdate_check'),
                        models.CheckConstraint(check=Q(prediction_end_date__gte=F('proposal_end_date')),
                                               name='predictionenddategreaterthanproposalenddate_check'),
-                       models.CheckConstraint(check=Q(delegate_vote_end_date__lte=F('prediction_end_date')),
+                       models.CheckConstraint(check=Q(delegate_vote_end_date__gte=F('prediction_end_date')),
                                               name='delegatevoteenddategreaterthanpredictionenddate_check'),
                        models.CheckConstraint(check=Q(vote_end_date__gte=F('delegate_vote_end_date')),
                                               name='voteenddategreaterthandelegatevoteenddate_check'),
