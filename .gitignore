@@ -6,7 +6,6 @@ __pycache__
 db.sqlite3
 media
 .flowback_pgpass
-flowback/user_subscription/*
 flowback/membership/*
 
 # Backup files #
@@ -46,6 +45,7 @@ flowback/membership/*
 
 # Sensitive or high-churn files
 .idea/**/dataSources/
+.idea/dataSources.xml
 .idea/**/dataSources.ids
 .idea/**/dataSources.local.xml
 .idea/**/sqlDataSources.xml

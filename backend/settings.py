@@ -19,7 +19,7 @@ env = environ.Env(DEBUG=(bool, False),
                   FLOWBACK_URL=(str, None),
                   PG_SERVICE=(str, 'flowback'),
                   FLOWBACK_ALLOW_GROUP_CREATION=(bool, True),
-
+                  FLOWBACK_DEFAULT_PERMISSION=(str, 'rest_framework.permissions.IsAuthenticated'),
                   EMAIL_HOST=(str, None),
                   EMAIL_PORT=(str, None),
                   EMAIL_HOST_USER=(str, None),
@@ -70,7 +70,7 @@ INSTALLED_APPS = [
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.TokenAuthentication'
+        env('FLOWBACK_DEFAULT_PERMISSION')
     ],
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
