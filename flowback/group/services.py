@@ -6,7 +6,6 @@ from flowback.user.models import User
 from flowback.group.models import Group, GroupUser, GroupUserInvite, GroupUserDelegate, GroupTags, GroupPermissions
 from flowback.group.selectors import group_user_permissions
 from flowback.common.services import model_update, get_object
-# TODO Leave, Invite_Request, Invite, Invite_Reject, Invite_Verify, Delegate, Remove_Delegate
 
 
 def group_create(*, user: int, name: str, description: str, image: str, cover_image: str,
@@ -101,7 +100,7 @@ def group_join(*, user: int, group: int) -> None:
         GroupUser.objects.create(user=user, group=group)
 
 
-def group_user_update(*, user: int, group: int, fetched_by: int, data) -> GroupPermissions:
+def group_user_update(*, user: int, group: int, fetched_by: int, data) -> GroupUser:
     user_to_update = group_user_permissions(group=group, user=fetched_by)
     non_side_effect_fields = []
 
@@ -155,7 +154,7 @@ def group_invite_reject(*, user: int, group: int) -> None:
 
 
 def group_tag_create(*, user: int, group: int, tag_name: str) -> GroupTags:
-    user = group_user_permissions(group=group, user=user, permissions=['admin'])
+    group_user_permissions(group=group, user=user, permissions=['admin'])
     tag = GroupTags(tag_name=tag_name, group_id=group)
     tag.full_clean()
     tag.save()
@@ -172,7 +171,7 @@ def group_tag_update(*, user: int, group: int, tag: int, data) -> GroupTags:
                                           fields=non_side_effect_fields,
                                           data=data)
 
-    return tag
+    return group_tag
 
 
 def group_tag_delete(*, user: int, group: int, tag: int) -> None:
@@ -201,7 +200,7 @@ def group_user_delegate(*, user: int, group: int, delegate: int, tags: list[int]
     if len(db_tags) < len(tags):
         raise ValidationError('Not all tags exists in the group')
 
-    delegate_rel = GroupUserDelegate(group_id=group, delegator_id=user, delegate_id=delegate.id)
+    delegate_rel = GroupUserDelegate(group_id=group, delegator_id=delegator.id, delegate_id=delegate.id)
     delegate_rel.full_clean()
     delegate_rel.save()
     delegate_rel.tags.add(*db_tags)

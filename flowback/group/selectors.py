@@ -2,7 +2,7 @@
 #  groupdefaultpermission, grouppermissions, grouptags, groupuserdelegates
 import django_filters
 from typing import Union, Literal, overload
-from django.db.models import Q
+from django.db.models import Q, Exists, OuterRef
 from django.forms import model_to_dict
 
 from flowback.common.services import get_object
@@ -86,7 +86,7 @@ def group_user_permissions(*,
 
 
 class BaseGroupFilter(django_filters.FilterSet):
-    joined = django_filters.NumberFilter(field_name='group_user__user', lookup_expr='exact')
+    user_joined = django_filters.NumberFilter(field_name='group_user__user', lookup_expr='exact')
 
     class Meta:
         model = Group
@@ -139,19 +139,25 @@ class BaseGroupUserDelegateFilter(django_filters.FilterSet):
         fields = ['delegate']
 
 
-def group_get_visible_for(user: User):
-    query = Q(public=True) | Q(Q(public=False) | Q(group_user__user=user))
+def _group_get_visible_for(user: User):
+    query = Q(public=True) | Q(Q(public=False) & Q(group_user__user__in=user))
     return Group.objects.filter(query)
 
 
 def group_list(*, fetched_by: User, filters=None):
     filters = filters or {}
-    qs = group_get_visible_for(user=fetched_by).all()
+    joined_groups = Group.objects.filter(id=OuterRef('pk'), group_user__user__in=fetched_by)
+    qs = _group_get_visible_for(user=fetched_by).annotate(joined=Exists(joined_groups)).all()
 
     if filters.get('joined') is True:
-        filters['joined'] = fetched_by.id
+        filters['user_joined'] = fetched_by.id
 
     return BaseGroupFilter(filters, qs).qs
+
+
+def group_detail(*, fetched_by: User, group_id: int):
+    group_user = group_user_permissions(group=group_id, user=fetched_by)
+    return group_user.group
 
 
 def group_user_list(*, group: int, fetched_by: User, filters=None):
@@ -186,7 +192,7 @@ def group_tags_list(*, group: int, fetched_by: User, filters=None):
     return BaseGroupTagsFilter(qs, filters).qs
 
 
-def group_user_delegate_list(* group: int, fetched_by: User, filters=None):
+def group_user_delegate_list(*, group: int, fetched_by: User, filters=None):
     filters = filters or {}
     group_user_permissions(group=group, user=fetched_by)
     query = Q(group_id=group, delegator_id=fetched_by)
