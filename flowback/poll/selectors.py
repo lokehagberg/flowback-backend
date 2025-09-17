@@ -1,7 +1,7 @@
 from typing import Union
 
 import django_filters
-from django.db.models import Q
+from django.db.models import Q, F
 from django.utils import timezone
 
 from flowback.common.services import get_object
@@ -105,7 +105,8 @@ def poll_proposal_list(*, fetched_by: User, group_id: int, poll_id: int, filters
             group_user_permissions(group=group_id, user=fetched_by)
 
         filters = filters or {}
-        qs = PollProposal.objects.filter(created_by__group_id=group_id, poll=poll).order_by('-score').all()
+        qs = PollProposal.objects.filter(created_by__group_id=group_id, poll=poll)\
+            .order_by(F('score').desc(nulls_last=True)).all()
 
         if poll.poll_type == Poll.PollType.SCHEDULE:
             return BasePollProposalScheduleFilter(filters, qs).qs
