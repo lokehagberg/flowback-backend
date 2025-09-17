@@ -1,28 +1,70 @@
 # TODO groups, groupusers, groupinvites, groupuserinvites,
 #  groupdefaultpermission, grouppermissions, grouptags, groupuserdelegates
 import django_filters
-from typing import Union
-from django.db.models import Q
+from typing import Union, Literal, overload
+from django.db.models import Q, Exists, OuterRef
+from django.forms import model_to_dict
+
 from flowback.common.services import get_object
 from flowback.user.models import User
-from flowback.group.models import Group, GroupUser, GroupUserInvite, GroupPermissions, GroupTags, GroupUserDelegate
+from flowback.group.models import Group, GroupUser, GroupUserInvite, GroupPermissions, GroupTags, GroupUserDelegator, \
+    GroupUserDelegatePool
 from rest_framework.exceptions import ValidationError
+
+#
+# @overload
+# def group_user_permissions(*
+#                            group: int,
+#                            user: Union[User, int],
+#                            permissions: list[str] = None,
+#                            raise_exception: Literal[True]) -> GroupUser:
+#     return group_user_permissions(group=group, user=user, permissions=permissions, raise_exception=True)
+#
+#
+# @overload
+# def group_user_permissions(*
+#                            group: int,
+#                            user: Union[User, int],
+#                            permissions: list[str] = None,
+#                            raise_exception: Literal[False]) -> Union[GroupUser, bool]:
+#     return group_user_permissions(group=group, user=user, permissions=permissions, raise_exception=False)
+
+
+def group_default_permissions(*, group: int):
+    group = get_object(Group, id=group)
+    if group.default_permission:
+        return model_to_dict(group.default_permission)
+
+    fields = GroupPermissions._meta.get_fields()
+    fields = [field for field in fields if not field.auto_created
+              and field.name not in ['created_at', 'updated_at', 'role_name', 'author']]
+
+    defaults = dict()
+    for field in fields:
+        defaults[field.name] = field.default
+
+    return defaults
 
 
 def group_user_permissions(*,
-                           group: id,
+                           group: int,
                            user: Union[User, int],
                            permissions: list[str] = None,
-                           raise_exception=True) -> Union[GroupUser, bool]:
+                           raise_exception: bool = True) -> Union[GroupUser, bool]:
+
+
+
     if type(user) == int:
-        user = get_object(User, user_id=user)
+        user = get_object(User, id=user)
     permissions = permissions or []
+    requires_permissions = bool(permissions)  # Avoids authentication if all permissions are removed before check
     user = get_object(GroupUser, 'User is not in group', group=group, user=user)
-    user_permissions = user.permission.values()
+    perobj = GroupPermissions()
+    user_permissions = model_to_dict(user.permission) if user.permission else group_default_permissions(group=group)
 
     # Check if admin permission is present
-    if 'admin' in permissions or user.user.is_superuser:
-        if user.is_admin or user.group.created_by == user.user or user.is_superuser:
+    if 'admin' in permissions:
+        if user.is_admin or user.group.created_by == user.user or user.user.is_superuser:
             return user
 
         permissions.remove('admin')
@@ -35,7 +77,7 @@ def group_user_permissions(*,
         permissions.remove('creator')
 
     failed_permissions = [key for key in permissions if user_permissions[key] is False]
-    if failed_permissions:
+    if failed_permissions or (requires_permissions and not failed_permissions):
         if raise_exception:
             raise ValidationError('Permission denied')
         else:
@@ -45,7 +87,7 @@ def group_user_permissions(*,
 
 
 class BaseGroupFilter(django_filters.FilterSet):
-    joined = django_filters.NumberFilter(field_name='group_user__user', lookup_expr='exact')
+    joined = django_filters.BooleanFilter(lookup_expr='exact')
 
     class Meta:
         model = Group
@@ -55,13 +97,13 @@ class BaseGroupFilter(django_filters.FilterSet):
 
 
 class BaseGroupUserFilter(django_filters.FilterSet):
-    username = django_filters.CharFilter(field_name='user__username')
+    username__icontains = django_filters.CharFilter(field_name='user__username', lookup_expr='icontains')
+    delegate = django_filters.NumberFilter(field_name='groupuserdelegate')
 
     class Meta:
         model = GroupUser
-        fields = dict(user_id=['exact'],
-                      username=['exact', 'icontains'],
-                      is_delegate=['exact'],
+        fields = dict(id=['exact'],
+                      user_id=['exact'],
                       is_admin=['exact'],
                       permission=['in'])
 
@@ -78,46 +120,69 @@ class BaseGroupUserInviteFilter(django_filters.FilterSet):
 class BaseGroupPermissionsFilter(django_filters.FilterSet):
     class Meta:
         model = GroupPermissions
-        fields = ['role_name']
+        fields = dict(id=['exact'], role_name=['exact', 'icontains'])
 
 
 class BaseGroupTagsFilter(django_filters.FilterSet):
     class Meta:
         model = GroupTags
-        fields = dict(tag_name=['exact', 'icontains'],
+        fields = dict(id=['exact'],
+                      tag_name=['exact', 'icontains'],
                       active=['exact'])
 
 
+class BaseGroupUserDelegatePoolFilter(django_filters.FilterSet):
+    id = django_filters.NumberFilter()
+    delegate_id = django_filters.NumberFilter(field_name='groupuserdelegate__user_id')
+    group_user_id = django_filters.NumberFilter(field_name='groupuserdelegate_id')
+
+
 class BaseGroupUserDelegateFilter(django_filters.FilterSet):
-    delegate_name__icontains = django_filters.CharFilter(field_name='delegate__username__icontains')
+    delegate_id = django_filters.NumberFilter()
+    delegate_user_id = django_filters.NumberFilter(field_name='delegate__user_id')
+    delegate_name__icontains = django_filters.CharFilter(field_name='delegate__user__username__icontains')
+    tag_id = django_filters.NumberFilter(field_name='tags__tag_id')
     tag_name = django_filters.CharFilter(field_name='tags__tag_name')
     tag_name__icontains = django_filters.CharFilter(field_name='tags__tag_name', lookup_expr='icontains')
 
     class Meta:
-        model = GroupUserDelegate
-        fields = ['delegate', 'tag']
+        model = GroupUserDelegator
+        fields = ['delegate_id']
 
 
-def group_get_visible_for(user: User):
-    query = Q(public=True) | Q(Q(public=False) | Q(group_user__user=user))
+def _group_get_visible_for(user: User):
+    query = Q(public=True) | Q(Q(public=False) & Q(groupuser__user__in=[user]))
     return Group.objects.filter(query)
 
 
 def group_list(*, fetched_by: User, filters=None):
     filters = filters or {}
-    qs = group_get_visible_for(user=fetched_by).all()
+    joined_groups = Group.objects.filter(id=OuterRef('pk'), groupuser__user__in=[fetched_by])
+    qs = _group_get_visible_for(user=fetched_by).annotate(joined=Exists(joined_groups)).all().distinct('id')
+    qs = BaseGroupFilter(filters, qs).qs
 
-    if filters.get('joined') is True:
-        filters['joined'] = fetched_by.id
+    return qs
 
-    return BaseGroupFilter(filters, qs).qs
+
+def group_detail(*, fetched_by: User, group_id: int):
+    group_user = group_user_permissions(group=group_id, user=fetched_by)
+    return group_user.group
 
 
 def group_user_list(*, group: int, fetched_by: User, filters=None):
     group_user_permissions(group=group, user=fetched_by)
     filters = filters or {}
-    qs = GroupUser.objects.filter(group_id=group).all()
+    is_delegate = GroupUser.objects.filter(group_id=group, groupuserdelegate__user=OuterRef('pk'),
+                                           groupuserdelegate__group=OuterRef('group'))
+    qs = GroupUser.objects.filter(group_id=group).annotate(delegate=Exists(is_delegate)).all()
     return BaseGroupUserFilter(filters, qs).qs
+
+
+def group_user_delegate_pool_list(*, group: int, fetched_by: User, filters=None):
+    group_user_permissions(group=group, user=fetched_by)
+    filters = filters or {}
+    qs = GroupUserDelegatePool.objects.filter(group=group).all()
+    return BaseGroupUserDelegatePoolFilter(filters, qs).qs
 
 
 def group_user_invite_list(*, group: int, fetched_by: User, filters=None):
@@ -130,25 +195,25 @@ def group_user_invite_list(*, group: int, fetched_by: User, filters=None):
 def group_permissions_list(*, group: int, fetched_by: User, filters=None):
     group_user_permissions(group=group, user=fetched_by)
     filters = filters or {}
-    qs = GroupPermissions.objects.filter(group_id=group).all()
-    return BaseGroupPermissionsFilter(qs, filters).qs
+    qs = GroupPermissions.objects.filter(author_id=group).all()
+    return BaseGroupPermissionsFilter(filters, qs).qs
 
 
 def group_tags_list(*, group: int, fetched_by: User, filters=None):
     filters = filters or {}
     group_user_permissions(group=group, user=fetched_by)
-    query = Q(group_id=group, active=False)
+    query = Q(group_id=group, active=True)
     if group_user_permissions(group=group, user=fetched_by, permissions=['admin'], raise_exception=False):
         query = Q(group_id=group)
 
     qs = GroupTags.objects.filter(query).all()
-    return BaseGroupTagsFilter(qs, filters).qs
+    return BaseGroupTagsFilter(filters, qs).qs
 
 
-def group_user_delegate_list(* group: int, fetched_by: User, filters=None):
+def group_user_delegate_list(*, group: int, fetched_by: User, filters=None):
     filters = filters or {}
-    group_user_permissions(group=group, user=fetched_by)
+    fetched_by = group_user_permissions(group=group, user=fetched_by)
     query = Q(group_id=group, delegator_id=fetched_by)
 
-    qs = GroupUserDelegate.objects.filter(query).all()
-    return BaseGroupUserDelegateFilter(qs, filters).qs
+    qs = GroupUserDelegator.objects.filter(query).all()
+    return BaseGroupUserDelegateFilter(filters, qs).qs

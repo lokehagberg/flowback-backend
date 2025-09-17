@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'corsheaders',
     'rest_framework',
+    'django_extensions',
     'rest_framework.authtoken',
     'flowback.user',
     'flowback.group',
@@ -88,6 +89,9 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = 'backend.urls'
+
+MEDIA_ROOT = str(BASE_DIR) + '/media'
+MEDIA_URL = '/media/'
 
 TEMPLATES = [
     {

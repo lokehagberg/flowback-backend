@@ -15,9 +15,17 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from backend.settings import DEBUG, MEDIA_URL, MEDIA_ROOT
 from flowback.user.urls import user_patterns
+from flowback.group.urls import group_patterns
+from django.conf.urls.static import static
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', include((user_patterns, 'user')))
+    path('', include((user_patterns, 'user'))),
+    path('group/', include((group_patterns, 'group')))
 ]
+
+if DEBUG:
+    urlpatterns += static(MEDIA_URL, document_root=MEDIA_ROOT)
+

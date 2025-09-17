@@ -53,8 +53,8 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_active = models.BooleanField(default=True)
 
     username = models.CharField(max_length=120, validators=[UnicodeUsernameValidator()], unique=True)
-    profile_image = models.ImageField(null=True, blank=True)
-    banner_image = models.ImageField(null=True, blank=True)
+    profile_image = models.ImageField(null=True, blank=True, upload_to='user/profile_image')
+    banner_image = models.ImageField(null=True, blank=True, upload_to='user/banner_image')
 
     bio = models.TextField(null=True, blank=True)
     website = models.TextField(null=True, blank=True)
