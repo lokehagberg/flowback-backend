@@ -17,9 +17,10 @@ from pathlib import Path
 env = environ.Env(DEBUG=(bool, False),
                   DJANGO_SECRET=str,
                   FLOWBACK_URL=(str, None),
-
+                  PG_SERVICE=(str, 'flowback'),
                   FLOWBACK_ALLOW_GROUP_CREATION=(bool, True),
-
+                  FLOWBACK_GROUP_ADMIN_USER_LIST_ACCESS_ONLY=(bool, False),
+                  FLOWBACK_DEFAULT_PERMISSION=(str, 'rest_framework.permissions.IsAuthenticated'),
                   EMAIL_HOST=(str, None),
                   EMAIL_PORT=(str, None),
                   EMAIL_HOST_USER=(str, None),
@@ -42,6 +43,7 @@ SECRET_KEY = env('DJANGO_SECRET')
 DEBUG = True
 
 FLOWBACK_URL = env('FLOWBACK_URL')
+PG_SERVICE = env('PG_SERVICE')
 ALLOWED_HOSTS = [FLOWBACK_URL or '*']
 CORS_ALLOW_ALL_ORIGINS = not bool(FLOWBACK_URL)
 if not CORS_ALLOW_ALL_ORIGINS:
@@ -61,13 +63,15 @@ INSTALLED_APPS = [
     'rest_framework',
     'django_extensions',
     'rest_framework.authtoken',
+    'pgtrigger',
     'flowback.user',
-    'flowback.group'
+    'flowback.group',
+    'flowback.poll'
 ]
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.TokenAuthentication'
+        env('FLOWBACK_DEFAULT_PERMISSION')
     ],
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
@@ -120,7 +124,7 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
         'OPTIONS': {
-            'service': 'flowback',
+            'service': PG_SERVICE,
             'passfile': '.flowback_pgpass',
         },
     }
