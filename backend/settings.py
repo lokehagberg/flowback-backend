@@ -90,6 +90,7 @@ MIDDLEWARE = [
 ROOT_URLCONF = 'backend.urls'
 
 MEDIA_ROOT = str(BASE_DIR) + '/media'
+MEDIA_URL = FLOWBACK_URL + '/media'
 
 TEMPLATES = [
     {
