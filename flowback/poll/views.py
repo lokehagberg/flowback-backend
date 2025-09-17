@@ -141,8 +141,8 @@ class PollProposalCreateAPI(APIView):
         serializer = self.InputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         poll_refresh_cheap(poll_id=poll)  # TODO get celery
-        poll_proposal_create(user_id=request.user.id, group_id=group, poll_id=poll, **serializer.validated_data)
-        return Response(status=status.HTTP_200_OK)
+        proposal = poll_proposal_create(user_id=request.user.id, group_id=group, poll_id=poll, **serializer.validated_data)
+        return Response(status=status.HTTP_200_OK, data=proposal.id)
 
 
 class PollProposalDeleteAPI(APIView):
