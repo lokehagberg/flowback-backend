@@ -29,6 +29,7 @@ class GroupListApi(APIView):
                       'created_by',
                       'active',
                       'direct_join',
+                      'hide_poll_users',
                       'name',
                       'description',
                       'image',
@@ -61,6 +62,7 @@ class GroupDetailApi(APIView):
                       'active',
                       'direct_join',
                       'public',
+                      'hide_poll_users',
                       'default_permission',
                       'name',
                       'description',
@@ -80,7 +82,7 @@ class GroupCreateApi(APIView):
     class InputSerializer(serializers.ModelSerializer):
         class Meta:
             model = Group
-            fields = ('name', 'description', 'image', 'cover_image', 'direct_join', 'public')
+            fields = ('name', 'description', 'image', 'cover_image', 'hide_poll_users', 'direct_join', 'public')
 
     def post(self, request):
         serializer = self.InputSerializer(data=request.data)
@@ -98,6 +100,7 @@ class GroupUpdateApi(APIView):
         image = serializers.ImageField(required=False)
         cover_image = serializers.ImageField(required=False)
         public = serializers.BooleanField(required=False)
+        hide_poll_users = serializers.BooleanField(required=False)
         direct_join = serializers.BooleanField(required=False)
         default_permission = serializers.IntegerField(required=False, allow_null=True)
 

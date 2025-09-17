@@ -27,6 +27,7 @@ class Group(BaseModel):
     description = models.TextField()
     image = models.ImageField(upload_to='group/image')
     cover_image = models.ImageField(upload_to='group/cover_image')
+    hide_poll_users = models.BooleanField(default=False)  # Hides users in polls, TODO remove bool from views
 
     jitsi_room = models.UUIDField(unique=True, default=uuid.uuid4)
 
@@ -37,7 +38,7 @@ class GroupPermissions(BaseModel):
     author = models.ForeignKey('Group', on_delete=models.CASCADE)
     invite_user = models.BooleanField(default=False)
     create_poll = models.BooleanField(default=False)
-    allow_vote = models.BooleanField(default=False)
+    allow_vote = models.BooleanField(default=True)
     kick_members = models.BooleanField(default=False)
     ban_members = models.BooleanField(default=False)
 
