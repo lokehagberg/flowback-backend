@@ -34,7 +34,7 @@ class KanbanEntryListApi(APIView):
 
         class Meta:
             model = KanbanEntry
-            fields = ('id', 'created_by', 'assignee', 'title', 'description', 'tag')
+            fields = ('id', 'group_id', 'created_by', 'assignee', 'title', 'description', 'tag')
 
     def get(self, request, group_id: int = None):
         serializer = self.FilterSerializer(data=request.query_params)
