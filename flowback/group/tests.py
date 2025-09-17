@@ -268,4 +268,4 @@ class CreateGroupTests(TransactionTestCase):
             group_user_update(user=self.user_member.id, group=self.group_open.id, 
                             fetched_by=self.user_member.id, data=dict(is_delegate=True, is_admin=True))
 
-    #TODO we do permission things at the end, and delegation stuff
+    #TODO we do permission and delegation
