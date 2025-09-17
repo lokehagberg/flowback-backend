@@ -24,7 +24,8 @@ class BasePollFilter(django_filters.FilterSet):
 class BasePollProposalFilter(django_filters.FilterSet):
     class Meta:
         model = PollProposal
-        fields = dict(created_by=['exact'],
+        fields = dict(id=['exact'],
+                      created_by=['exact'],
                       title=['exact', 'icontains'])
 
 

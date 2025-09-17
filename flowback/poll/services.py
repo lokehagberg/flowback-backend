@@ -71,15 +71,14 @@ def poll_proposal_create(*, user_id: int, group_id: int, poll_id: int, title: st
     return proposal
 
 
-def poll_proposal_delete(*, user_id: int, group_id: int, proposal_id: int) -> None:
+def poll_proposal_delete(*, user_id: int, group_id: int, poll_id: int, proposal_id: int) -> None:
     group_user = group_user_permissions(user=user_id, group=group_id)
-    proposal = get_object(PollProposal, id=proposal_id)
-    poll = proposal.poll
+    proposal = get_object(PollProposal, id=proposal_id, poll_id=poll_id)
 
     if not proposal.created_by == group_user:
         raise ValidationError('Permission denied')
 
-    if poll.finished:
+    if proposal.poll.finished:
         raise ValidationError('Only site administrators and above can delete proposals after the poll is finished.')
 
     proposal.delete()
