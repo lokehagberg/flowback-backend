@@ -168,7 +168,8 @@ class CreateGroupTests(TransactionTestCase):
         group_invite(user=self.user_creator.id, group=self.group_closed.id, to=self.user_member.id)
 
     def test_group_invite_from_non_member(self):
-        group_invite(user=self.user_member.id, group=self.group_closed.id, to=self.user_member_2.id)
+        with self.assertRaises(ValidationError):
+            group_invite(user=self.user_member.id, group=self.group_closed.id, to=self.user_member_2.id)
 
     def test_group_invite_to_self(self):
         with self.assertRaises(ValidationError):
@@ -260,5 +261,11 @@ class CreateGroupTests(TransactionTestCase):
         group_join(user=self.user_member.id, group=self.group_open.id)
         group_user_update(user=self.user_creator.id, group=self.group_open.id, 
                           fetched_by=self.user_creator.id, data=dict(is_delegate=True, is_admin=True))
+
+    def test_update_group_user_update_by_non_authorized(self):
+        with self.assertRaises(ValidationError):
+            group_join(user=self.user_member.id, group=self.group_open.id)
+            group_user_update(user=self.user_member.id, group=self.group_open.id, 
+                            fetched_by=self.user_member.id, data=dict(is_delegate=True, is_admin=True))
 
     #TODO we do permission things at the end, and delegation stuff
