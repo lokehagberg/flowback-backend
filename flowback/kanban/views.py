@@ -23,7 +23,13 @@ class KanbanEntryListApi(APIView):
         tag = serializers.ChoiceField((1, 2, 3, 4, 5), required=False)
 
     class OutputSerializer(serializers.ModelSerializer):
-        assignee = serializers.IntegerField(source='assignee.user_id')
+        class UserSerializer(serializers.Serializer):
+            id = serializers.IntegerField(source='user.id')
+            profile_image = serializers.ImageField(source='user.profile_image')
+            username = serializers.CharField(source='user.username')
+
+        assignee = UserSerializer(read_only=True)
+        created_by = UserSerializer(read_only=True)
 
         class Meta:
             model = KanbanEntry
