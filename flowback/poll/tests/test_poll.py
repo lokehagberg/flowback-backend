@@ -135,6 +135,7 @@ class GroupDelegationTests(TestCase):
 
         poll_proposal_delete(user_id=self.user_creator.user.id,
                              group_id=self.group.id,
+                             poll_id=poll.id,
                              proposal_id=proposal.id)
 
     def test_vote_update(self):
@@ -142,14 +143,14 @@ class GroupDelegationTests(TestCase):
         poll_proposal_vote_update(user_id=self.user_creator.user.id,
                                   group_id=self.group.id,
                                   poll_id=poll.id,
-                                  data=[proposal_one.id, proposal_two.id, proposal_three.id])
+                                  data=dict(votes=[proposal_one.id, proposal_two.id, proposal_three.id]))
 
     def test_poll_finish(self):
         poll, proposal_one, proposal_two, proposal_three = self.generate_voting_environment()
         poll_proposal_vote_update(user_id=self.user_creator.user.id,
                                   group_id=self.group.id,
                                   poll_id=poll.id,
-                                  data=[proposal_one.id, proposal_two.id, proposal_three.id])
+                                  data=dict(votes=[proposal_one.id, proposal_two.id, proposal_three.id]))
         poll_finish(poll_id=poll.id)
         poll.refresh_from_db()
         self.assertTrue(poll.finished)
@@ -159,7 +160,7 @@ class GroupDelegationTests(TestCase):
         poll_proposal_vote_update(user_id=self.user_creator.user.id,
                                   group_id=self.group.id,
                                   poll_id=poll.id,
-                                  data=[proposal_one.id, proposal_two.id, proposal_three.id])
+                                  data=dict(votes=[proposal_one.id, proposal_two.id, proposal_three.id]))
         poll_refresh_cheap(poll_id=poll.id)
         poll.refresh_from_db()
         self.assertEqual(poll.participants, 0)

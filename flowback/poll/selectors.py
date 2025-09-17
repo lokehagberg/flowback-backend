@@ -58,23 +58,25 @@ def poll_proposal_list(*, fetched_by: User, group_id: int, poll_id: int, filters
     return BasePollProposalFilter(filters, qs).qs
 
 
-def poll_vote_filter(*, fetched_by: User, group_id: int, poll_id: int, delegates: bool = False, filters=None):
+def poll_vote_list(*, fetched_by: User, group_id: int, poll_id: int, delegates: bool = False, filters=None):
     poll = get_object(Poll, id=poll_id)
     group_user = group_user_permissions(group=group_id, user=fetched_by)
     filters = filters or {}
 
     if poll.poll_type == Poll.PollType.RANKING:
         if delegates:
-            qs = PollVotingTypeRanking.objects.filter(poll=poll, author_delegate__isnull=False).all()
+            qs = PollVotingTypeRanking.objects.filter(proposal__poll=poll,
+                                                      author_delegate__isnull=False).order_by('-priority').all()
         else:
-            qs = PollVotingTypeRanking.objects.filter(poll=poll, author__created_by=group_user).all()
+            qs = PollVotingTypeRanking.objects.filter(proposal__poll=poll,
+                                                      author__created_by=group_user).order_by('-priority').all()
 
         return BasePollVoteRankingFilter(filters, qs).qs
 
 
-def poll_delegates_filter(*, fetched_by: User, group_id: int, poll_id: int, filters=None):
+def poll_delegates_list(*, fetched_by: User, group_id: int, poll_id: int, filters=None):
     poll = get_object(Poll, id=poll_id)
     group_user_permissions(group=group_id, user=fetched_by)
     filters = filters or {}
-    qs = PollDelegateVoting.objects.filter(poll=poll)
+    qs = PollDelegateVoting.objects.filter(poll=poll).all()
     return BasePollDelegateVotingFilter(filters, qs).qs

@@ -84,19 +84,20 @@ def poll_proposal_delete(*, user_id: int, group_id: int, poll_id: int, proposal_
     proposal.delete()
 
 
-def poll_proposal_vote_update(*, user_id: int, group_id: int, poll_id: int, data) -> None:
+def poll_proposal_vote_update(*, user_id: int, group_id: int, poll_id: int, data: dict) -> None:
     group_user = group_user_permissions(user=user_id, group=group_id, permissions=['allow_vote', 'admin'])
     poll = get_object(Poll, id=poll_id)
 
     if poll.poll_type == Poll.PollType.RANKING:
-        proposals = poll.pollproposal_set.filter(id__in=[x for x in data]).all()
-        if len(proposals) != len(data):
+        proposals = poll.pollproposal_set.filter(id__in=[x for x in data['votes']]).all()
+        if len(proposals) != len(data['votes']):
             raise ValidationError('Not all proposals are available to vote for')
 
         poll_vote, created = PollVoting.objects.get_or_create(created_by=group_user, poll=poll)
         poll_vote_ranking = [PollVotingTypeRanking(author=poll_vote,
                                                    proposal_id=proposal,
-                                                   priority=priority) for priority, proposal in enumerate(data)]
+                                                   priority=poll.pollproposal_set.count() - priority)
+                             for priority, proposal in enumerate(data['votes'])]
         PollVotingTypeRanking.objects.filter(author=poll_vote).delete()
         PollVotingTypeRanking.objects.bulk_create(poll_vote_ranking)
 
@@ -111,14 +112,15 @@ def poll_proposal_delegate_vote_update(*, user_id: int, group_id: int, poll_id: 
     poll = get_object(Poll, id=poll_id)
 
     if poll.poll_type == Poll.PollType.RANKING:
-        proposals = poll.pollproposal_set.filter(id__in=[x for x in data]).all()
-        if len(proposals) != len(data):
+        proposals = poll.pollproposal_set.filter(id__in=data['votes']).all()
+        if len(proposals) != len(data['votes']):
             raise ValidationError('Not all proposals are available to vote for')
 
         poll_vote, created = PollDelegateVoting.objects.get_or_create(created_by=delegate_pool, poll=poll)
         poll_vote_ranking = [PollVotingTypeRanking(author_delegate=poll_vote,
                                                    proposal_id=proposal,
-                                                   priority=priority) for priority, proposal in enumerate(data)]
+                                                   priority=poll.pollproposal_set.count() - priority)
+                             for priority, proposal in enumerate(data['vot'])]
         PollVotingTypeRanking.objects.filter(author_delegate=poll_vote).delete()
         PollVotingTypeRanking.objects.bulk_create(poll_vote_ranking)
 
