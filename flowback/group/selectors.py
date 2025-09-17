@@ -98,7 +98,7 @@ class BaseGroupFilter(django_filters.FilterSet):
 
 class BaseGroupUserFilter(django_filters.FilterSet):
     username__icontains = django_filters.CharFilter(field_name='user__username', lookup_expr='icontains')
-    delegate = django_filters.NumberFilter(field_name='groupuserdelegate')
+    delegate = django_filters.BooleanFilter(field_name='delegate')
 
     class Meta:
         model = GroupUser

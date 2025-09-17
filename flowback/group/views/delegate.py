@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from flowback.common.pagination import LimitOffsetPagination, get_paginated_response
 
-from flowback.group.models import GroupUserDelegator, GroupUserDelegatePool
+from flowback.group.models import GroupUserDelegator, GroupUserDelegatePool, GroupTags
 from flowback.group.selectors import group_user_delegate_list, group_user_delegate_pool_list
 from flowback.group.services import group_user_delegate, group_user_delegate_update, group_user_delegate_remove, \
     group_user_delegate_pool_create, group_user_delegate_pool_delete
@@ -61,10 +61,26 @@ class GroupUserDelegateListApi(APIView):
         tag_name = serializers.CharField(required=False)
         tag_name__icontains = serializers.CharField(required=False)
 
-    class OutputSerializer(serializers.Serializer):
+    class OutputSerializer(serializers.ModelSerializer):
+        class Delegates(serializers.Serializer):
+            delegate_id = serializers.IntegerField(source='id')
+            group_user_id = serializers.IntegerField(source='user_id')
+            user_id = serializers.IntegerField(source='user.user_id')
+
+        class Tags(serializers.ModelSerializer):
+            class Meta:
+                model = GroupTags
+                fields = ('id', 'tag_name')
+
+        tags = Tags(many=True,
+                    read_only=True)
+
+        delegates = Delegates(many=True,
+                              source='delegate_pool.groupuserdelegate_set',
+                              read_only=True)
         class Meta:
             model = GroupUserDelegator
-            fields = ('id', 'tags', 'delegate')
+            fields = ('id', 'tags', 'delegates', 'delegate_pool_id')
 
     def get(self, request, group: int):
         filter_serializer = self.FilterSerializer(data=request.query_params)
@@ -99,7 +115,7 @@ class GroupUserDelegatePoolDeleteApi(APIView):
 
 class GroupUserDelegateApi(APIView):
     class InputSerializer(serializers.Serializer):
-        delegate = serializers.IntegerField()
+        delegate_pool_id = serializers.IntegerField()
         tags = serializers.ListField(child=serializers.IntegerField())
 
     def post(self, request, group: int):
@@ -112,7 +128,7 @@ class GroupUserDelegateApi(APIView):
 
 class GroupUserDelegateUpdateApi(APIView):
     class InputSerializer(serializers.Serializer):
-        delegate_pool_id = serializers.IntegerField(source='id')
+        delegate_pool_id = serializers.IntegerField()
         tags = serializers.ListField(child=serializers.IntegerField())
 
     def post(self, request, group: int):
@@ -125,7 +141,7 @@ class GroupUserDelegateUpdateApi(APIView):
 
 class GroupUserDelegateDeleteApi(APIView):
     class InputSerializer(serializers.Serializer):
-        delegate_pool_id = serializers.IntegerField(source='id')
+        delegate_pool_id = serializers.IntegerField()
 
     def post(self, request, group: int):
         serializer = self.InputSerializer(data=request.data)
