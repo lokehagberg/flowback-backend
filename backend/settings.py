@@ -18,6 +18,8 @@ env = environ.Env(DEBUG=(bool, False),
                   DJANGO_SECRET=str,
                   FLOWBACK_URL=(str, None),
 
+                  FLOWBACK_ALLOW_GROUP_CREATION=(bool, True),
+
                   EMAIL_HOST=(str, None),
                   EMAIL_PORT=(str, None),
                   EMAIL_HOST_USER=(str, None),

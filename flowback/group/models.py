@@ -15,13 +15,13 @@ class Group(BaseModel):
     public = models.BooleanField(default=False)
 
     # Determines the default permission for every user get when they join
+    # TODO return basic permissions by default if field is NULL
     default_permission = models.OneToOneField('GroupPermission',
                                               null=True,
                                               blank=True,
                                               on_delete=models.SET_NULL)
 
     name = models.TextField(unique=True)
-    banner_description = models.TextField()
     description = models.TextField()
     image = models.ImageField()
     cover_image = models.ImageField()
