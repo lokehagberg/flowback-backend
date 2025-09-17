@@ -1,4 +1,3 @@
-# TODO add Poll (Create, Update, Delete), Proposal (Create, Update, Delete), Vote (Create, Update, Delete)
 from django.db.models import Sum, Q, Count, F
 from rest_framework.exceptions import ValidationError
 from flowback.common.services import get_object, model_update

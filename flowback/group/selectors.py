@@ -1,7 +1,7 @@
 # TODO groups, groupusers, groupinvites, groupuserinvites,
 #  groupdefaultpermission, grouppermissions, grouptags, groupuserdelegates
 import django_filters
-from typing import Union, Literal, overload
+from typing import Union
 from django.db.models import Q, Exists, OuterRef
 from django.forms import model_to_dict
 
@@ -10,24 +10,6 @@ from flowback.user.models import User
 from flowback.group.models import Group, GroupUser, GroupUserInvite, GroupPermissions, GroupTags, GroupUserDelegator, \
     GroupUserDelegatePool
 from rest_framework.exceptions import ValidationError
-
-#
-# @overload
-# def group_user_permissions(*
-#                            group: int,
-#                            user: Union[User, int],
-#                            permissions: list[str] = None,
-#                            raise_exception: Literal[True]) -> GroupUser:
-#     return group_user_permissions(group=group, user=user, permissions=permissions, raise_exception=True)
-#
-#
-# @overload
-# def group_user_permissions(*
-#                            group: int,
-#                            user: Union[User, int],
-#                            permissions: list[str] = None,
-#                            raise_exception: Literal[False]) -> Union[GroupUser, bool]:
-#     return group_user_permissions(group=group, user=user, permissions=permissions, raise_exception=False)
 
 
 def group_default_permissions(*, group: int):
