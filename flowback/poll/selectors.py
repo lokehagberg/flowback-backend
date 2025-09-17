@@ -4,7 +4,8 @@ import django_filters
 from django.db.models import Q
 
 from flowback.common.services import get_object
-from flowback.poll.models import Poll, PollProposal, PollVotingTypeRanking, PollDelegateVoting, PollVoting
+from flowback.poll.models import Poll, PollProposal, PollVotingTypeRanking, PollDelegateVoting, PollVoting, \
+    PollProposalTypeSchedule, PollVotingTypeForAgainst
 from flowback.user.models import User
 from flowback.group.selectors import group_user_permissions
 
@@ -43,6 +44,20 @@ class BasePollVoteRankingFilter(django_filters.FilterSet):
         fields = dict(proposal=['exact'])
 
 
+class BasePollProposalScheduleFilter(django_filters.FilterSet):
+    class Meta:
+        model = PollProposalTypeSchedule
+        fields = dict(proposal=['exact'],
+                      start_date=['lt', 'gt'],
+                      end_date=['lt', 'gt'])
+
+
+class BasePollVoteForAgainstFilter(django_filters.FilterSet):
+    class Meta:
+        model = PollVotingTypeForAgainst
+        fields = dict(proposal=['exact'])
+
+
 class BasePollDelegateVotingFilter(django_filters.FilterSet):
     class Meta:
         model = PollDelegateVoting
@@ -68,7 +83,11 @@ def poll_proposal_list(*, fetched_by: User, group_id: int, poll_id: int, filters
 
     filters = filters or {}
     qs = PollProposal.objects.filter(created_by__group_id=group_id, poll=poll).all()
-    return BasePollProposalFilter(filters, qs).qs
+
+    if poll.poll_type == Poll.PollType.SCHEDULE:
+        return BasePollProposalScheduleFilter(filters, qs).qs
+    else:
+        return BasePollProposalFilter(filters, qs).qs
 
 
 def poll_vote_list(*, fetched_by: User, group_id: int, poll_id: int, delegates: bool = False, filters=None):
@@ -76,6 +95,7 @@ def poll_vote_list(*, fetched_by: User, group_id: int, poll_id: int, delegates: 
     group_user = group_user_permissions(group=group_id, user=fetched_by)
     filters = filters or {}
 
+    # Ranking
     if poll.poll_type == Poll.PollType.RANKING:
         if delegates:
             qs = PollVotingTypeRanking.objects.filter(proposal__poll=poll,
@@ -85,6 +105,17 @@ def poll_vote_list(*, fetched_by: User, group_id: int, poll_id: int, delegates: 
                                                       author__created_by=group_user).order_by('-priority').all()
 
         return BasePollVoteRankingFilter(filters, qs).qs
+
+    # Schedule (For Against)
+    if poll.poll_type == Poll.PollType.SCHEDULE:
+        if delegates:
+            qs = PollVotingTypeForAgainst.objects.filter(proposal__poll=poll,
+                                                         author_delegate__isnull=False).order_by('-priority').all()
+        else:
+            qs = PollVotingTypeForAgainst.objects.filter(proposal__poll=poll,
+                                                         author__created_by=group_user).order_by('-priority').all()
+
+        return BasePollVoteForAgainstFilter(filters, qs).qs
 
 
 def poll_delegates_list(*, fetched_by: User, group_id: int, poll_id: int, filters=None):
