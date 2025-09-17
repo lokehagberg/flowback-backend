@@ -171,7 +171,7 @@ def poll_proposal_vote_count(*, poll_id: int) -> None:
             # TODO make this work aswell, replace above
             # PollProposal.objects.bulk_update(proposals, fields=('score',))
 
-            poll.live_count = mandate + user_votes.distinct('author').count()
+            poll.participants = mandate + user_votes.distinct('author').count()
             poll.save()
 
 
@@ -203,5 +203,11 @@ def poll_refresh(*, poll_id: int) -> None:
 def poll_refresh_cheap(*, poll_id: int) -> None:
     poll = get_object(Poll, id=poll_id)
 
-    if poll.finished and not poll.result or poll.dynamic:
+    if poll.finished and not poll.result or poll.dynamic and not poll.finished:
+        if poll.end_date <= timezone.now():
+            poll.finished = True
+            poll.save()
         poll_proposal_vote_count(poll_id=poll_id)
+        poll.refresh_from_db()
+        poll.result = True
+        poll.save()

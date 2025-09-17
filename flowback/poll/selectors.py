@@ -30,7 +30,9 @@ class BasePollProposalFilter(django_filters.FilterSet):
 
 
 class BasePollVoteRankingFilter(django_filters.FilterSet):
-    delegate = django_filters.NumberFilter(field_name='author_delegate__created_by')
+    delegate_pool_id = django_filters.NumberFilter(field_name='author_delegate__created_by')
+    delegate_user_id = django_filters.NumberFilter(
+        field_name='author_delegate__created_by__groupuserdelegate__group_user__user_id')
 
     class Meta:
         model = PollVotingTypeRanking
