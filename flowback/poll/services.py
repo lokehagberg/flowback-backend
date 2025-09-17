@@ -89,6 +89,10 @@ def poll_proposal_vote_update(*, user_id: int, group_id: int, poll_id: int, data
     poll = get_object(Poll, id=poll_id)
 
     if poll.poll_type == Poll.PollType.RANKING:
+        if not data['votes']:
+
+            return
+
         proposals = poll.pollproposal_set.filter(id__in=[x for x in data['votes']]).all()
         if len(proposals) != len(data['votes']):
             raise ValidationError('Not all proposals are available to vote for')
@@ -96,7 +100,7 @@ def poll_proposal_vote_update(*, user_id: int, group_id: int, poll_id: int, data
         poll_vote, created = PollVoting.objects.get_or_create(created_by=group_user, poll=poll)
         poll_vote_ranking = [PollVotingTypeRanking(author=poll_vote,
                                                    proposal_id=proposal,
-                                                   priority=poll.pollproposal_set.count() - priority)
+                                                   priority=len(data['votes']) - priority)
                              for priority, proposal in enumerate(data['votes'])]
         PollVotingTypeRanking.objects.filter(author=poll_vote).delete()
         PollVotingTypeRanking.objects.bulk_create(poll_vote_ranking)
@@ -108,7 +112,7 @@ def poll_proposal_vote_update(*, user_id: int, group_id: int, poll_id: int, data
 # TODO update in future for delegate pool
 def poll_proposal_delegate_vote_update(*, user_id: int, group_id: int, poll_id: int, data) -> None:
     group_user = group_user_permissions(user=user_id, group=group_id)
-    delegate_pool = get_object(GroupUserDelegatePool, group_user_delegate__group_user=group_user)
+    delegate_pool = get_object(GroupUserDelegatePool, groupuserdelegate__group_user=group_user)
     poll = get_object(Poll, id=poll_id)
 
     if poll.poll_type == Poll.PollType.RANKING:
@@ -119,8 +123,8 @@ def poll_proposal_delegate_vote_update(*, user_id: int, group_id: int, poll_id: 
         poll_vote, created = PollDelegateVoting.objects.get_or_create(created_by=delegate_pool, poll=poll)
         poll_vote_ranking = [PollVotingTypeRanking(author_delegate=poll_vote,
                                                    proposal_id=proposal,
-                                                   priority=poll.pollproposal_set.count() - priority)
-                             for priority, proposal in enumerate(data['vot'])]
+                                                   priority=len(data['votes']) - priority)
+                             for priority, proposal in enumerate(data['votes'])]
         PollVotingTypeRanking.objects.filter(author_delegate=poll_vote).delete()
         PollVotingTypeRanking.objects.bulk_create(poll_vote_ranking)
 
@@ -130,6 +134,7 @@ def poll_proposal_delegate_vote_update(*, user_id: int, group_id: int, poll_id: 
 
 def poll_proposal_vote_count(*, poll_id: int) -> None:
     poll = get_object(Poll, id=poll_id)
+    total_proposals = poll.pollproposals_set.count()
 
     if poll.poll_type == Poll.PollType.RANKING:
         if poll.tag:
@@ -140,14 +145,15 @@ def poll_proposal_vote_count(*, poll_id: int) -> None:
 
             # Count mandate for each delegate, multiply it by score
             delegate_votes = PollVotingTypeRanking.objects.filter(author_delegate__poll=poll).values('pk').annotate(
-                score=F('priority') *
+                score=total_proposals - (F('priority') - Count('author_delegate__pollvotingtyperanking')) *
                 Count('author_delegate__created_by__groupuserdelegator',
                       filter=~Q(author_delegate__created_by__groupuserdelegator__delegator__pollvoting__poll=poll) &
                       Q(author_delegate__created_by__groupuserdelegator__tags__in=[poll.tag])))
 
             # Set score to the same as priority for user votes
             user_votes = PollVotingTypeRanking.objects.filter(author__poll=poll
-                                                              ).values('pk').annotate(score=F('priority'))
+                                                              ).values('pk').annotate(
+                score=total_proposals - (F('priority') - Count('author__pollvotingtyperanking')))
 
             for i in user_votes:
                 print(i)
