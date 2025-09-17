@@ -1,4 +1,4 @@
-from django.db.models import Sum, Q, Count, F
+from django.db.models import Sum, Q, Count, F, OuterRef, Subquery
 from rest_framework.exceptions import ValidationError
 from flowback.common.services import get_object, model_update
 from flowback.group.models import GroupUserDelegatePool
@@ -134,7 +134,7 @@ def poll_proposal_delegate_vote_update(*, user_id: int, group_id: int, poll_id: 
 
 def poll_proposal_vote_count(*, poll_id: int) -> None:
     poll = get_object(Poll, id=poll_id)
-    total_proposals = poll.pollproposals_set.count()
+    total_proposals = poll.pollproposal_set.count()
 
     if poll.poll_type == Poll.PollType.RANKING:
         if poll.tag:
@@ -144,16 +144,19 @@ def poll_proposal_vote_count(*, poll_id: int) -> None:
                               Q(groupuserdelegator__tags__in=[poll.tag])))['mandate']
 
             # Count mandate for each delegate, multiply it by score
+            subquery = GroupUserDelegatePool.objects.filter(id=OuterRef('author_delegate__created_by')).annotate(
+                mandate=Count('groupuserdelegator',
+                              filter=~Q(groupuserdelegator__delegator__pollvoting__poll=poll) &
+                              Q(groupuserdelegator__tags__in=[poll.tag]))).values('mandate')
             delegate_votes = PollVotingTypeRanking.objects.filter(author_delegate__poll=poll).values('pk').annotate(
-                score=total_proposals - (F('priority') - Count('author_delegate__pollvotingtyperanking')) *
-                Count('author_delegate__created_by__groupuserdelegator',
-                      filter=~Q(author_delegate__created_by__groupuserdelegator__delegator__pollvoting__poll=poll) &
-                      Q(author_delegate__created_by__groupuserdelegator__tags__in=[poll.tag])))
+                score=(total_proposals - (Count('author_delegate__pollvotingtyperanking') - F('priority'))) *
+                Subquery(subquery)
+            )
 
             # Set score to the same as priority for user votes
             user_votes = PollVotingTypeRanking.objects.filter(author__poll=poll
                                                               ).values('pk').annotate(
-                score=total_proposals - (F('priority') - Count('author__pollvotingtyperanking')))
+                score=total_proposals - (Count('author__pollvotingtyperanking') - F('priority')))
 
             for i in user_votes:
                 print(i)
@@ -168,7 +171,7 @@ def poll_proposal_vote_count(*, poll_id: int) -> None:
 
             # Update scores on each proposal, Summarize both regular votes and delegate votes
             proposals = PollProposal.objects.filter(poll_id=poll_id).values('pk') \
-                .annotate(score=Sum('pollvotingtyperanking__priority'))
+                .annotate(score=Sum('pollvotingtyperanking__score'))
 
             for i in proposals:
                 print(i)
@@ -177,7 +180,7 @@ def poll_proposal_vote_count(*, poll_id: int) -> None:
             # TODO make this work aswell, replace above
             # PollProposal.objects.bulk_update(proposals, fields=('score',))
 
-            poll.participants = mandate + user_votes.distinct('author').count()
+            poll.participants = mandate + PollVoting.objects.filter(poll=poll).all().count()
             poll.save()
 
 

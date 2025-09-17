@@ -59,7 +59,7 @@ def group_user_permissions(*,
         permissions.remove('creator')
 
     failed_permissions = [key for key in permissions if user_permissions[key] is False]
-    if failed_permissions or (requires_permissions and not failed_permissions):
+    if failed_permissions or (requires_permissions and failed_permissions):
         if raise_exception:
             raise ValidationError('Permission denied')
         else:

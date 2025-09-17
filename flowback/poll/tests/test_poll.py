@@ -22,7 +22,7 @@ from flowback.poll.services import (poll_create,
                                     poll_proposal_create,
                                     poll_proposal_delete,
                                     poll_proposal_vote_count,
-                                    poll_proposal_vote_update)
+                                    poll_proposal_vote_update, poll_proposal_delegate_vote_update)
 from flowback.poll.models import (Poll, PollProposal, PollVoting, PollDelegateVoting, PollVotingTypeRanking)
 
 
@@ -151,6 +151,10 @@ class GroupDelegationTests(TestCase):
                                   group_id=self.group.id,
                                   poll_id=poll.id,
                                   data=dict(votes=[proposal_one.id, proposal_two.id, proposal_three.id]))
+        poll_proposal_vote_update(user_id=self.user_non_delegate.user.id,
+                                  group_id=self.group.id,
+                                  poll_id=poll.id,
+                                  data=dict(votes=[proposal_two.id, proposal_three.id]))
         poll_finish(poll_id=poll.id)
         poll.refresh_from_db()
         self.assertTrue(poll.finished)
@@ -161,6 +165,20 @@ class GroupDelegationTests(TestCase):
                                   group_id=self.group.id,
                                   poll_id=poll.id,
                                   data=dict(votes=[proposal_one.id, proposal_two.id, proposal_three.id]))
+        poll_proposal_vote_update(user_id=self.user_non_delegate.user.id,
+                                  group_id=self.group.id,
+                                  poll_id=poll.id,
+                                  data=dict(votes=[proposal_two.id, proposal_three.id]))
+        poll_proposal_delegate_vote_update(user_id=self.user_delegate.user.id,
+                                           group_id=self.group.id,
+                                           poll_id=poll.id,
+                                           data=dict(votes=[proposal_one.id, proposal_two.id, proposal_three.id]))
         poll_refresh_cheap(poll_id=poll.id)
         poll.refresh_from_db()
-        self.assertEqual(poll.participants, 0)
+        proposal_one.refresh_from_db()
+        proposal_two.refresh_from_db()
+        proposal_three.refresh_from_db()
+        self.assertEqual(poll.participants, 3)
+        self.assertEqual(proposal_one.score, 6)
+        self.assertEqual(proposal_two.score, 7)
+        self.assertEqual(proposal_three.score, 4)
