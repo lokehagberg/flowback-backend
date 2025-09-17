@@ -56,17 +56,19 @@ def group_permission_create(*,
                             create_poll: bool,
                             allow_vote: bool,
                             kick_members: bool,
-                            ban_members: bool) -> None:
+                            ban_members: bool) -> GroupPermissions:
     group_user_permissions(group=group, user=user, permissions=['admin'])
-    group_permissions = GroupPermissions(role_name=role_name,
-                                         author_id=group,
-                                         invite_user=invite_user,
-                                         create_poll=create_poll,
-                                         allow_vote=allow_vote,
-                                         kick_members=kick_members,
-                                         ban_members=ban_members)
-    group_permissions.full_clean()
-    group_permissions.save()
+    group_permission = GroupPermissions(role_name=role_name,
+                                        author_id=group,
+                                        invite_user=invite_user,
+                                        create_poll=create_poll,
+                                        allow_vote=allow_vote,
+                                        kick_members=kick_members,
+                                        ban_members=ban_members)
+    group_permission.full_clean()
+    group_permission.save()
+
+    return group_permission
 
 
 def group_permission_update(*, user: int, group: int, permission_id: int, data) -> GroupPermissions:
@@ -256,24 +258,26 @@ def group_user_delegate_remove(*, user_id: int, group_id: int, delegate_pool_id:
     delegate_rel.delete()
 
 
-def group_user_delegate_pool_create(*, user: int, group: int):
+def group_user_delegate_pool_create(*, user: int, group: int) -> GroupUserDelegatePool:
     group_user = group_user_permissions(user=user, group=group)
 
     # To avoid duplicates (for now)
-    get_object(GroupUserDelegate, reverse=True, group=group, user=group_user)
+    get_object(GroupUserDelegate, reverse=True, group=group, group_user=group_user)
 
     delegate_pool = GroupUserDelegatePool(group_id=group)
     delegate_pool.full_clean()
     delegate_pool.save()
-    user_delegate = GroupUserDelegate(group_id=group, user=group_user, pool=delegate_pool)
+    user_delegate = GroupUserDelegate(group_id=group, group_user=group_user, pool=delegate_pool)
     user_delegate.full_clean()
     user_delegate.save()
+
+    return delegate_pool
 
 
 def group_user_delegate_pool_delete(*, user: int, group: int):
     group_user = group_user_permissions(user=user, group=group)
 
-    delegate_user = get_object(GroupUserDelegate, user=group_user, group_id=group)
+    delegate_user = get_object(GroupUserDelegate, group_user=group_user, group_id=group)
     delegate_pool = get_object(GroupUserDelegatePool, id=delegate_user.pool_id)
 
     delegate_pool.delete()

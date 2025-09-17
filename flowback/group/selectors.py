@@ -115,8 +115,8 @@ class BaseGroupTagsFilter(django_filters.FilterSet):
 
 class BaseGroupUserDelegatePoolFilter(django_filters.FilterSet):
     id = django_filters.NumberFilter()
-    delegate_id = django_filters.NumberFilter(field_name='groupuserdelegate__user_id')
-    group_user_id = django_filters.NumberFilter(field_name='groupuserdelegate_id')
+    delegate_id = django_filters.NumberFilter(field_name='groupuserdelegate__id')
+    group_user_id = django_filters.NumberFilter(field_name='groupuserdelegate__group_user_id')
 
 
 class BaseGroupUserDelegateFilter(django_filters.FilterSet):
@@ -154,7 +154,7 @@ def group_detail(*, fetched_by: User, group_id: int):
 def group_user_list(*, group: int, fetched_by: User, filters=None):
     group_user_permissions(group=group, user=fetched_by)
     filters = filters or {}
-    is_delegate = GroupUser.objects.filter(group_id=group, groupuserdelegate__user=OuterRef('pk'),
+    is_delegate = GroupUser.objects.filter(group_id=group, groupuserdelegate__group_user=OuterRef('pk'),
                                            groupuserdelegate__group=OuterRef('group'))
     qs = GroupUser.objects.filter(group_id=group).annotate(delegate=Exists(is_delegate)).all()
     return BaseGroupUserFilter(filters, qs).qs

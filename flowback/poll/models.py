@@ -8,9 +8,9 @@ import pgtrigger
 # Create your models here.
 class Poll(BaseModel):
     class PollType(models.IntegerChoices):
-        RANKING = 1, _('Ranking')
-        # FOR_AGAINST = 2, _('For/Against')
-        # CARDINAL = 3, _('Cardinal')
+        RANKING = 1, _('ranking')
+        # FOR_AGAINST = 2, _('for_against')
+        # CARDINAL = 3, _('cardinal')
 
     created_by = models.ForeignKey(GroupUser, on_delete=models.CASCADE)
 
@@ -76,7 +76,7 @@ class PollVotingTypeRanking(BaseModel):
             pgtrigger.Protect(
                 name='protects_author_or_author_delegate',
                 operation=pgtrigger.Insert | pgtrigger.Update,
-                condition=(pgtrigger.Q(new__author__isnull=True, new__author_delegate__isnull=False)
-                           | pgtrigger.Q(new__author__isnull=False, new__author_delegate__isnull=True))
+                condition=(pgtrigger.Q(new__author__isnull=True, new__author_delegate__isnull=True)
+                           | pgtrigger.Q(new__author__isnull=False, new__author_delegate__isnull=False))
             )
         ]
