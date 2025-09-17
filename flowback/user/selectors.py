@@ -13,7 +13,7 @@ class UserFilter(FilterSet):
 
 
 def get_user(user: int):
-    return User.objects.get(user=user)
+    return User.objects.get(user_id=user)
 
 
 def user_list(*, filters=None):
