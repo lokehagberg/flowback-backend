@@ -107,10 +107,20 @@ class GroupInviteApi(APIView):
 
 
 class GroupInviteAcceptApi(APIView):
+    class InputSerializer(serializers.Serializer):
+        to = serializers.IntegerField(required=False)
+
     def post(self, request, group: int):
-        group_invite_accept(user=request.user.id, group=group)
+        serializer = self.InputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        group_invite_accept(fetched_by=request.user, group=group, **serializer.validated_data)
 
 
 class GroupInviteRejectApi(APIView):
+    class InputSerializer(serializers.Serializer):
+        to = serializers.IntegerField(required=False)
+
     def post(self, request, group: int):
-        group_invite_reject(user=request.user.id, group=group)
+        serializer = self.InputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        group_invite_reject(fetched_by=request.user, group=group, **serializer.validated_data)
