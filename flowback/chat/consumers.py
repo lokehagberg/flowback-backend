@@ -14,7 +14,7 @@ from flowback.chat.models import GroupMessage, DirectMessage
 class GroupChatConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         self.user = self.scope['user']
-        self.group_id = self.scope['url_route']['kwargs'].get('group_id')
+        self.group_id = self.scope['url_route']['kwargs'].get('group')
         self.chat_id = f'group_{self.group_id}'
 
         if self.scope['user'].is_anonymous or not self.group_id:
@@ -77,8 +77,8 @@ class GroupChatConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def group_channel_message(self, message):
-        obj = GroupMessage(user=self.user,
-                           group=self.group,
+        group_user = group_user_permissions(group=self.group_id, user=self.user.id)
+        obj = GroupMessage(group_user=group_user,
                            message=message)
 
         obj.full_clean()
