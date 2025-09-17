@@ -70,6 +70,7 @@ class GroupUserInvite(BaseModel):
 
 
 # Delegator to delegate relations
+# TODO Add signals to avoid user subscribing to the same user outside of services
 class GroupUserDelegate(BaseModel):
     delegator = models.ForeignKey(GroupUser, on_delete=models.CASCADE, related_name='group_user_delegate_delegator')
     delegate = models.ForeignKey(GroupUser, on_delete=models.CASCADE, related_name='group_user_delegate_delegate')
@@ -77,4 +78,4 @@ class GroupUserDelegate(BaseModel):
     tags = models.ManyToManyField(GroupTags)
 
     class Meta:
-        unique_together = (('delegator', 'delegate', 'group'), ('delegator', 'group', 'tags'))
+        unique_together = ('delegator', 'delegate', 'group')
