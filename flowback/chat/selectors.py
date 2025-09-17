@@ -45,10 +45,10 @@ class BaseDirectMessageFilter(django_filters.FilterSet):
 
     class Meta:
         model = DirectMessage
-        dict(id=['exact'],
-             target=['exact'],
-             message=['icontains'],
-             created_at=['gt', 'lt'])
+        fields = dict(id=['exact'],
+                      target=['exact'],
+                      message=['icontains'],
+                      created_at=['gt', 'lt'])
 
 
 class BaseDirectMessagePreviewFilter(django_filters.FilterSet):

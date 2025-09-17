@@ -121,7 +121,7 @@ class DirectChatConsumer(AsyncWebsocketConsumer):
                 model = User
                 fields = 'id', 'username', 'profile_image'
 
-        serializer = FilterSerializer(data=json.loads(text_data))
+        serializer = FilterSerializer(data=json.loads(text_data or '{}'))
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
         await self.direct_message(**data)

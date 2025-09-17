@@ -18,6 +18,8 @@ env = environ.Env(DEBUG=(bool, False),
                   DJANGO_SECRET=str,
                   FLOWBACK_URL=(str, None),
                   PG_SERVICE=(str, 'flowback'),
+                  REDIS_IP=(str, 'localhost'),
+                  REDIS_PORT=(str, '6379'),
                   FLOWBACK_ALLOW_GROUP_CREATION=(bool, True),
                   FLOWBACK_GROUP_ADMIN_USER_LIST_ACCESS_ONLY=(bool, False),
                   FLOWBACK_DEFAULT_PERMISSION=(str, 'rest_framework.permissions.IsAuthenticated'),
@@ -117,7 +119,17 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'backend.wsgi.application'
+
 ASGI_APPLICATION = "backend.asgi.application"
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [(env('REDIS_IP'), env('REDIS_PORT'))],
+        },
+    },
+}
 
 
 # Database
