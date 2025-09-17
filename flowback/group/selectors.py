@@ -91,12 +91,11 @@ class BaseGroupUserFilter(django_filters.FilterSet):
 
 
 class BaseGroupUserInviteFilter(django_filters.FilterSet):
-    username = django_filters.CharFilter(field_name='user__username')
     username__icontains = django_filters.CharFilter(field_name='user__username', lookup_expr='icontains')
 
     class Meta:
         model = GroupUser
-        fields = ['user']
+        fields = ['user', 'group']
 
 
 class BaseGroupPermissionsFilter(django_filters.FilterSet):
@@ -168,9 +167,14 @@ def group_user_delegate_pool_list(*, group: int, fetched_by: User, filters=None)
 
 
 def group_user_invite_list(*, group: int, fetched_by: User, filters=None):
-    group_user_permissions(group=group, user=fetched_by, permissions=['invite_user'])
+    if group:
+        group_user_permissions(group=group, user=fetched_by, permissions=['invite_user', 'admin'])
+        qs = GroupUserInvite.objects.filter(group_id=group).all()
+
+    else:
+        qs = GroupUserInvite.objects.filter(user=fetched_by).all()
+
     filters = filters or {}
-    qs = GroupUserInvite.objects.filter(group_id=group).all()
     return BaseGroupUserFilter(filters, qs).qs
 
 

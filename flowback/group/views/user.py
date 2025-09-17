@@ -4,8 +4,7 @@ from rest_framework.views import APIView
 from flowback.common.pagination import LimitOffsetPagination, get_paginated_response
 
 from flowback.group.models import GroupUser
-from flowback.group.selectors import group_user_list
-
+from flowback.group.selectors import group_user_list, group_user_invite_list
 
 from flowback.group.services import group_join, group_user_update, group_leave, group_invite, group_invite_accept, \
     group_invite_reject
@@ -48,6 +47,39 @@ class GroupUserListApi(APIView):
             pagination_class=self.Pagination,
             serializer_class=self.OutputSerializer,
             queryset=users,
+            request=request,
+            view=self
+        )
+
+
+class GroupInviteListApi(APIView):
+    class Pagination(LimitOffsetPagination):
+        default_limit = 20
+
+    class FilterSerializer(serializers.Serializer):
+        user = serializers.IntegerField(required=False)
+        username__icontains = serializers.CharField(required=False)
+        group = serializers.IntegerField(required=False)
+
+    class OutputSerializer(serializers.Serializer):
+        user = serializers.IntegerField(source='user_id')
+        username = serializers.CharField(source='user.username')
+        profile_image = serializers.ImageField(source='user.profile_image')
+        group = serializers.IntegerField(source='group_id')
+        external = serializers.BooleanField()
+
+    def get(self, request, group: int = None):
+        filter_serializer = self.FilterSerializer(data=request.query_params)
+        filter_serializer.is_valid(raise_exception=True)
+
+        invites = group_user_invite_list(group=group,
+                                         fetched_by=request.user,
+                                         filters=filter_serializer.validated_data)
+
+        return get_paginated_response(
+            pagination_class=self.Pagination,
+            serializer_class=self.OutputSerializer,
+            queryset=invites,
             request=request,
             view=self
         )
