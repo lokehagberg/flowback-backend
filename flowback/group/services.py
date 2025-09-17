@@ -2,14 +2,15 @@ from django.shortcuts import get_object_or_404
 from backend.settings import env
 from rest_framework.exceptions import ValidationError
 from flowback.user.models import User
+from flowback.user.selectors import get_user
 from flowback.group.models import Group, GroupUser, GroupUserInvite
-from flowback.common.services import model_update
-# TODO Create, Update, Delete, Join, Leave, Invite, Invite_Verify, Delegate, Remove_Delegate
+from flowback.common.services import model_update, get_object
+# TODO Leave, Invite_Request, Invite, Invite_Reject, Invite_Verify, Delegate, Remove_Delegate
 
 
 def group_create(*, user: int, name: str, description: str, image: str, cover_image: str,
                  public: bool, direct_join: bool) -> Group:
-    user = get_object_or_404(User, id=user)
+    user = get_user(user=user)
 
     if not (env('ALLOW_GROUP_CREATION') or user.is_staff):
         raise ValidationError('Permission denied')
@@ -21,10 +22,14 @@ def group_create(*, user: int, name: str, description: str, image: str, cover_im
 
 
 def group_update(*, user: int, group: int, data) -> Group:
-    user = get_object_or_404(GroupUser, user=user, group=group)
+    user = get_object(GroupUser, 'User is not in group', user_id=user, group=group)
     group = get_object_or_404(Group, id=group)
     non_side_effect_fields = ['name', 'description', 'image', 'cover_image', 'public', 'direct_join']
 
+    if not user:
+        raise ValidationError('User is not in group')
+    if not group:
+        raise ValidationError('Group does not exist')
     if not user.is_admin:
         raise ValidationError('Permission denied')
 
@@ -36,7 +41,7 @@ def group_update(*, user: int, group: int, data) -> Group:
 
 
 def group_delete(*, user: int, group: int) -> None:
-    user = get_object_or_404(User, id=user)
+    user = get_object(User, 'User does not exist', id=user)
     group = get_object_or_404(Group, id=group)
 
     if not (group.created_by == user or user.is_staff):
@@ -49,7 +54,7 @@ def group_delete(*, user: int, group: int) -> None:
 
 
 def group_join(*, user: int, group: int) -> None:
-    user = get_object_or_404(User, id=user)
+    user = get_object(User, 'User does not exist', id=user)
     group = get_object_or_404(Group, id=group)
 
     if not group.public:
