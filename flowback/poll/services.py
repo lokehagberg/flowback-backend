@@ -13,6 +13,10 @@ def poll_create(*, user_id: int, group_id: int,
                 title: str,
                 description: str,
                 start_date: datetime,
+                proposal_end_date: datetime,
+                prediction_end_date: datetime,
+                delegate_vote_end_date: datetime,
+                vote_end_date: datetime,
                 end_date: datetime,
                 poll_type: int,
                 public: bool,
@@ -21,7 +25,8 @@ def poll_create(*, user_id: int, group_id: int,
                 ) -> Poll:
     group_user = group_user_permissions(user=user_id, group=group_id, permissions=['create_poll', 'admin'])
     poll = Poll(created_by=group_user, title=title, description=description,
-                start_date=start_date, end_date=end_date,
+                start_date=start_date, proposal_end_date=proposal_end_date, prediction_end_date=prediction_end_date,
+                delegate_vote_end_date=delegate_vote_end_date, vote_end_date=vote_end_date, end_date=end_date,
                 poll_type=poll_type, public=public, tag_id=tag, dynamic=dynamic)
     poll.full_clean()
     poll.save()
@@ -68,6 +73,9 @@ def poll_proposal_create(*, user_id: int, group_id: int, poll_id: int,
     group_user = group_user_permissions(user=user_id, group=group_id)
     poll = get_object(Poll, id=poll_id)
 
+    if poll.proposal_end_date <= timezone.now():
+        raise ValidationError("Can't create a proposal after proposal end date")
+
     proposal = PollProposal(created_by=group_user, poll=poll, title=title, description=description)
 
     proposal.full_clean()
@@ -92,6 +100,9 @@ def poll_proposal_delete(*, user_id: int, group_id: int, poll_id: int, proposal_
     group_user = group_user_permissions(user=user_id, group=group_id)
     proposal = get_object(PollProposal, id=proposal_id, poll_id=poll_id)
 
+    if proposal.poll.proposal_end_date <= timezone.now():
+        raise ValidationError("Can't delete a proposal after proposal end date")
+
     if not proposal.created_by == group_user:
         raise ValidationError('Permission denied')
 
@@ -104,6 +115,9 @@ def poll_proposal_delete(*, user_id: int, group_id: int, poll_id: int, proposal_
 def poll_proposal_vote_update(*, user_id: int, group_id: int, poll_id: int, data: dict) -> None:
     group_user = group_user_permissions(user=user_id, group=group_id, permissions=['allow_vote', 'admin'])
     poll = get_object(Poll, id=poll_id)
+
+    if poll.vote_end_date <= timezone.now():
+        raise ValidationError("Can't vote after vote end date")
 
     if poll.poll_type == Poll.PollType.RANKING:
         if not data['votes']:
@@ -149,6 +163,9 @@ def poll_proposal_delegate_vote_update(*, user_id: int, group_id: int, poll_id: 
     group_user = group_user_permissions(user=user_id, group=group_id)
     delegate_pool = get_object(GroupUserDelegatePool, groupuserdelegate__group_user=group_user)
     poll = get_object(Poll, id=poll_id)
+
+    if poll.delegate_vote_end_date <= timezone.now():
+        raise ValidationError("Can't vote after delegate vote end date")
 
     if poll.poll_type == Poll.PollType.RANKING:
         if not data['votes']:

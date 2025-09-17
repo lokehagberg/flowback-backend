@@ -1,4 +1,5 @@
 from django.db import models
+from django.db.models import Q, F
 from django.utils.translation import gettext_lazy as _
 from rest_framework.exceptions import ValidationError
 
@@ -31,6 +32,10 @@ class Poll(BaseModel):
 
     # Determines the state of this poll
     start_date = models.DateTimeField()
+    proposal_end_date = models.DateTimeField()
+    prediction_end_date = models.DateTimeField()
+    delegate_vote_end_date = models.DateTimeField()
+    vote_end_date = models.DateTimeField()
     end_date = models.DateTimeField()
     finished = models.BooleanField(default=False)
     result = models.BooleanField(default=False)
@@ -40,8 +45,16 @@ class Poll(BaseModel):
     dynamic = models.BooleanField()
 
     def clean(self):
-        if self.start_date > self.end_date:
-            raise ValidationError("Poll start date is after poll end date")
+        constraints = [models.CheckConstraint(check=Q(proposal_end_date__gte=F('start_date')),
+                                              name='proposalenddategreaterthanstartdate_check'),
+                       models.CheckConstraint(check=Q(prediction_end_date__gte=F('proposal_end_date')),
+                                              name='predictionenddategreaterthanproposalenddate_check'),
+                       models.CheckConstraint(check=Q(delegate_vote_end_date__lte=F('prediction_end_date')),
+                                              name='delegatevoteenddategreaterthanpredictionenddate_check'),
+                       models.CheckConstraint(check=Q(vote_end_date__gte=F('delegate_vote_end_date')),
+                                              name='voteenddategreaterthandelegatevoteenddate_check'),
+                       models.CheckConstraint(check=Q(end_date__gte=F('vote_end_date')),
+                                              name='enddategreaterthanvoteenddate_check')]
 
 
 class PollProposal(BaseModel):
