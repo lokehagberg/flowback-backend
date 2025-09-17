@@ -12,6 +12,6 @@ chat_patterns = [
 
 chat_ws_patterns = [
     path('chat/ws/group/<int:group>', GroupChatConsumer.as_asgi(), name='ws_chat_group'),
-    path('chat/ws/', ChatConsumer.as_asgi(), name='ws_chat'),
+    path('chat/ws', ChatConsumer.as_asgi(), name='ws_chat'),
     path('chat/ws/direct', DirectChatConsumer.as_asgi(), name='ws_chat_direct')
 ]

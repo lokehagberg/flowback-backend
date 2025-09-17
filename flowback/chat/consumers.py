@@ -1,4 +1,6 @@
 import json
+
+from asgiref.sync import sync_to_async
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
 from django.shortcuts import get_object_or_404
@@ -10,7 +12,7 @@ from flowback.group.models import Group
 from flowback.group.services import group_user_permissions
 from flowback.chat.models import GroupMessage, DirectMessage
 
-
+# TODO Delete
 class GroupChatConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         self.user = self.scope['user']
@@ -93,9 +95,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             await self.close()
 
         # chat_id: user_<id:int>
-
-        user_groups = Group.objects.filter(groupuser__user__in=self.user).all()
-        self.chat_groups = [f'group_{x.id}' for x in user_groups] + [f'user_{self.user.id}']
+        self.chat_groups = await self.get_chat_groups()
 
         # Join room group
         for group in self.chat_groups:
@@ -130,16 +130,20 @@ class ChatConsumer(AsyncWebsocketConsumer):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
+        target_type = data.get('target_type')
+        message = data.get('message')
+        target = data.get('target')
+
         # Save message to database
         if data.get('target_type') == 'direct':
-            await self.direct_message(**data)
+            await self.direct_message(message=message, target=target)
 
         else:
-            await self.group_message(**data)
+            await self.group_message(message=message, target=target)
 
         # Send message to room group
         await self.channel_layer.group_send(
-            await self.get_message_target(**data),
+            await self.get_message_target(target=target, target_type=target_type),
             {
                 'type': 'chat_message',
                 'target_type': data.get('target_type'),
@@ -162,6 +166,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
         return f'user_{target}' if target_type == 'direct' else f'group_{target}'
 
     @database_sync_to_async
+    def get_chat_groups(self):
+        user_groups = Group.objects.filter(groupuser__user__in=[self.user]).all()
+        return [f'group_{x.id}' for x in user_groups] + [f'user_{self.user.id}']
+
+    @database_sync_to_async
     def direct_message(self, *, message: str, target: int):
         target = get_object(User, pk=target)
 
@@ -182,7 +191,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         obj.save()
 
 
-
+# TODO Delete
 class DirectChatConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         self.user = self.scope['user']
