@@ -345,4 +345,5 @@ class CreateGroupTests(TestCase):
                                                 password='password123')
             group_invite(user=self.user.id, group=group.id, to=user.id)
 
-        #TODO we do permission things at the end, and delegation stuff
+    
+    #TODO we do permission things at the end, and delegation stuff
