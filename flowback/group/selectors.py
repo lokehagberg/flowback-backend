@@ -97,7 +97,7 @@ class BaseGroupFilter(django_filters.FilterSet):
 
 class BaseGroupUserFilter(django_filters.FilterSet):
     username__icontains = django_filters.CharFilter(field_name='user__username', lookup_expr='icontains')
-    delegate = django_filters.BooleanFilter(field_name='groupuserdelegate__isnull')
+    delegate = django_filters.NumberFilter(field_name='groupuserdelegate')
 
     class Meta:
         model = GroupUser
@@ -165,7 +165,8 @@ def group_detail(*, fetched_by: User, group_id: int):
 def group_user_list(*, group: int, fetched_by: User, filters=None):
     group_user_permissions(group=group, user=fetched_by)
     filters = filters or {}
-    qs = GroupUser.objects.filter(group_id=group).all()
+    is_delegate = GroupUser.objects.filter(group_id=group, groupuserdelegate__user=OuterRef('pk'))
+    qs = GroupUser.objects.filter(group_id=group).annotate(delegate=Exists(is_delegate)).all()
     return BaseGroupUserFilter(filters, qs).qs
 
 
@@ -180,24 +181,24 @@ def group_permissions_list(*, group: int, fetched_by: User, filters=None):
     group_user_permissions(group=group, user=fetched_by)
     filters = filters or {}
     qs = GroupPermissions.objects.filter(group_id=group).all()
-    return BaseGroupPermissionsFilter(qs, filters).qs
+    return BaseGroupPermissionsFilter(filters, qs).qs
 
 
 def group_tags_list(*, group: int, fetched_by: User, filters=None):
     filters = filters or {}
     group_user_permissions(group=group, user=fetched_by)
-    query = Q(group_id=group, active=False)
+    query = Q(group_id=group, active=True)
     if group_user_permissions(group=group, user=fetched_by, permissions=['admin'], raise_exception=False):
         query = Q(group_id=group)
 
     qs = GroupTags.objects.filter(query).all()
-    return BaseGroupTagsFilter(qs, filters).qs
+    return BaseGroupTagsFilter(filters, qs).qs
 
 
 def group_user_delegate_list(*, group: int, fetched_by: User, filters=None):
     filters = filters or {}
-    group_user_permissions(group=group, user=fetched_by)
+    fetched_by = group_user_permissions(group=group, user=fetched_by)
     query = Q(group_id=group, delegator_id=fetched_by)
 
     qs = GroupUserDelegator.objects.filter(query).all()
-    return BaseGroupUserDelegateFilter(qs, filters).qs
+    return BaseGroupUserDelegateFilter(filters, qs).qs

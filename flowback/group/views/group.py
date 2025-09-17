@@ -99,7 +99,7 @@ class GroupUpdateApi(APIView):
     def post(self, request, group: int):
         serializer = self.InputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        data = group_update(user=request.user.id, group=group, data=serializer.validated_data)
+        group_update(user=request.user.id, group=group, data=serializer.validated_data)
         return Response(status=status.HTTP_200_OK)
 
 

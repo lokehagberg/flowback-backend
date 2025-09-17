@@ -19,22 +19,22 @@ class GroupUserListApi(APIView):
         id = serializers.IntegerField(required=False, source='group_user_id')
         user_id = serializers.IntegerField(required=False)
         username__icontains = serializers.CharField(required=False)
-        delegate = serializers.BooleanField(required=False)
-        is_admin = serializers.BooleanField(required=False)
+        delegate = serializers.NullBooleanField(required=False, default=None)
+        is_admin = serializers.NullBooleanField(required=False, default=None)
         permission = serializers.IntegerField(required=False)
 
     class OutputSerializer(serializers.ModelSerializer):
-        user_id = serializers.CharField(source='user__id')
-        username = serializers.CharField(source='user__username')
-        profile_image = serializers.ImageField(source='user__profile_image')
-        banner_image = serializers.ImageField(source='user__banner_image')
+        username = serializers.CharField(source='user.username')
+        profile_image = serializers.ImageField(source='user.profile_image')
+        banner_image = serializers.ImageField(source='user.banner_image')
         delegate = serializers.PrimaryKeyRelatedField(source='groupuserdelegate', read_only=True)
         permission_id = serializers.IntegerField(source='permission', allow_null=True)
-        permission_name = serializers.CharField(source='permission__role_name', allow_null=True)
+        permission_name = serializers.CharField(source='permission.role_name', allow_null=True)
 
         class Meta:
             model = GroupUser
-            fields = ('id', 'user_id', 'group', 'is_admin', 'permission')
+            fields = ('id', 'user_id', 'username', 'profile_image', 'banner_image', 'delegate',
+                      'is_admin', 'permission_name', 'permission_id', 'permission_name')
 
     def get(self, request, group: int):
         filter_serializer = self.FilterSerializer(data=request.query_params)
@@ -74,7 +74,7 @@ class GroupLeaveApi(APIView):
 class GroupUserUpdateApi(APIView):
     class InputSerializer(serializers.Serializer):
         user = serializers.IntegerField(required=False)
-        delegate = serializers.BooleanField(required=False)
+        delegate = serializers.NullBooleanField(required=False, default=None)
         permission = serializers.IntegerField(required=False, allow_null=True)
         is_admin = serializers.IntegerField(required=False)
 
