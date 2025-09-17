@@ -64,6 +64,7 @@ class PollListApi(APIView):
 class PollCreateAPI(APIView):
     class InputSerializer(serializers.ModelSerializer):
         tag = serializers.IntegerField()
+        public = serializers.BooleanField(default=False)
 
         class Meta:
             model = Poll
