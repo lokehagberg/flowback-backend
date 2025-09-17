@@ -22,7 +22,7 @@ def group_user_permissions(*,
 
     # Check if admin permission is present
     if 'admin' in permissions or user.user.is_superuser:
-        if user.is_admin:
+        if user.is_admin or user.group.created_by == user.user or user.is_superuser:
             return user
 
         permissions.remove('admin')

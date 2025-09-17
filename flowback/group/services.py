@@ -3,7 +3,7 @@ from django.shortcuts import get_object_or_404
 from backend.settings import env
 from rest_framework.exceptions import ValidationError
 from flowback.user.models import User
-from flowback.group.models import Group, GroupUser, GroupUserInvite, GroupUserDelegate, GroupTags
+from flowback.group.models import Group, GroupUser, GroupUserInvite, GroupUserDelegate, GroupTags, GroupPermissions
 from flowback.group.selectors import group_user_permissions
 from flowback.common.services import model_update, get_object
 # TODO Leave, Invite_Request, Invite, Invite_Reject, Invite_Verify, Delegate, Remove_Delegate
@@ -18,13 +18,19 @@ def group_create(*, user: int, name: str, description: str, image: str, cover_im
 
     group = Group.objects.create(created_by=user, name=name, description=description, image=image,
                                  cover_image=cover_image, public=public, direct_join=direct_join)
+    GroupUser.objects.create(user_id=user, group=group)
 
     return group
 
 
 def group_update(*, user: int, group: int, data) -> Group:
     user = group_user_permissions(group=group, user=user, permissions=['admin'])
-    non_side_effect_fields = ['name', 'description', 'image', 'cover_image', 'public', 'direct_join']
+    non_side_effect_fields = ['name', 'description', 'image', 'cover_image', 'public',
+                              'direct_join', 'default_permission']
+
+    # Check if group_permission exists to allow for a new default_permission
+    if default_permission := data.get('default_permission'):
+        get_object(GroupPermissions, id=default_permission, author_id=group)
 
     group, has_updated = model_update(instance=user.group,
                                       fields=non_side_effect_fields,
@@ -35,6 +41,44 @@ def group_update(*, user: int, group: int, data) -> Group:
 
 def group_delete(*, user: int, group: int) -> None:
     group_user_permissions(group=group, user=user, permissions=['creator']).group.delete()
+
+
+def group_permission_create(*,
+                            user: int,
+                            group: int,
+                            role_name: str,
+                            invite_user: bool,
+                            create_poll: bool,
+                            allow_vote: bool,
+                            kick_members: bool,
+                            ban_members: bool) -> None:
+    group_user_permissions(group=group, user=user, permissions=['admin'])
+    group_permissions = GroupPermissions(role_name=role_name,
+                                         author_id=group,
+                                         invite_user=invite_user,
+                                         create_poll=create_poll,
+                                         allow_vote=allow_vote,
+                                         kick_members=kick_members,
+                                         ban_members=ban_members)
+    group_permissions.full_clean()
+    group_permissions.save()
+
+
+def group_permission_update(*, user: int, group: int, permission_id: int, data) -> GroupPermissions:
+    group_user_permissions(group=group, user=user, permissions=['admin'])
+    non_side_effect_fields = ['role_name', 'invite_user', 'create_poll', 'allow_vote', 'kick_members', 'ban_members']
+    group_permission = get_object(GroupPermissions, id=permission_id, author_id=group)
+
+    group_permission, has_updated = model_update(instance=group_permission,
+                                                 fields=non_side_effect_fields,
+                                                 data=data)
+
+    return group_permission
+
+
+def group_permission_delete(*, user: int, group: int, permission_id: int):
+    group_user_permissions(group=group, user=user, permissions=['admin'])
+    get_object(GroupPermissions, id=permission_id).delete()
 
 
 def group_join(*, user: int, group: int) -> None:
@@ -52,6 +96,22 @@ def group_join(*, user: int, group: int) -> None:
 
     else:
         GroupUser.objects.create(user=user, group=group)
+
+
+def group_user_update(*, user: int, group: int, fetched_by: int, data):
+    user_to_update = group_user_permissions(group=group, user=fetched_by)
+    non_side_effect_fields = ['is_delegate']
+
+    if user_to_update.user.id != user:
+        group_user_permissions(group=group, user=fetched_by, permissions=['admin'])
+        user_to_update = group_user_permissions(group=group, user=user)
+        non_side_effect_fields = ['permission', 'is_admin']
+
+    group_permission, has_updated = model_update(instance=user_to_update,
+                                                 fields=non_side_effect_fields,
+                                                 data=data)
+
+    return group_permission
 
 
 def group_leave(*, user: int, group: int) -> None:
