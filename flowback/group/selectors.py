@@ -86,7 +86,7 @@ def group_user_permissions(*,
 
 
 class BaseGroupFilter(django_filters.FilterSet):
-    user_joined = django_filters.NumberFilter(field_name='group_user__user', lookup_expr='exact')
+    joined = django_filters.BooleanFilter(lookup_expr='exact')
 
     class Meta:
         model = Group
@@ -152,11 +152,9 @@ def group_list(*, fetched_by: User, filters=None):
     filters = filters or {}
     joined_groups = Group.objects.filter(id=OuterRef('pk'), groupuser__user__in=[fetched_by])
     qs = _group_get_visible_for(user=fetched_by).annotate(joined=Exists(joined_groups)).all()
+    qs = BaseGroupFilter(filters, qs).qs
 
-    if filters.get('joined') is True:
-        filters['user_joined'] = fetched_by.id
-
-    return BaseGroupFilter(filters, qs).qs
+    return qs
 
 
 def group_detail(*, fetched_by: User, group_id: int):

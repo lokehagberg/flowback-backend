@@ -16,10 +16,12 @@ class GroupListApi(APIView):
         id = serializers.IntegerField(required=False)
         name = serializers.CharField(required=False)
         name__icontains = serializers.CharField(required=False)
-        direct_join = serializers.BooleanField(required=False)
-        joined = serializers.BooleanField(required=False)
+        direct_join = serializers.NullBooleanField(required=False, default=None)
+        joined = serializers.NullBooleanField(required=False, default=None)
 
     class OutputSerializer(serializers.ModelSerializer):
+        joined = serializers.BooleanField()
+
         class Meta:
             model = Group
             fields = ('id',
