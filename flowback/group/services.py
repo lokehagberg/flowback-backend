@@ -217,6 +217,45 @@ def group_user_delegate(*, user: int, group: int, delegate_pool_id: int, tags: l
     return delegate_rel
 
 
+def group_user_delegate_update(*, user_id: int, group_id: int, data):
+    group_user = group_user_permissions(user=user_id, group=group_id)
+
+    tags = sum([x.get('tags', []) for x in data], [])
+    tags_rel = {rel['delegate_pool_id']: rel['tags'] for rel in data}
+    pools = [x.get('delegate_pool_id') for x in data]
+
+    delegate_rel = GroupUserDelegator.objects.filter(delegator_id=group_user.id,
+                                                     group_id=group_id,
+                                                     delegate_pool__in=pools).all()
+
+    if len(GroupTags.objects.filter(id__in=tags, active=True).all()) < len(tags):
+        raise ValidationError('Not all tags are available in group')
+
+    if len(delegate_rel) < len(pools):
+        raise ValidationError('User is not delegator in all pools')
+
+    TagsModel = GroupUserDelegator.tags.through
+    TagsModel.objects.filter(groupuserdelegator__in=delegate_rel).delete()
+
+    updated_tags = []
+    for rel in delegate_rel:
+        pk = rel.id
+        for tag_pk in tags_rel[rel.delegate_pool.id]:
+            updated_tags.append(TagsModel(groupuserdelegator_id=pk, grouptags_id=tag_pk))
+
+    TagsModel.objects.bulk_create(updated_tags)
+
+
+def group_user_delegate_remove(*, user_id: int, group_id: int, delegate_pool_id: int) -> None:
+    delegator = group_user_permissions(group=group_id, user=user_id)
+    delegate_pool = get_object(GroupUserDelegatePool, 'Delegate pool does not exist', id=delegate_pool_id)
+
+    delegate_rel = get_object(GroupUserDelegator, 'User to delegate pool relation does not exist',
+                              delegator=delegator, group_id=group_id, delegate_pool=delegate_pool)
+
+    delegate_rel.delete()
+
+
 def group_user_delegate_pool_create(*, user: int, group: int):
     group_user = group_user_permissions(user=user, group=group)
 
@@ -238,24 +277,3 @@ def group_user_delegate_pool_delete(*, user: int, group: int):
     delegate_pool = get_object(GroupUserDelegatePool, id=delegate_user.pool_id)
 
     delegate_pool.delete()
-
-
-def group_user_delegate_remove(*, user_id: int, group_id: int, delegate_pool_id: int) -> None:
-    delegator = group_user_permissions(group=group_id, user=user_id)
-    delegate_pool = get_object(GroupUserDelegatePool, 'Delegate pool does not exist', id=delegate_pool_id)
-
-    delegate_rel = get_object(GroupUserDelegator, 'User to delegate pool relation does not exist',
-                              delegator=delegator, group_id=group_id, delegate_pool=delegate_pool)
-
-    delegate_rel.delete()
-
-
-def group_user_delegate_update(*,
-                               user_id: int,
-                               group_id: int,
-                               delegate_pool_id: int,
-                               tags: list[int] = None) -> GroupUserDelegator:
-    group_user_delegate_remove(user_id=user_id, group_id=group_id, delegate_pool_id=delegate_pool_id)
-    new_delegate_rel = group_user_delegate(user=user_id, group=group_id, delegate_pool_id=delegate_pool_id, tags=tags)
-
-    return new_delegate_rel
