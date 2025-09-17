@@ -53,6 +53,7 @@ if not CORS_ALLOW_ALL_ORIGINS:
 # Application definition
 
 INSTALLED_APPS = [
+    'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -66,7 +67,8 @@ INSTALLED_APPS = [
     'pgtrigger',
     'flowback.user',
     'flowback.group',
-    'flowback.poll'
+    'flowback.poll',
+    'flowback.chat'
 ]
 
 REST_FRAMEWORK = {
@@ -115,6 +117,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'backend.wsgi.application'
+ASGI_APPLICATION = "backend.asgi.application"
 
 
 # Database
