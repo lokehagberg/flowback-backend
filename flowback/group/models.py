@@ -25,8 +25,8 @@ class Group(BaseModel):
 
     name = models.TextField(unique=True)
     description = models.TextField()
-    image = models.ImageField()
-    cover_image = models.ImageField()
+    image = models.ImageField(upload_to='group/image')
+    cover_image = models.ImageField(upload_to='group/cover_image')
 
     jitsi_room = models.UUIDField(unique=True, default=uuid.uuid4)
 

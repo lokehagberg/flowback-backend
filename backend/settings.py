@@ -89,6 +89,8 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'backend.urls'
 
+MEDIA_ROOT = str(BASE_DIR) + '/media'
+
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
