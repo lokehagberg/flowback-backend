@@ -1,7 +1,7 @@
-from django.db.models import Q
+from django.db.models import Q, OuterRef, Subquery
 import django_filters
 
-from .models import GroupMessage, DirectMessage
+from .models import GroupMessage, DirectMessage, GroupMessageUserData, DirectMessageUserData
 from flowback.user.models import User
 from flowback.group.models import GroupUser, Group
 from flowback.group.services import group_user_permissions
@@ -64,6 +64,7 @@ class BaseDirectMessagePreviewFilter(django_filters.FilterSet):
 def group_message_list(*, user: User, group: int, filters=None):
     group_user_permissions(user=user, group=group)
     filters = filters or {}
+
     qs = GroupMessage.objects.filter(group_user__group=group).all()
 
     return BaseGroupMessageFilter(filters, qs).qs
@@ -71,9 +72,10 @@ def group_message_list(*, user: User, group: int, filters=None):
 
 def group_message_preview(*, user: User, filters=None):
     filters = filters or {}
+    subquery = GroupMessageUserData.objects.get(group_user=OuterRef('group_user')).values('timestamp')
     qs = GroupMessage.objects.filter(group_user__user__in=[user]
                                      ).order_by('group_user__group_id', '-created_at')\
-        .distinct('group_user__group_id').all()
+        .annotate(timestamp=Subquery(subquery)).distinct('group_user__group_id').all()
     return BaseGroupMessagePreviewFilter(filters, qs).qs
 
 
@@ -86,8 +88,9 @@ def direct_message_list(*, user: User, target: int, filters=None):
 
 def direct_message_preview(*, user: User, filters=None):
     filters = filters or {}
+    subquery = DirectMessageUserData.objects.get(user=OuterRef('user')).values('timestamp')
     qs = DirectMessage.objects.filter(Q(user=user) | Q(target=user)
-                                      ).order_by('user', 'target', 'created_at').distinct('user', 'target')
+                                      ).annotate(timestamp=Subquery(subquery)
+                                                 ).order_by('user', 'target', 'created_at').distinct('user', 'target')
 
     return BaseDirectMessagePreviewFilter(filters, qs).qs
-

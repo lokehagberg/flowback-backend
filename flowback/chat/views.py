@@ -5,6 +5,7 @@ from rest_framework.views import APIView
 from flowback.chat.selectors import group_message_list, group_message_preview, direct_message_list, \
     direct_message_preview
 from flowback.chat.models import GroupMessage
+from flowback.chat.services import direct_chat_timestamp, group_chat_timestamp
 from flowback.common.pagination import get_paginated_response, LimitOffsetPagination
 
 
@@ -67,7 +68,7 @@ class GroupMessagePreviewApi(APIView):
 
         class Meta:
             model = GroupMessage
-            fields = 'group_id', 'username', 'user_id', 'profile_image', 'message', 'created_at'
+            fields = 'group_id', 'username', 'user_id', 'profile_image', 'message', 'created_at', 'timestamp'
 
     def get(self, request):
         messages = group_message_preview(user=request.user.id)
@@ -136,7 +137,8 @@ class DirectMessagePreviewApi(APIView):
 
         class Meta:
             model = GroupMessage
-            fields = 'username', 'user_id', 'target_username', 'target_id', 'profile_image', 'message', 'created_at'
+            fields = ('username', 'user_id', 'target_username', 'target_id',
+                      'profile_image', 'message', 'created_at', 'timestamp')
 
     def get(self, request):
         filter_serializer = self.FilterSerializer(data=request.query_params)
@@ -152,3 +154,25 @@ class DirectMessagePreviewApi(APIView):
             request=request,
             view=self
         )
+
+
+class DirectMessageTimestampApi(APIView):
+    class InputSerializer(serializers.Serializer):
+        timestamp = serializers.DateTimeField()
+
+    def post(self, request, target: int):
+        serializer = self.InputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        direct_chat_timestamp(user_id=request.user.id, target=target, **serializer.validated_data)
+
+
+class GroupMessageTimestampApi(APIView):
+    class InputSerializer(serializers.Serializer):
+        timestamp = serializers.DateTimeField()
+
+    def post(self, request, group: int):
+        serializer = self.InputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        group_chat_timestamp(user_id=request.user.id, group_id=group, **serializer.validated_data)
