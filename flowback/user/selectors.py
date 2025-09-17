@@ -1,6 +1,6 @@
 import django_filters
 from django_filters import FilterSet
-
+from flowback.common.services import get_object
 from flowback.user.models import User
 
 
@@ -13,7 +13,7 @@ class UserFilter(FilterSet):
 
 
 def get_user(user: int):
-    return User.objects.get(user_id=user)
+    return get_object(User, user_id=user)
 
 
 def user_list(*, filters=None):

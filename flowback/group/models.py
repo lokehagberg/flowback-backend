@@ -66,6 +66,7 @@ class GroupUser(BaseModel):
 class GroupUserInvite(BaseModel):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     group = models.ForeignKey(Group, on_delete=models.CASCADE)
+    external = models.BooleanField()
 
 
 # Delegator to delegate relations

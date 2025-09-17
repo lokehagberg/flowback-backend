@@ -29,9 +29,11 @@ def model_update(
     return instance, has_updated
 
 
-def get_object(model_or_queryset, error_message: str = None, **kwargs):
+def get_object(model_or_queryset, error_message: str = None, reverse: bool = False, **kwargs):
     try:
         get_object_or_404(model_or_queryset, **kwargs)
+        if reverse:
+            raise ValidationError(error_message)
     except Http404:
         if not error_message:
             return None

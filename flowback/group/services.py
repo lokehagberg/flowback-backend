@@ -2,7 +2,6 @@ from django.shortcuts import get_object_or_404
 from backend.settings import env
 from rest_framework.exceptions import ValidationError
 from flowback.user.models import User
-from flowback.user.selectors import get_user
 from flowback.group.models import Group, GroupUser, GroupUserInvite
 from flowback.group.selectors import group_user_permissions
 from flowback.common.services import model_update, get_object
@@ -11,7 +10,7 @@ from flowback.common.services import model_update, get_object
 
 def group_create(*, user: int, name: str, description: str, image: str, cover_image: str,
                  public: bool, direct_join: bool) -> Group:
-    user = get_user(user=user)
+    user = get_object(User, user_id=user)
 
     if not (env('ALLOW_GROUP_CREATION') or user.is_staff):
         raise ValidationError('Permission denied')
@@ -38,17 +37,14 @@ def group_delete(*, user: int, group: int) -> None:
 
 
 def group_join(*, user: int, group: int) -> None:
-    user = get_user(user)
+    user = get_object(User, user_id=user)
     group = get_object_or_404(Group, id=group)
 
     if not group.public:
         raise ValidationError('Permission denied')
 
-    if GroupUser.objects.filter(user=user, group=group).exists():
-        raise ValidationError('User already joined')
-
-    if GroupUserInvite.objects.filter(user=user, group=group).exists():
-        raise ValidationError('User already requested invite')
+    get_object(GroupUser, 'User already joined', reverse=True, user=user, group=group)
+    get_object(GroupUserInvite, 'User already requested invite', user=user, group=group)
 
     if not group.direct_join:
         GroupUserInvite.objects.create(user=user, group=group)
@@ -59,3 +55,15 @@ def group_join(*, user: int, group: int) -> None:
 
 def group_leave(*, user: int, group: int) -> None:
     group_user_permissions(group=group, user=user).delete()
+
+
+def group_invite(*, user: int, group: int, to: int):
+    group = group_user_permissions(group=group, user=user, permissions=['admin', 'invite_user']).group
+    GroupUserInvite.objects.create(user=to, group=group)
+
+
+def group_invite_accept(*, user: int, group: int):
+    get_object(GroupUser, 'User already joined', reverse=True, user=user, group=group)
+    get_object(GroupUserInvite, user=user, group=group)
+
+
