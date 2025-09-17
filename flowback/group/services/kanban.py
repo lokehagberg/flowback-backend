@@ -1,9 +1,10 @@
 from django.utils import timezone
 
-from flowback.group.selectors import group_user_permissions
-from flowback.group.services.group import group_notification
+from flowback.group.notify import notify_group_kanban
+from flowback.group.selectors.permission import group_user_permissions
 from flowback.kanban.models import KanbanEntry
 from flowback.kanban.services import KanbanManager
+from flowback.notification.models import NotificationChannel
 
 group_kanban = KanbanManager(origin_type='group')
 
@@ -35,8 +36,15 @@ def group_kanban_entry_create(*,
                                               end_date=end_date,
                                               lane=lane)
 
-    group_notification.create(sender_id=group_id, action=group_notification.Action.create, category='kanban',
-                              message=f'User {group_user.user.username} created a kanban in {group_user.group.name}')
+    notify_group_kanban(kanban_entry=kanban,
+                        message="New kanban entry has been created",
+                        action=NotificationChannel.Action.CREATED)
+
+    if assignee_id:
+        notify_group_kanban(kanban_entry=kanban,
+                            message="New kanban entry has been assigned to you",
+                            user=assignee_id,
+                            action=NotificationChannel.Action.CREATED)
 
     return kanban
 
@@ -46,42 +54,62 @@ def group_kanban_entry_update(*,
                               group_id: int,
                               entry_id: int,
                               data) -> KanbanEntry:
-    work_group = KanbanEntry.objects.get(id=entry_id).work_group
+    previous_kanban_entry = KanbanEntry.objects.get(id=entry_id,
+                                                    kanban__origin_type='group',
+                                                    kanban__origin_id=group_id)
+
     group_user = group_user_permissions(user=fetched_by_id,
                                         group=group_id,
                                         permissions=['admin', 'update_kanban_task'],
-                                        work_group=work_group.id if work_group else None)
+                                        work_group=previous_kanban_entry.work_group.id
+                                        if previous_kanban_entry.work_group else None)
 
     if 'assignee_id' in data.keys() and data['assignee_id'] is not None:
         group_user_permissions(user=data['assignee_id'], group=group_id)
+        
+    if not data.get("work_group_id"):
+        data["work_group_id"] = None
+    
+    new_kanban_entry = group_kanban.kanban_entry_update(origin_id=group_id,
+                                                        entry_id=entry_id,
+                                                        data=data)
 
-    kanban = group_kanban.kanban_entry_update(origin_id=group_id,
-                                              entry_id=entry_id,
-                                              data=data)
+    # Notify Users
+    if data.get('assignee_id', None) and data['assignee_id'] != previous_kanban_entry.assignee_id:
+        notify_group_kanban(kanban_entry=new_kanban_entry,
+                            message="A kanban entry has been assigned to you",
+                            user=data['assignee_id'],
+                            action=NotificationChannel.Action.UPDATED)
 
-    if 'assignee_id' in data.keys() and data['assignee_id'] is not None:  # Notify assignee about kanban
-        group_notification.create(sender_id=group_id, related_id=entry_id,
-                                  action=group_notification.Action.update, category='kanban_self_assign',
-                                  message=f'You have been assigned to a kanban in {group_user.group.name}',
-                                  target_user_ids=data['assignee_id'])
+        if previous_kanban_entry.assignee_id:
+            notify_group_kanban(kanban_entry=new_kanban_entry,
+                                message="You have been unassigned from a kanban entry",
+                                user=previous_kanban_entry.assignee_id,
+                                action=NotificationChannel.Action.UPDATED)
 
-    for check in ['lane', 'priority']:
-        if check in data.keys() and data[check] is not None and kanban.assignee:  # Notify status update
-            group_notification.create(sender_id=group_id, related_id=entry_id,
-                                      action=group_notification.Action.update, category=f'kanban_{check}_update',
-                                      message=f'Status for {check} "{kanban.title}" has been updated',
-                                      target_user_ids=kanban.assignee)
+    elif new_kanban_entry.assignee_id:
+        notify_group_kanban(kanban_entry=new_kanban_entry,
+                            message="A kanban entry you've been assigned to has been updated",
+                            user=new_kanban_entry.assignee_id,
+                            action=NotificationChannel.Action.UPDATED)
 
-    return kanban
+    return new_kanban_entry
 
 
 def group_kanban_entry_delete(*,
                               fetched_by_id: int,
                               group_id: int,
                               entry_id: int):
-    work_group = KanbanEntry.objects.get(id=entry_id).work_group
+    kanban_entry = KanbanEntry.objects.get(id=entry_id, kanban__origin_type='group', kanban__origin_id=group_id)
     group_user_permissions(user=fetched_by_id,
                            group=group_id,
                            permissions=['admin', 'delete_kanban_task'],
-                           work_group=work_group.id if work_group else None)
+                           work_group=kanban_entry.work_group.id if kanban_entry.work_group else None)
+
+    if kanban_entry.assignee_id:
+        notify_group_kanban(kanban_entry=kanban_entry,
+                            message="A kanban entry you've been assigned to has been deleted",
+                            user=kanban_entry.assignee_id,
+                            action=NotificationChannel.Action.DELETED)
+
     return group_kanban.kanban_entry_delete(origin_id=group_id, entry_id=entry_id)

@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from flowback.group.models import Group
+from flowback.group.models import Group, GroupUser
 from flowback.user.serializers import BasicUserSerializer
 
 
@@ -21,6 +21,22 @@ class GroupUserSerializer(serializers.Serializer):
     group_id = serializers.IntegerField(required=False)
     group_name = serializers.CharField(required=False, source='group.name')
     group_image = serializers.CharField(required=False, source='group.image')
+
+    def __init__(self, *args, hide_relevant_users=False, **kwargs):
+        self.hide_relevant_users = hide_relevant_users
+
+        super().__init__(*args, **kwargs)
+
+    def to_representation(self, instance):
+        if isinstance(instance, int):
+            group_user = GroupUser.objects.get(id=instance)
+        else:
+            group_user = instance
+
+        if self.hide_relevant_users and group_user.group.hide_poll_users:
+            return None
+
+        return super().to_representation(instance)
 
 
 class WorkGroupSerializer(serializers.Serializer):

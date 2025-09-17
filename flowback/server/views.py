@@ -14,6 +14,8 @@ class ServerConfigListAPI(APIView):
 
     class OutputSerializer(serializers.Serializer):
         DEBUG = serializers.BooleanField(help_text="Backend debug mode")
+        DEBUG_REGISTER_BYPASS_EMAIL_VERIFICATION = serializers.BooleanField(
+            help_text="Requires DEBUG to be enabled, sends verification_code along with UserCreateAPI")
         FLOWBACK_KANBAN_LANES = serializers.ListField(
             child=serializers.CharField(),
             help_text="List of kanban lanes, when using the kanban list APIs, the kanban lanes represent the position "
@@ -26,6 +28,7 @@ class ServerConfigListAPI(APIView):
                                                             help_text="Default groups id's that users join")
         FLOWBACK_DISABLE_DEFAULT_USER_REGISTRATION = serializers.BooleanField(
             help_text="If users can register or not")
+        VERSION = serializers.CharField(help_text="Flowback version, updated manually")
         GIT_HASH = serializers.CharField(help_text="The latest commit hash associated with this repository")
 
     def get(self, request):
@@ -37,6 +40,9 @@ class ServerReportListAPI(APIView):
     class OutputSerializer(serializers.Serializer):
         title = serializers.CharField()
         description = serializers.CharField()
+        group_id = serializers.IntegerField()
+        post_id = serializers.IntegerField()
+        post_type = serializers.CharField()
 
     def get(self, request):
         reports = reports_list(fetched_by=request.user)

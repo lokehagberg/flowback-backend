@@ -1,7 +1,7 @@
 import json
 
 from django.db.models import Sum, Case, When
-from rest_framework.test import APIRequestFactory, force_authenticate, APITransactionTestCase
+from rest_framework.test import APIRequestFactory, force_authenticate, APITestCase
 
 from flowback.group.models import GroupUser, GroupTags
 from flowback.group.tests.factories import GroupFactory, GroupUserFactory, GroupTagsFactory
@@ -16,7 +16,7 @@ from flowback.poll.services.area import poll_area_statement_vote_update
 from flowback.poll.views.area import PollAreaStatementListAPI
 
 
-class PollAreaTest(APITransactionTestCase):
+class PollAreaTest(APITestCase):
     def setUp(self):
         self.group = GroupFactory.create()
         self.group_user_creator = GroupUserFactory(group=self.group, user=self.group.created_by)

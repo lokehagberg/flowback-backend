@@ -1,7 +1,7 @@
 import json
 from pprint import pprint
 
-from rest_framework.test import APIRequestFactory, force_authenticate, APITransactionTestCase
+from rest_framework.test import APIRequestFactory, force_authenticate, APITestCase
 from django.core.files.uploadedfile import SimpleUploadedFile
 
 from flowback.comment.models import Comment
@@ -12,7 +12,7 @@ from ...files.tests.factories import FileCollectionFactory, FileSegmentFactory
 from ...poll.views.comment import PollCommentCreateAPI, PollCommentListAPI
 
 
-class PollCommentTest(APITransactionTestCase):
+class PollCommentTest(APITestCase):
 
     def setUp(self):
         self.collection = FileCollectionFactory()

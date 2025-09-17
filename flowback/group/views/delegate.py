@@ -2,13 +2,18 @@ from drf_spectacular.utils import extend_schema
 from rest_framework import serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
+
+from flowback.common.filters import NumberInFilter
 from flowback.common.pagination import LimitOffsetPagination, get_paginated_response
 
-from flowback.group.models import GroupUserDelegator, GroupTags
-from flowback.group.selectors import group_user_delegate_list, group_user_delegate_pool_list
+from flowback.group.models import GroupUserDelegator, GroupTags, GroupUserDelegatePool
+from flowback.group.selectors.user import group_user_delegate_list
+from flowback.group.selectors.delegate import group_user_delegate_pool_list
 from flowback.group.serializers import GroupUserSerializer
-from flowback.group.services.delegate import group_user_delegate, group_user_delegate_update, group_user_delegate_remove, \
-    group_user_delegate_pool_create, group_user_delegate_pool_delete
+from flowback.group.services.delegate import group_user_delegate, group_user_delegate_update, \
+    group_user_delegate_remove, \
+    group_user_delegate_pool_create, group_user_delegate_pool_delete, group_user_delegate_pool_notification_subscribe
+from flowback.notification.views import NotificationSubscribeTemplateAPI
 
 
 @extend_schema(tags=['group/delegate'])
@@ -121,6 +126,11 @@ class GroupUserDelegatePoolDeleteApi(APIView):
         return Response(status=status.HTTP_200_OK)
 
 
+@extend_schema(tags=['group/delegate'], description=GroupUserDelegatePool.notification_docs())
+class GroupUserDelegatePoolNotificationSubscribeAPI(NotificationSubscribeTemplateAPI):
+    lazy_action = group_user_delegate_pool_notification_subscribe
+
+
 @extend_schema(tags=['group/delegate'])
 class GroupUserDelegateApi(APIView):
     class InputSerializer(serializers.Serializer):
@@ -139,12 +149,12 @@ class GroupUserDelegateApi(APIView):
 class GroupUserDelegateUpdateApi(APIView):
     class InputSerializer(serializers.Serializer):
         delegate_pool_id = serializers.IntegerField()
-        tags = serializers.ListField(child=serializers.IntegerField(), default=[])
+        tags = serializers.ListField(child=serializers.IntegerField(), required=False)
 
     def post(self, request, group: int):
-        serializer = self.InputSerializer(data=request.data, many=True)
+        serializer = self.InputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        group_user_delegate_update(user_id=request.user.id, group_id=group, data=serializer.validated_data)
+        group_user_delegate_update(user_id=request.user.id, group_id=group, **serializer.validated_data)
 
         return Response(status=status.HTTP_200_OK)
 

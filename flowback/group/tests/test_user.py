@@ -1,13 +1,13 @@
 import json
 
 from rest_framework import status
-from rest_framework.test import APIRequestFactory, force_authenticate, APITransactionTestCase
+from rest_framework.test import APITestCase
 from .factories import GroupFactory, GroupUserFactory, GroupUserDelegateFactory
 from ..views.user import GroupUserListApi
 from ...common.tests import generate_request
 
 
-class GroupUserTest(APITransactionTestCase):
+class GroupUserTest(APITestCase):
     def setUp(self):
         self.group = GroupFactory()
         self.group_user_creator = self.group.group_user_creator
@@ -24,7 +24,7 @@ class GroupUserTest(APITransactionTestCase):
         # Basic test
         response = generate_request(api=GroupUserListApi,
                                     user=user,
-                                    url_params=dict(group_id=1))
+                                    url_params=dict(group_id=self.group.id))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['count'], 4)
         self.assertEqual(response.data['results'][0].get('delegate_pool_id'), None)
@@ -35,7 +35,7 @@ class GroupUserTest(APITransactionTestCase):
         # Test delegates only
         response = generate_request(api=GroupUserListApi,
                                     user=user,
-                                    url_params=dict(group_id=1),
+                                    url_params=dict(group_id=self.group.id),
                                     data=dict(is_delegate=True))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['count'], 1)

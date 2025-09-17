@@ -1,9 +1,10 @@
 from flowback.comment.models import Comment
 from flowback.common.services import get_object
-from flowback.group.selectors import group_user_permissions
-from flowback.poll.models import Poll, PollDelegateVoting
+from flowback.group.selectors.permission import group_user_permissions
+from flowback.notification.models import NotificationChannel
+from flowback.poll.models import Poll
 from flowback.comment.services import comment_create, comment_update, comment_delete, comment_vote
-from flowback.poll.services.poll import poll_notification
+from flowback.poll.notify import notify_poll_comment
 
 
 def poll_comment_create(*, author_id: int, poll_id: int, message: str = None, attachments: list = None,
@@ -18,21 +19,10 @@ def poll_comment_create(*, author_id: int, poll_id: int, message: str = None, at
                              attachments=attachments,
                              attachment_upload_to="group/poll/comment/attachments")
 
-    poll_notification.create(sender_id=poll_id,
-                             action=poll_notification.Action.create,
-                             category='comment_all',
-                             message=f'User {group_user.user.username} replied to your comment '
-                                     f'in poll {poll.title}',
-                             related_id=comment.id)
-
-    if poll_notification.is_subscribed(user_id=comment.author_id, sender_id=poll_id, category='comment_self'):
-        poll_notification.create(sender_id=poll_id,
-                                 action=poll_notification.Action.create,
-                                 category='comment_self',
-                                 message=f'User {group_user.user.username} replied to your comment '
-                                         f'in poll {poll.title}',
-                                 related_id=comment.id,
-                                 target_user_ids=comment.author_id)
+    notify_poll_comment(message="A new comment has been posted",
+                        action=NotificationChannel.Action.CREATED,
+                        poll=poll,
+                        comment=comment)
 
     return comment
 

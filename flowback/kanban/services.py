@@ -58,9 +58,6 @@ def kanban_entry_create(*,
 
     kanban.save()
 
-    # group_notification.create(sender_id=group_id, action=group_notification.Action.create, category='kanban',
-    #                           message=f'User {created_by.user.username} created a kanban in {created_by.group.name}')
-
     return kanban
 
 
@@ -73,18 +70,11 @@ def kanban_entry_update(*, kanban_entry_id: int, data) -> KanbanEntry:
                                        fields=non_side_effect_fields,
                                        data=data)
 
-    # group_notification.create(sender_id=group_id, action=group_notification.Action.update, category='kanban',
-    #                           message=f'User {group_user.user.username} updated a kanban in {group_user.group.name}')
-
     return kanban
 
 
 def kanban_entry_delete(*, kanban_entry_id: int) -> None:
     get_object(KanbanEntry, id=kanban_entry_id).delete()
-
-    # group_notification.create(sender_id=group_id, action=group_notification.Action.delete, category='kanban',
-    #                           message=f'User {group_user.user.username} deleted a kanban in {group_user.group.name}')
-
 
 class KanbanManager:
     def __init__(self, origin_type: str):

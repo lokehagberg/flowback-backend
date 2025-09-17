@@ -1,8 +1,6 @@
-from django.utils import timezone
-
-from flowback.group.models import WorkGroupUser
-from flowback.group.selectors import group_user_permissions
-from flowback.group.services.group import group_notification
+from flowback.group.notify import notify_group_schedule_event
+from flowback.group.selectors.permission import group_user_permissions
+from flowback.notification.models import NotificationChannel
 from flowback.schedule.models import ScheduleEvent
 from flowback.schedule.services import ScheduleManager, subscribe_schedule
 from flowback.user.services import user_schedule
@@ -15,6 +13,7 @@ def group_schedule_event_create(*,
                                 group_id: int,
                                 title: str,
                                 work_group_id: int = None,
+                                reminders: list[int] = None,
                                 **data) -> ScheduleEvent:
     group_user = group_user_permissions(user=user_id, group=group_id, work_group=work_group_id)
     event = group_schedule.create_event(schedule_id=group_user.group.schedule.id,
@@ -22,19 +21,18 @@ def group_schedule_event_create(*,
                                         origin_id=group_user.group.id,
                                         origin_name='group',
                                         work_group_id=work_group_id,
+                                        reminders=reminders,
                                         **data)
 
-    target_user_ids = None
-    if work_group_id:
-        target_user_ids = WorkGroupUser.objects.filter(id=work_group_id).values_list('group_user__user_id',
-                                                                                     flat=True)
+    notify_group_schedule_event(message="A new event has been created",
+                                action=NotificationChannel.Action.CREATED,
+                                schedule_event=event)
 
-    group_notification.create(sender_id=group_id,
-                              action=group_notification.Action.create,
-                              category='schedule_event_create',
-                              message='A new schedule event has been created',
-                              related_id=event.id,
-                              target_user_ids=list(target_user_ids) if target_user_ids else None)
+    if event.assignees:
+        notify_group_schedule_event(message="You have been assigned to a new event",
+                                    action=NotificationChannel.Action.CREATED,
+                                    schedule_event=event,
+                                    user_id_list=list(event.assignees.values_list('user_id', flat=True)))
 
     return event
 
@@ -44,42 +42,44 @@ def group_schedule_event_update(*,
                                 group_id: int,
                                 event_id: int,
                                 **data):
-    work_group = group_schedule.get_schedule_event(event_id=event_id).work_group
-    group_user = group_user_permissions(user=user_id, group=group_id, work_group=work_group.id if work_group else None)
-    group_schedule.update_event(event_id=event_id, schedule_origin_id=group_user.group.id, data=data)
+    old_event = group_schedule.get_schedule_event(event_id=event_id)
+    old_event_assignees = list(old_event.assignees.values_list('user_id', flat=True))
 
-    target_user_ids = None
-    if work_group:
-        target_user_ids = WorkGroupUser.objects.filter(id=work_group.id).values_list('group_user__user_id',
-                                                                                     flat=True)
+    group_user = group_user_permissions(user=user_id,
+                                        group=group_id,
+                                        work_group=old_event.work_group.id if old_event.work_group else None)
+    updated_event = group_schedule.update_event(event_id=event_id, schedule_origin_id=group_user.group.id, data=data)
+    updated_event_assignees = list(updated_event.assignees.values_list('user_id', flat=True))
 
-    group_notification.create(sender_id=group_id,
-                              action=group_notification.Action.update,
-                              category='schedule_event_update',
-                              message='A schedule event has been updated',
-                              related_id=event_id,
-                              target_user_ids=list(target_user_ids) if target_user_ids else None)
+    # Notify users
+    if list(set(old_event_assignees) - set(updated_event_assignees)):
+        notify_group_schedule_event(message="You have been unassigned from an event",
+                                    action=NotificationChannel.Action.UPDATED,
+                                    schedule_event=updated_event,
+                                    user_id_list=list(set(old_event_assignees) - set(updated_event_assignees)))
+
+    if list(set(updated_event_assignees) - set(old_event_assignees)):
+        notify_group_schedule_event(message="You have been assigned to an event",
+                                    action=NotificationChannel.Action.UPDATED,
+                                    schedule_event=updated_event,
+                                    user_id_list=list(set(updated_event_assignees) - set(old_event_assignees)))
 
 
 def group_schedule_event_delete(*,
                                 user_id: int,
                                 group_id: int,
                                 event_id: int):
-    work_group = group_schedule.get_schedule_event(event_id=event_id).work_group
-    group_user = group_user_permissions(user=user_id, group=group_id, work_group=work_group.id if work_group else None)
+    event = group_schedule.get_schedule_event(event_id=event_id)
+    group_user = group_user_permissions(user=user_id,
+                                        group=group_id,
+                                        work_group=event.work_group.id if event.work_group else None)
     group_schedule.delete_event(event_id=event_id, schedule_origin_id=group_user.group.id)
 
-    target_user_ids = None
-    if work_group:
-        target_user_ids = WorkGroupUser.objects.filter(id=work_group.id).values_list('group_user__user_id',
-                                                                                     flat=True)
-
-    group_notification.create(sender_id=group_id,
-                              action=group_notification.Action.delete,
-                              category='schedule_event_delete',
-                              message='A schedule event has been deleted',
-                              related_id=event_id,
-                              target_user_ids=list(target_user_ids) if target_user_ids else None)
+    if event.assignees:
+        notify_group_schedule_event(message="The schedule event you've been assigned to has been deleted",
+                                    action=NotificationChannel.Action.DELETED,
+                                    schedule_event=event,
+                                    user_id_list=list(event.assignees.values_list('user_id', flat=True)))
 
 
 def group_schedule_subscribe(*,

@@ -1,18 +1,15 @@
 import json
 
-from rest_framework.test import APIRequestFactory, force_authenticate, APITransactionTestCase
-from django.core.files.uploadedfile import SimpleUploadedFile
+from rest_framework.test import APIRequestFactory, force_authenticate, APITestCase
 
 from .factories import CommentFactory
 
-from ..models import Comment
 from ..views import CommentListAPI
 from ...files.tests.factories import FileCollectionFactory, FileSegmentFactory
 from ...poll.tests.factories import PollFactory
-from ...poll.views.comment import PollCommentCreateAPI, PollCommentListAPI
 
 
-class CommentAttachmentsTest(APITransactionTestCase):
+class CommentAttachmentsTest(APITestCase):
     def setUp(self):
         self.collection = FileCollectionFactory()
         (self.file_one,

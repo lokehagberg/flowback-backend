@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from flowback.user.models import User, Report
+from flowback.user.services import user_delete
 
 
 @admin.register(User)
@@ -24,6 +25,12 @@ class UserAdmin(BaseUserAdmin):
     search_fields = ('email',)
     ordering = ('email',)
     filter_horizontal = ()
+
+    def get_queryset(self, request):
+        return User.objects.filter(is_active=True).all()
+
+    def delete_model(self, request, obj):
+        user_delete(user_id=obj.id)
 
 
 @admin.register(Report)

@@ -1,8 +1,9 @@
 import json
 from pprint import pprint
 
-from rest_framework.test import APITransactionTestCase, APIRequestFactory, force_authenticate
+from rest_framework.test import APITestCase, APIRequestFactory, force_authenticate
 
+from flowback.common.tests import generate_request
 from flowback.group.tests.factories import GroupFactory, GroupUserFactory, GroupUserDelegateFactory
 from flowback.poll.tests.factories import PollFactory, PollProposalFactory, PollVotingTypeCardinalFactory, \
     PollDelegateVotingFactory
@@ -10,7 +11,7 @@ from flowback.poll.tests.utils import generate_poll_phase_kwargs
 from flowback.poll.views.vote import DelegatePollVoteListAPI
 
 
-class PollDelegateTests(APITransactionTestCase):
+class PollDelegateTests(APITestCase):
     def setUp(self):
         self.group = GroupFactory()
         self.group_user_creator = GroupUserFactory(group=self.group)
@@ -46,12 +47,42 @@ class PollDelegateTests(APITransactionTestCase):
                                           for proposal in self.poll_three_proposals[0:3:2]]
 
     def test_delegate_poll_vote_list(self):
-        factory = APIRequestFactory()
-        user = self.delegator.user
-        view = DelegatePollVoteListAPI.as_view()
+        # Test as delegate user
+        response = generate_request(
+            api=DelegatePollVoteListAPI,
+            user=self.delegate.group_user.user,
+            data=dict(group_id=self.group.id)
+        )
 
-        request = factory.get('')
-        force_authenticate(request, user=user)
-        response = view(request, delegate_pool_id=1)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['results']), 3)  # Should return all 3 polls
 
-        pprint(response.data)
+        # Verify poll IDs are in the response
+        poll_ids = [item['poll_id'] for item in response.data['results']]
+        self.assertIn(self.poll_one.id, poll_ids)
+        self.assertIn(self.poll_two.id, poll_ids)
+        self.assertIn(self.poll_three.id, poll_ids)
+
+        # Test filtering by poll_id
+        response = generate_request(
+            api=DelegatePollVoteListAPI,
+            user=self.delegate.group_user.user,
+            data=dict(group_id=self.group.id, poll_id=self.poll_one.id)
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['results']), 1)  # Should return only poll_one
+        self.assertEqual(response.data['results'][0]['poll_id'], self.poll_one.id)
+
+        # Test filtering by delegate_pool_id
+        response = generate_request(
+            api=DelegatePollVoteListAPI,
+            user=self.delegate.group_user.user,
+            data=dict(group_id=self.group.id, delegate_pool_id=self.delegate.pool.id)
+        )
+
+        print(response.data['results'])
+
+        self.assertEqual(response.status_code, 200)
+        # Should return polls where this delegate has voted
+        self.assertGreaterEqual(len(response.data['results']), 1)

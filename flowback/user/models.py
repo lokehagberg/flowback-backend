@@ -13,6 +13,7 @@ from rest_framework.authtoken.models import Token
 from flowback.chat.models import MessageChannelParticipant
 from flowback.common.models import BaseModel
 from flowback.kanban.models import Kanban
+from flowback.notification.models import NotifiableModel, NotificationChannel
 from flowback.schedule.models import Schedule
 
 
@@ -51,7 +52,7 @@ class CustomUserManager(BaseUserManager):
         return user
 
 
-class User(AbstractBaseUser, PermissionsMixin):
+class User(AbstractBaseUser, PermissionsMixin, NotifiableModel):
     class PublicStatus(models.TextChoices):
         PUBLIC = 'public', _('Public')  # Everyone can see/access
         GROUP_ONLY = 'group_only', _('Group Only')  # Only users in the same group can see/access
@@ -88,6 +89,33 @@ class User(AbstractBaseUser, PermissionsMixin):
     def message_channel_origin(self) -> str:
         return "user"
 
+    NOTIFICATION_DATA_FIELDS = (('user_id', int, 'The ID of the user'),
+                                ('username', str, "The user's username"))
+
+    @property
+    def notification_data(self) -> dict | None:
+        return dict(user_id=self.id,
+                    username=self.username)
+
+    def notify_chat(self,
+                    action: NotificationChannel.Action,
+                    message: str,
+                    message_channel_id,
+                    message_channel_title: str
+                    ):
+        """
+        Notifies chat users
+        :param action: FIGHT!
+        :param message:
+        :param message_channel_id: Chat channel ID
+        :param message_channel_title: Chat channel title
+        :return:
+        """
+        params = locals()
+        params.pop('self')
+
+        return self.notification_channel.notify(**params)
+
     @classmethod
     # Updates Schedule name
     def post_save(cls, instance, created, update_fields, **kwargs):
@@ -123,10 +151,10 @@ post_delete.connect(User.post_delete, sender=User)
 
 
 class OnboardUser(BaseModel):
-    email = models.EmailField(max_length=120)
-    username = models.CharField(max_length=120, validators=[UnicodeUsernameValidator()])
-    verification_code = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    email = models.EmailField(max_length=120, unique=True)
+    verification_code = models.UUIDField(default=uuid.uuid4, editable=False)
     is_verified = models.BooleanField(default=False)
+
 
 
 class PasswordReset(BaseModel):
@@ -139,6 +167,9 @@ class Report(BaseModel):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     title = models.CharField(max_length=255)
     description = models.TextField()
+    group_id = models.IntegerField(null=True, blank=True)
+    post_id = models.IntegerField(null=True, blank=True)
+    post_type = models.CharField(max_length=50, null=True, blank=True)
 
 
 class UserChatInvite(BaseModel):

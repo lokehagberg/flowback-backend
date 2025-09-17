@@ -44,6 +44,7 @@ class ScheduleEventListTemplateAPI(APIView):
         origin_id = serializers.IntegerField()
         schedule_origin_name = serializers.CharField(source='schedule.origin_name')
         schedule_origin_id = serializers.CharField(source='schedule.origin_id')
+        repeat_frequency = serializers.CharField(source='get_repeat_frequency_display', read_only=True)
         work_group = WorkGroupSerializer(allow_null=True)
         assignees = GroupUserSerializer(many=True,
                                         allow_null=True,

@@ -1,5 +1,5 @@
 from django.utils import timezone
-from rest_framework.test import APITransactionTestCase
+from rest_framework.test import APITestCase
 
 from flowback.kanban.models import KanbanEntry
 from flowback.kanban.services import kanban_entry_create
@@ -7,7 +7,7 @@ from flowback.kanban.tests.factories import KanbanFactory
 from flowback.user.tests.factories import UserFactory
 
 
-class TestKanban(APITransactionTestCase):
+class TestKanban(APITestCase):
     def setUp(self):
         self.user = UserFactory()
         self.user_assignee_one, self.user_assignee_two = UserFactory.create_batch(size=2)
