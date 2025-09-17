@@ -151,7 +151,7 @@ def _group_get_visible_for(user: User):
 def group_list(*, fetched_by: User, filters=None):
     filters = filters or {}
     joined_groups = Group.objects.filter(id=OuterRef('pk'), groupuser__user__in=[fetched_by])
-    qs = _group_get_visible_for(user=fetched_by).annotate(joined=Exists(joined_groups)).all()
+    qs = _group_get_visible_for(user=fetched_by).annotate(joined=Exists(joined_groups)).all().distinct('id')
     qs = BaseGroupFilter(filters, qs).qs
 
     return qs

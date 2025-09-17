@@ -57,7 +57,7 @@ class GroupDetailApi(APIView):
                       'active',
                       'direct_join',
                       'public',
-                      'default_permission'
+                      'default_permission',
                       'name',
                       'description',
                       'image',
@@ -100,6 +100,7 @@ class GroupUpdateApi(APIView):
         serializer = self.InputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = group_update(user=request.user.id, group=group, data=serializer.validated_data)
+        return Response(status=status.HTTP_200_OK)
 
 
 class GroupDeleteApi(APIView):
