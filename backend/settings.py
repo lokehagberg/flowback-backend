@@ -61,7 +61,8 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework.authtoken',
     'flowback.user',
-    'flowback.group'
+    'flowback.group',
+    'flowback.poll'
 ]
 
 REST_FRAMEWORK = {
