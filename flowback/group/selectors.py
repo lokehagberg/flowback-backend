@@ -7,7 +7,7 @@ from django.forms import model_to_dict
 
 from flowback.common.services import get_object
 from flowback.user.models import User
-from flowback.group.models import Group, GroupUser, GroupUserInvite, GroupPermissions, GroupTags, GroupUserDelegate
+from flowback.group.models import Group, GroupUser, GroupUserInvite, GroupPermissions, GroupTags, GroupUserDelegator
 from rest_framework.exceptions import ValidationError
 
 #
@@ -97,11 +97,11 @@ class BaseGroupFilter(django_filters.FilterSet):
 
 class BaseGroupUserFilter(django_filters.FilterSet):
     username__icontains = django_filters.CharFilter(field_name='user__username', lookup_expr='icontains')
+    delegate = django_filters.BooleanFilter(field_name='groupuserdelegate__isnull')
 
     class Meta:
         model = GroupUser
         fields = dict(user_id=['exact'],
-                      is_delegate=['exact'],
                       is_admin=['exact'],
                       permission=['in'])
 
@@ -135,7 +135,7 @@ class BaseGroupUserDelegateFilter(django_filters.FilterSet):
     tag_name__icontains = django_filters.CharFilter(field_name='tags__tag_name', lookup_expr='icontains')
 
     class Meta:
-        model = GroupUserDelegate
+        model = GroupUserDelegator
         fields = ['delegate']
 
 
@@ -197,5 +197,5 @@ def group_user_delegate_list(*, group: int, fetched_by: User, filters=None):
     group_user_permissions(group=group, user=fetched_by)
     query = Q(group_id=group, delegator_id=fetched_by)
 
-    qs = GroupUserDelegate.objects.filter(query).all()
+    qs = GroupUserDelegator.objects.filter(query).all()
     return BaseGroupUserDelegateFilter(qs, filters).qs

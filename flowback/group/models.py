@@ -56,7 +56,6 @@ class GroupTags(BaseModel):
 class GroupUser(BaseModel):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     group = models.ForeignKey(Group, on_delete=models.CASCADE)
-    is_delegate = models.BooleanField(default=False)
     is_admin = models.BooleanField(default=False)
     permission = models.ForeignKey(GroupPermissions, null=True, blank=True, on_delete=models.SET_NULL)
 
@@ -74,11 +73,18 @@ class GroupUserInvite(BaseModel):
         unique_together = ('user', 'group')
 
 
-# Delegator to delegate relations
-# TODO Add signals to avoid user subscribing to the same user outside of services
 class GroupUserDelegate(BaseModel):
+    user = models.OneToOneField(GroupUser, on_delete=models.DO_NOTHING)
+    group = models.ForeignKey(Group, on_delete=models.CASCADE)
+
+    class Meta:
+        unique_together = ('user', 'group')
+
+
+# Delegator to delegate relations
+class GroupUserDelegator(BaseModel):
     delegator = models.ForeignKey(GroupUser, on_delete=models.CASCADE, related_name='group_user_delegate_delegator')
-    delegate = models.ForeignKey(GroupUser, on_delete=models.CASCADE, related_name='group_user_delegate_delegate')
+    delegate = models.ForeignKey('GroupUserDelegate', on_delete=models.CASCADE)
     group = models.ForeignKey(Group, on_delete=models.CASCADE)
     tags = models.ManyToManyField(GroupTags)
 

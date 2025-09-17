@@ -12,7 +12,7 @@ from flowback.group.selectors import group_user_permissions
 
 from flowback.user.models import User
 
-from flowback.group.models import (Group, GroupPermissions, GroupUser, GroupTags, GroupUserDelegate, 
+from flowback.group.models import (Group, GroupPermissions, GroupUser, GroupTags, GroupUserDelegator,
                                    GroupUserInvite)
 from flowback.group.services import (group_create, group_update, group_delete, group_join,
                                      group_leave, group_invite, group_invite_accept, 
@@ -253,19 +253,26 @@ class CreateGroupTests(TransactionTestCase):
     #         group_invite(user=self.user_creator.id, group=self.group_open.id, to=self.user_member.id)
 
     def test_update_group_user(self):
-        group_user_update(user=self.user_creator.id, group=self.group_open.id, 
-                          fetched_by=self.user_creator.id, data=dict(is_delegate=True, is_admin=True))
+        group_join(user=self.user_member.id, group=self.group_open.id)
+        user = group_user_update(user=self.user_member.id, group=self.group_open.id,
+                                 fetched_by=self.user_creator.id, data=dict(delegate=True, is_admin=True))
+        self.assertTrue(user.is_admin)
+        self.assertTrue(not hasattr(user, 'groupuserdelegate'))
 
     def test_update_group_user_update(self):
         group_join(user=self.user_member.id, group=self.group_open.id)
-        group_user_update(user=self.user_member.id, group=self.group_open.id, 
-                          fetched_by=self.user_creator.id, data=dict(is_delegate=True, is_admin=True))
+        user = group_user_update(user=self.user_member.id, group=self.group_open.id,
+                                 fetched_by=self.user_member.id, data=dict(delegate=True, is_admin=True))
+        self.assertFalse(user.is_admin)
+        self.assertTrue(hasattr(user, 'groupuserdelegate'))
 
     def test_update_group_user_update_by_non_authorized(self):
         group_join(user=self.user_member.id, group=self.group_open.id)
+        group_join(user=self.user_member_2.id, group=self.group_open.id)
         user = group_user_update(user=self.user_member.id, group=self.group_open.id,
-                          fetched_by=self.user_member.id, data=dict(is_delegate=True, is_admin=True))
+                                 fetched_by=self.user_member_2.id, data=dict(delegate=True, is_admin=True))
         self.assertFalse(user.is_admin)
+        self.assertFalse(hasattr(user, 'groupuserdelegate'))
 
     def test_super_create_tag(self):
         group_tag_create(user=self.user_creator.id, group=self.group_open.id, tag_name="test")
@@ -299,153 +306,3 @@ class CreateGroupTests(TransactionTestCase):
             group_join(user=self.user_member.id, group=self.group_open.id)
             tag = group_tag_create(user=self.user_creator.id, group=self.group_open.id, tag_name="test")
             group_tag_delete(user=self.user_member.id, group=self.group_open.id, tag=tag.id)
-
-    def test_delegation(self):
-        group_join(user=self.user_member.id, group=self.group_open.id)
-        group_join(user=self.user_member_2.id, group=self.group_open.id)
-        tag = group_tag_create(user=self.user_creator.id, group=self.group_open.id, tag_name="test")
-        group_user_update(user=self.user_member.id, group=self.group_open.id, 
-                          fetched_by=self.user_member.id, data=dict(is_delegate=True))
-        group_user_delegate(user=self.user_member_2.id, group=self.group_open.id, 
-                            delegate=self.user_member.id, tags=[tag.id])
-
-    def test_double_delegation(self):
-        with self.assertRaises(ValidationError):
-            group_join(user=self.user_member.id, group=self.group_open.id)
-            group_join(user=self.user_member_2.id, group=self.group_open.id)
-            tag = group_tag_create(user=self.user_creator.id, group=self.group_open.id, tag_name="test")
-            group_user_update(user=self.user_member.id, group=self.group_open.id, 
-                            fetched_by=self.user_creator.id, data=dict(is_delegate=True))
-            group_user_delegate(user=self.user_member_2.id, group=self.group_open.id, 
-                                delegate=self.user_member.id, tags=[tag.id])
-            group_user_delegate(user=self.user_member_2.id, group=self.group_open.id, 
-                                delegate=self.user_member.id, tags=[tag.id])
-
-    def test_delegation_to_none_delegate(self):
-        with self.assertRaises(ValidationError):
-            group_join(user=self.user_member.id, group=self.group_open.id)
-            group_join(user=self.user_member_2.id, group=self.group_open.id)
-            tag = group_tag_create(user=self.user_creator.id, group=self.group_open.id, tag_name="test")
-            group_user_delegate(user=self.user_member_2.id, group=self.group_open.id, 
-                                delegate=self.user_member.id, tags=[tag.id])
-    
-    def test_delegation_from_non_joined(self):
-        with self.assertRaises(ValidationError):
-            group_join(user=self.user_member.id, group=self.group_open.id)
-            tag = group_tag_create(user=self.user_creator.id, group=self.group_open.id, tag_name="test")
-            group_user_update(user=self.user_member.id, group=self.group_open.id, 
-                              fetched_by=self.user_creator.id, data=dict(is_delegate=True))
-            group_user_delegate(user=self.user_member_2.id, group=self.group_open.id, 
-                                delegate=self.user_member.id, tags=[tag.id])
-    
-    def test_remove_delegate(self):
-        group_join(user=self.user_member.id, group=self.group_open.id)
-        group_join(user=self.user_member_2.id, group=self.group_open.id)
-        tag = group_tag_create(user=self.user_creator.id, group=self.group_open.id, tag_name="test")
-        group_user_update(user=self.user_member.id, group=self.group_open.id,
-                          fetched_by=self.user_member.id, data=dict(is_delegate=True))
-        group_user_delegate(user=self.user_member_2.id, group=self.group_open.id, 
-                            delegate=self.user_member.id, tags=[tag.id])
-        group_user_delegate_remove(user=self.user_member_2.id, group=self.group_open.id, 
-                            delegate=self.user_member.id)
-
-    def test_double_remove_delegate(self):
-        with self.assertRaises(ValidationError):
-            group_join(user=self.user_member.id, group=self.group_open.id)
-            group_join(user=self.user_member_2.id, group=self.group_open.id)
-            tag = group_tag_create(user=self.user_creator.id, group=self.group_open.id, tag_name="test")
-            group_user_update(user=self.user_member.id, group=self.group_open.id, 
-                              fetched_by=self.user_creator.id, data=dict(is_delegate=True))
-            group_user_delegate(user=self.user_member_2.id, group=self.group_open.id, 
-                                delegate=self.user_member.id, tags=[tag.id])
-            group_user_delegate_remove(user=self.user_member_2.id, group=self.group_open.id, 
-                                delegate=self.user_member.id)
-            group_user_delegate_remove(user=self.user_member_2.id, group=self.group_open.id, 
-                                delegate=self.user_member.id)
-
-    def test_remove_delegate_when_not_delegated(self):
-        with self.assertRaises(ValidationError):
-            group_join(user=self.user_member.id, group=self.group_open.id)
-            group_join(user=self.user_member_2.id, group=self.group_open.id)
-            tag = group_tag_create(user=self.user_creator.id, group=self.group_open.id, tag_name="test")
-            group_user_update(user=self.user_member.id, group=self.group_open.id, 
-                              fetched_by=self.user_creator.id, data=dict(is_delegate=True))
-            group_user_delegate_remove(user=self.user_member_2.id, group=self.group_open.id, 
-                                       delegate=self.user_member.id)
-
-    def test_remove_delegate_when_not_joined(self):
-        with self.assertRaises(ValidationError):
-            group_join(user=self.user_member.id, group=self.group_open.id)
-            tag = group_tag_create(user=self.user_creator.id, group=self.group_open.id, tag_name="test")
-            group_user_update(user=self.user_member.id, group=self.group_open.id, 
-                              fetched_by=self.user_creator.id, data=dict(is_delegate=True))
-            group_user_delegate_remove(user=self.user_member_2.id, group=self.group_open.id, 
-                                       delegate=self.user_member.id)
-
-    def test_remove_delegation_to_none_delegate(self):
-        with self.assertRaises(ValidationError):
-            group_join(user=self.user_member.id, group=self.group_open.id)
-            group_join(user=self.user_member_2.id, group=self.group_open.id)
-            tag = group_tag_create(user=self.user_creator.id, group=self.group_open.id, tag_name="test")
-            group_user_delegate_remove(user=self.user_member_2.id, group=self.group_open.id, 
-                                       delegate=self.user_member.id)
-
-    def test_update_delegate_add(self):
-        group_join(user=self.user_member.id, group=self.group_open.id)
-        group_join(user=self.user_member_2.id, group=self.group_open.id)
-        tag1 = group_tag_create(user=self.user_creator.id, group=self.group_open.id, tag_name="first")
-        tag2 = group_tag_create(user=self.user_creator.id, group=self.group_open.id, tag_name="second")
-        group_user_update(user=self.user_member.id, group=self.group_open.id, 
-                          fetched_by=self.user_member.id, data=dict(is_delegate=True))
-        group_user_delegate(user=self.user_member_2.id, group=self.group_open.id, 
-                            delegate=self.user_member.id)
-        group_user_delegate_update(user=self.user_member_2.id, group=self.group_open.id, 
-                            delegate=self.user_member.id, tags=[tag1.id, tag2.id])
-
-    def test_update_delegate_subtract(self):
-        group_join(user=self.user_member.id, group=self.group_open.id)
-        group_join(user=self.user_member_2.id, group=self.group_open.id)
-        tag1 = group_tag_create(user=self.user_creator.id, group=self.group_open.id, tag_name="first")
-        tag2 = group_tag_create(user=self.user_creator.id, group=self.group_open.id, tag_name="second")
-        group_user_update(user=self.user_member.id, group=self.group_open.id, 
-                          fetched_by=self.user_member.id, data=dict(is_delegate=True))
-        group_user_delegate(user=self.user_member_2.id, group=self.group_open.id, 
-                            delegate=self.user_member.id, tags=[tag1.id, tag2.id])
-        group_user_delegate_update(user=self.user_member_2.id, group=self.group_open.id, 
-                            delegate=self.user_member.id, tags=[tag1.id])
-    
-    # def test_update_delegate_no_update(self):
-    #     with self.assertRaises(ValidationError):
-    #         group_join(user=self.user_member.id, group=self.group_open.id)
-    #         group_join(user=self.user_member_2.id, group=self.group_open.id)
-    #         tag1 = group_tag_create(user=self.user_creator.id, group=self.group_open.id, tag_name="first")
-    #         group_user_update(user=self.user_member.id, group=self.group_open.id,
-    #                         fetched_by=self.user_member.id, data=dict(is_delegate=True))
-    #         group_user_delegate(user=self.user_member_2.id, group=self.group_open.id,
-    #                             delegate=self.user_member.id, tags=[tag1.id])
-    #         group_user_delegate_update(user=self.user_member_2.id, group=self.group_open.id,
-    #                             delegate=self.user_member.id, tags=[tag1.id])
-
-    def test_update_non_delegate(self):
-        with self.assertRaises(ValidationError):
-            group_join(user=self.user_member.id, group=self.group_open.id)
-            group_join(user=self.user_member_2.id, group=self.group_open.id)
-            tag1 = group_tag_create(user=self.user_creator.id, group=self.group_open.id, tag_name="first")
-            group_user_delegate(user=self.user_member.id, group=self.group_open.id,
-                                delegate=self.user_member.id, tags=[tag1.id])
-            group_user_delegate_update(user=self.user_member_2.id, group=self.group_open.id, 
-                                delegate=self.user_member.id, tags=[tag1.id])
-
-    def test_update_delegate_non_member(self):
-        with self.assertRaises(ValidationError):
-            group_join(user=self.user_member.id, group=self.group_open.id)
-            tag1 = group_tag_create(user=self.user_creator.id, group=self.group_open.id, tag_name="first")
-            tag2 = group_tag_create(user=self.user_creator.id, group=self.group_open.id, tag_name="second")
-            group_user_update(user=self.user_member.id, group=self.group_open.id, 
-                            fetched_by=self.user_member.id, data=dict(is_delegate=True))
-            group_user_delegate(user=self.user_member_2.id, group=self.group_open.id, 
-                                delegate=self.user_member.id, tags=[tag1.id])
-            group_user_delegate_update(user=self.user_member_2.id, group=self.group_open.id, 
-                                delegate=self.user_member.id, tags=[tag1, tag2.id])
-
-    #TODO permissions, note that tags are written as strings
