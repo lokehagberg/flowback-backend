@@ -4,3 +4,4 @@ psycopg2==2.9.3
 django-environ==0.8.1
 pillow==9.0.1
 django-filter==21.1
+django-cors-headers==3.13.0

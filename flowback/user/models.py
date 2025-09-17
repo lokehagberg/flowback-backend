@@ -76,20 +76,3 @@ class PasswordReset(BaseModel):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     verification_code = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     is_verified = models.BooleanField(default=False)
-
-
-class Group(BaseModel):
-    created_by = models.ForeignKey(User, on_delete=models.CASCADE)
-    active = models.BooleanField(default=True)
-
-    direct_join = models.BooleanField(default=True)
-    public = models.BooleanField(default=False)
-
-    name = models.TextField(unique=True)
-    banner_description = models.TextField()
-    description = models.TextField()
-    image = models.TextField()
-    cover_image = models.ImageField()
-
-    jitsi_room = models.TextField(unique=True)
-    
