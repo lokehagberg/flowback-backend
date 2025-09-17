@@ -59,9 +59,7 @@ class Poll(BaseModel):
                 raise ValidationError(f'{labels[x][1].title()} is greater than {labels[x+1][1]}')
 
     class Meta:
-        constraints = [models.CheckConstraint(check=Q(start_date__gte=timezone.now()),
-                                              name='nowgreaterthanstartdate_check'),
-                       models.CheckConstraint(check=Q(proposal_end_date__gte=F('start_date')),
+        constraints = [models.CheckConstraint(check=Q(proposal_end_date__gte=F('start_date')),
                                               name='proposalenddategreaterthanstartdate_check'),
                        models.CheckConstraint(check=Q(prediction_end_date__gte=F('proposal_end_date')),
                                               name='predictionenddategreaterthanproposalenddate_check'),
