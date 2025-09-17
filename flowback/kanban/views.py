@@ -18,6 +18,8 @@ class KanbanEntryListApi(APIView):
 
     class FilterSerializer(serializers.Serializer):
         group_id = serializers.IntegerField(required=False)
+        created_by = serializers.IntegerField(required=False)
+        assignee = serializers.IntegerField(required=False)
         title__icontains = serializers.CharField(required=False)
         description__icontains = serializers.CharField(required=False)
         tag = serializers.ChoiceField((1, 2, 3, 4, 5), required=False)

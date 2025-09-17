@@ -10,6 +10,8 @@ from flowback.group.selectors import group_user_permissions
 
 class BaseKanbanEntryFilter(django_filters.FilterSet):
     group_id = django_filters.NumberFilter(field_name='created_by__group_id')
+    created_by = django_filters.NumberFilter(field_name='created_by__user_id')
+    assignee = django_filters.NumberFilter(field_name='assignee__user_id')
 
     class Meta:
         model = KanbanEntry
