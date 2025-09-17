@@ -1,3 +1,5 @@
+import uuid
+
 from flowback.common.models import BaseModel
 from flowback.user.models import User
 from django.db import models
@@ -23,10 +25,10 @@ class Group(BaseModel):
 
     name = models.TextField(unique=True)
     description = models.TextField()
-    image = models.ImageField()
-    cover_image = models.ImageField()
+    image = models.ImageField(upload_to='group/image')
+    cover_image = models.ImageField(upload_to='group/cover_image')
 
-    jitsi_room = models.TextField(unique=True)
+    jitsi_room = models.UUIDField(unique=True, default=uuid.uuid4)
 
 
 # Permission class for each Group
@@ -54,7 +56,6 @@ class GroupTags(BaseModel):
 class GroupUser(BaseModel):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     group = models.ForeignKey(Group, on_delete=models.CASCADE)
-    is_delegate = models.BooleanField(default=False)
     is_admin = models.BooleanField(default=False)
     permission = models.ForeignKey(GroupPermissions, null=True, blank=True, on_delete=models.SET_NULL)
 
@@ -68,14 +69,29 @@ class GroupUserInvite(BaseModel):
     group = models.ForeignKey(Group, on_delete=models.CASCADE)
     external = models.BooleanField()
 
+    class Meta:
+        unique_together = ('user', 'group')
+
+
+class GroupUserDelegatePool(BaseModel):
+    group = models.ForeignKey(Group, on_delete=models.CASCADE)
+
+
+class GroupUserDelegate(BaseModel):
+    group = models.ForeignKey(Group, on_delete=models.CASCADE)
+    group_user = models.ForeignKey(GroupUser, on_delete=models.CASCADE)
+    pool = models.ForeignKey(GroupUserDelegatePool, on_delete=models.CASCADE)
+
+    class Meta:
+        unique_together = ('group_user', 'group')
+
 
 # Delegator to delegate relations
-# TODO Add signals to avoid user subscribing to the same user outside of services
-class GroupUserDelegate(BaseModel):
+class GroupUserDelegator(BaseModel):
     delegator = models.ForeignKey(GroupUser, on_delete=models.CASCADE, related_name='group_user_delegate_delegator')
-    delegate = models.ForeignKey(GroupUser, on_delete=models.CASCADE, related_name='group_user_delegate_delegate')
+    delegate_pool = models.ForeignKey(GroupUserDelegatePool, on_delete=models.CASCADE)
     group = models.ForeignKey(Group, on_delete=models.CASCADE)
     tags = models.ManyToManyField(GroupTags)
 
     class Meta:
-        unique_together = ('delegator', 'delegate', 'group')
+        unique_together = ('delegator', 'delegate_pool', 'group')

@@ -59,9 +59,12 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'corsheaders',
     'rest_framework',
+    'django_extensions',
     'rest_framework.authtoken',
+    'pgtrigger',
     'flowback.user',
-    'flowback.group'
+    'flowback.group',
+    'flowback.poll'
 ]
 
 REST_FRAMEWORK = {
@@ -70,7 +73,8 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
-    )
+    ),
+    'EXCEPTION_HANDLER': 'flowback.common.exception_handlers.drf_default_with_modifications_exception_handler'
 }
 
 AUTH_USER_MODEL = 'user.User'
@@ -87,6 +91,9 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = 'backend.urls'
+
+MEDIA_ROOT = str(BASE_DIR) + '/media'
+MEDIA_URL = '/media/'
 
 TEMPLATES = [
     {

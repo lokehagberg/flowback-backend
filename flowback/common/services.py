@@ -37,11 +37,15 @@ def get_object(model_or_queryset,
     try:
         data = get_object_or_404(model_or_queryset, **kwargs)
         if reverse:
-            raise ValidationError(error_message)
+            if not raise_exception:
+                return None
+            raise ValidationError(error_message or f'{model_or_queryset._meta.model_name} already exists')
 
         return data
 
     except Http404:
         if not raise_exception:
             return None
+        if reverse:
+            return True
         raise ValidationError(error_message or f'{model_or_queryset._meta.model_name} does not exist')

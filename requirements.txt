@@ -1,7 +1,9 @@
 Django==4.0.3
+django-extensions==3.2.1
 djangorestframework==3.13.1
 psycopg2==2.9.3
 django-environ==0.8.1
 pillow==9.0.1
 django-filter==21.1
 django-cors-headers==3.13.0
+django-pgtrigger==4.5.3
