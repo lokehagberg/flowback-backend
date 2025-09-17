@@ -99,7 +99,7 @@ def group_join(*, user: int, group: int) -> Union[GroupUser, GroupUserInvite]:
     get_object(GroupUserInvite, 'User already requested invite', reverse=True, user=user, group=group)
 
     if not group.direct_join:
-        user_status = GroupUserInvite(user=user, group=group)
+        user_status = GroupUserInvite(user=user, group=group, external=True)
 
     else:
         user_status = GroupUser(user=user, group=group)
@@ -151,16 +151,32 @@ def group_invite_remove(*, user: int, group: int, to: int) -> None:
     invite.delete()
 
 
-def group_invite_accept(*, user: int, group: int) -> None:
-    get_object(GroupUser, 'User already joined', reverse=True, user=user, group=group)
-    invite = get_object(GroupUserInvite, 'User has not been invited', user_id=user, group_id=group)
-    GroupUser.objects.create(user_id=user, group_id=group)
+def group_invite_accept(*, fetched_by: int, group: int, to: int = None) -> None:
+    to = to or fetched_by
+    get_object(GroupUser, 'User already joined', reverse=True, user_id=to, group=group)
+
+    if fetched_by == to:
+        invite = get_object(GroupUserInvite, 'User has not requested invite', user_id=to, group_id=group, external=True)
+
+    else:
+        group_user_permissions(group=group, user=fetched_by, permissions=['invite_user', 'admin'])
+        invite = get_object(GroupUserInvite, 'User has not been invited', user_id=to, group_id=group, external=False)
+
+    GroupUser.objects.create(user_id=to, group_id=group)
     invite.delete()
 
 
-def group_invite_reject(*, user: int, group: int) -> None:
-    get_object(GroupUser, 'User already joined', reverse=True, user_id=user, group_id=group)
-    invite = get_object(GroupUserInvite, 'User has not been invited', user_id=user, group_id=group)
+def group_invite_reject(*, fetched_by: id, group: int, to: int = None) -> None:
+    to = to or fetched_by
+    get_object(GroupUser, 'User already joined', reverse=True, user_id=to, group_id=group)
+
+    if fetched_by == to:
+        invite = get_object(GroupUserInvite, 'User has not requested invite', user_id=to, group_id=group, external=True)
+
+    else:
+        group_user_permissions(group=group, user=fetched_by, permissions=['invite_user', 'admin'])
+        invite = get_object(GroupUserInvite, 'User has not been invited', user_id=to, group_id=group, external=False)
+
     invite.delete()
 
 
