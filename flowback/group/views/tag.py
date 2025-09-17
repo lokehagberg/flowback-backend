@@ -21,7 +21,7 @@ class GroupTagsListApi(APIView):
     class OutputSerializer(serializers.ModelSerializer):
         class Meta:
             model = GroupTags
-            fields = ('tag_name', 'active')
+            fields = ('id', 'tag_name', 'active')
 
     def get(self, request, group: int):
         filter_serializer = self.FilterSerializer(data=request.query_params)
@@ -57,7 +57,7 @@ class GroupTagsCreateApi(APIView):
 
 class GroupTagsUpdateApi(APIView):
     class InputSerializer(serializers.Serializer):
-        tag = serializers.IntegerField()
+        tag = serializers.IntegerField(source='id')
         active = serializers.BooleanField(required=False)
 
     def post(self, request, group: int):

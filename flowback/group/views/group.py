@@ -81,6 +81,8 @@ class GroupCreateApi(APIView):
 
         group_create(user=request.user.id, **serializer.validated_data)
 
+        return Response(status=status.HTTP_200_OK)
+
 
 class GroupUpdateApi(APIView):
     class InputSerializer(serializers.Serializer):

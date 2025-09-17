@@ -131,14 +131,16 @@ class BaseGroupTagsFilter(django_filters.FilterSet):
 
 
 class BaseGroupUserDelegateFilter(django_filters.FilterSet):
-    delegate_name__icontains = django_filters.CharFilter(field_name='delegate__username__icontains')
+    delegate_id = django_filters.NumberFilter()
+    delegate_user_id = django_filters.NumberFilter(field_name='delegate__user_id')
+    delegate_name__icontains = django_filters.CharFilter(field_name='delegate__user__username__icontains')
     tag_id = django_filters.NumberFilter(field_name='tags__tag_id')
     tag_name = django_filters.CharFilter(field_name='tags__tag_name')
     tag_name__icontains = django_filters.CharFilter(field_name='tags__tag_name', lookup_expr='icontains')
 
     class Meta:
         model = GroupUserDelegator
-        fields = ['delegate']
+        fields = ['delegate_id']
 
 
 def _group_get_visible_for(user: User):

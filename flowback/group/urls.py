@@ -42,9 +42,9 @@ group_patterns = [
     path('<int:group>/permission/delete', GroupPermissionDeleteApi.as_view(), name='group_permission_delete'),
 
     path('<int:group>/tags', GroupTagsListApi.as_view(), name='group_tags'),
-    path('<int:group>/tags/create', GroupTagsCreateApi.as_view(), name='group_tags_create'),
-    path('<int:group>/tags/update', GroupTagsUpdateApi.as_view(), name='group_tags_update'),
-    path('<int:group>/tags/delete', GroupTagsDeleteApi.as_view(), name='group_tags_delete'),
+    path('<int:group>/tag/create', GroupTagsCreateApi.as_view(), name='group_tags_create'),
+    path('<int:group>/tag/update', GroupTagsUpdateApi.as_view(), name='group_tags_update'),
+    path('<int:group>/tag/delete', GroupTagsDeleteApi.as_view(), name='group_tags_delete'),
 
     path('<int:group>/delegates', GroupUserDelegateListApi.as_view(), name='group_user_delegates'),
     path('<int:group>/delegate/create', GroupUserDelegateApi.as_view(), name='group_user_delegate'),

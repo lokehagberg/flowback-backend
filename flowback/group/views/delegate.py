@@ -13,6 +13,8 @@ class GroupUserDelegateListApi(APIView):
         default_limit = 1
 
     class FilterSerializer(serializers.Serializer):
+        delegate_id = serializers.IntegerField(required=False)
+        delegate_user_id = serializers.IntegerField(required=False)
         delegate_name__icontains = serializers.CharField(required=False)
         tag_id = serializers.IntegerField(required=False)
         tag_name = serializers.CharField(required=False)
@@ -68,7 +70,7 @@ class GroupUserDelegateUpdateApi(APIView):
 
 class GroupUserDelegateDeleteApi(APIView):
     class InputSerializer(serializers.Serializer):
-        delegate_id = serializers.IntegerField(source='delegate')
+        delegate_id = serializers.IntegerField(source='id')
 
     def post(self, request, group: int):
         serializer = self.InputSerializer(data=request.data)

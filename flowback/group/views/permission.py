@@ -20,7 +20,7 @@ class GroupPermissionListApi(APIView):
     class OutputSerializer(serializers.ModelSerializer):
         class Meta:
             model = GroupPermissions
-            fields = ('role_name', 'invite_user', 'create_poll',
+            fields = ('id', 'role_name', 'invite_user', 'create_poll',
                       'allow_vote', 'kick_members', 'ban_members')
 
     def get(self, request, group: int):
@@ -58,12 +58,12 @@ class GroupPermissionCreateApi(APIView):
 class GroupPermissionUpdateApi(APIView):
     class InputSerializer(serializers.Serializer):
         permission_id = serializers.IntegerField(source='permission')
-        role_name = serializers.BooleanField(default=False)
-        invite_user = serializers.BooleanField(default=False)
-        create_poll = serializers.BooleanField(default=False)
-        allow_vote = serializers.BooleanField(default=False)
-        kick_members = serializers.BooleanField(default=False)
-        ban_members = serializers.BooleanField(default=False)
+        role_name = serializers.BooleanField()
+        invite_user = serializers.BooleanField()
+        create_poll = serializers.BooleanField()
+        allow_vote = serializers.BooleanField()
+        kick_members = serializers.BooleanField()
+        ban_members = serializers.BooleanField()
 
     def post(self, request, group: int):
         serializer = self.InputSerializer(data=request.data)
