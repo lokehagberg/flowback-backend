@@ -55,19 +55,19 @@ class Poll(BaseModel):
                   (self.end_date, 'end date'))
 
         for x in range(len(labels) - 1):
-            if labels[x][0] >= labels[x+1][0]:
+            if labels[x][0] > labels[x+1][0]:
                 raise ValidationError(f'{labels[x][1].title()} is greater than {labels[x+1][1]}')
 
     class Meta:
-        constraints = [models.CheckConstraint(check=Q(proposal_end_date__gte=F('start_date')),
+        constraints = [models.CheckConstraint(check=Q(proposal_end_date__gt=F('start_date')),
                                               name='proposalenddategreaterthanstartdate_check'),
-                       models.CheckConstraint(check=Q(prediction_end_date__gte=F('proposal_end_date')),
+                       models.CheckConstraint(check=Q(prediction_end_date__gt=F('proposal_end_date')),
                                               name='predictionenddategreaterthanproposalenddate_check'),
-                       models.CheckConstraint(check=Q(delegate_vote_end_date__gte=F('prediction_end_date')),
+                       models.CheckConstraint(check=Q(delegate_vote_end_date__gt=F('prediction_end_date')),
                                               name='delegatevoteenddategreaterthanpredictionenddate_check'),
-                       models.CheckConstraint(check=Q(vote_end_date__gte=F('delegate_vote_end_date')),
+                       models.CheckConstraint(check=Q(vote_end_date__gt=F('delegate_vote_end_date')),
                                               name='voteenddategreaterthandelegatevoteenddate_check'),
-                       models.CheckConstraint(check=Q(end_date__gte=F('vote_end_date')),
+                       models.CheckConstraint(check=Q(end_date__gt=F('vote_end_date')),
                                               name='enddategreaterthanvoteenddate_check')]
 
 
