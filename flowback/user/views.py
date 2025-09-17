@@ -72,8 +72,8 @@ class UserGetApi(APIView):
             model = User
             fields = 'email', 'username', 'profile_image', 'banner_image', 'bio', 'website'
 
-    def get(self, request, id=None):
-        serializer = self.OutputSerializer(get_user(user=id or request.user.id))
+    def get(self, request, user_id=None):
+        serializer = self.OutputSerializer(get_user(user=user_id or request.user.id))
         return Response(serializer.data)
 
 

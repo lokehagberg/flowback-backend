@@ -12,5 +12,5 @@ user_patterns = [
     path('login/', views.obtain_auth_token, name='login'),
     path('users/', UserListApi.as_view(), name='users'),
     path('user/', UserGetApi.as_view(), name='user'),
-    path('user/<int:id>', UserGetApi.as_view(), name='user'),
+    path('user/<int:user_id>', UserGetApi.as_view(), name='user'),
 ]

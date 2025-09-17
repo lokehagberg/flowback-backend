@@ -5,12 +5,12 @@ from django.core.validators import ValidationError as CoreValidationError
 
 # Create your tests here.
 from flowback.user.models import OnboardUser, User
-from flowback.user.services import user_create, user_create_verify
+from flowback.user.services import user_create, user_create_verify, user_update
 
 
 class CreateUserTests(TestCase):
     def setUp(self):
-        self.user = User.objects.user_create(username='test_user',
+        self.user = User.objects.create_user(username='test_user',
                                              email='example@example.com',
                                              password='password123')
 
@@ -45,3 +45,11 @@ class CreateUserTests(TestCase):
         with self.assertRaises(ValidationError):
             user_create_verify(verification_code=verification_code_2,
                                password='SomeHardPassword23')
+
+    def test_update_user(self):
+        user = self.user
+        data = dict(username='updated_user',
+                    bio='some_description')
+        user_update(user=user, data=data)
+        self.assertEqual(user.username, 'updated_user')
+        self.assertEqual(user.bio, 'some_description')

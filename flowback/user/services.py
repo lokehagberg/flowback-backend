@@ -45,7 +45,7 @@ def user_create_verify(*, verification_code: str, password: str):
 
     validate_password(password)
 
-    return User.objects.user_create(username=user.username,
+    return User.objects.create_user(username=user.username,
                                     email=user.email,
                                     password=password)
 
