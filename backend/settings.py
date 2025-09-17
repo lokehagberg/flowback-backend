@@ -15,6 +15,7 @@ from pathlib import Path
 
 
 env = environ.Env(DEBUG=(bool, False),
+                  SECURE_PROXY_SSL_HEADER=(bool, False),
                   DJANGO_SECRET=str,
                   FLOWBACK_URL=(str, None),
                   PG_SERVICE=(str, 'flowback'),
@@ -28,7 +29,9 @@ env = environ.Env(DEBUG=(bool, False),
                   EMAIL_HOST_USER=(str, None),
                   EMAIL_HOST_PASSWORD=(str, None),
                   EMAIL_USE_TLS=(bool, None),
-                  EMAIL_USE_SSL=(bool, None))
+                  EMAIL_USE_SSL=(bool, None),
+                  INTEGRATIONS=(list, []),
+                  )
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -51,6 +54,9 @@ CORS_ALLOW_ALL_ORIGINS = not bool(FLOWBACK_URL)
 if not CORS_ALLOW_ALL_ORIGINS:
     CORS_ALLOWED_ORIGINS = (FLOWBACK_URL,)
 
+if env('SECURE_PROXY_SSL_HEADERS'):
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
 
 # Application definition
 
@@ -70,8 +76,8 @@ INSTALLED_APPS = [
     'flowback.user',
     'flowback.group',
     'flowback.poll',
-    'flowback.chat'
-]
+    'flowback.chat',
+] + env('INTEGRATIONS')
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
