@@ -6,6 +6,8 @@ __pycache__
 db.sqlite3
 media
 .flowback_pgpass
+flowback/user_subscription/*
+flowback/membership/*
 
 # Backup files #
 *.bak
