@@ -62,20 +62,28 @@ def poll_delete(*, user_id: int, group_id: int, poll_id: int) -> None:
     poll.delete()
 
 
-def poll_proposal_create(*, user_id: int, group_id: int, poll_id: int, title: str, description: str, **data) -> PollProposal:
+# TODO proposal can be created without schedule, dangerous
+def poll_proposal_create(*, user_id: int, group_id: int, poll_id: int,
+                         title: str = None, description: str = None, **data) -> PollProposal:
     group_user = group_user_permissions(user=user_id, group=group_id)
     poll = get_object(Poll, id=poll_id)
 
     proposal = PollProposal(created_by=group_user, poll=poll, title=title, description=description)
 
-    if poll.type == Poll.PollType.SCHEDULE:
+    proposal.full_clean()
+    proposal.save()
+
+    extra = []
+    if poll.poll_type == Poll.PollType.SCHEDULE:
         if not data.get('start_date') and not data.get('end_date'):
             raise Exception('Missing start_date and/or end_date, for proposal schedule creation')
 
-        PollProposalTypeSchedule(proposal=proposal, start_date=data['start_date'], end_date=data['end_date'])
+        extra.append(PollProposalTypeSchedule(proposal=proposal, start_date=data['start_date'],
+                                              end_date=data['end_date']))
 
-    proposal.full_clean()
-    proposal.save()
+    for extension in extra:
+        extension.full_clean()
+        extension.save()
 
     return proposal
 
@@ -128,7 +136,7 @@ def poll_proposal_vote_update(*, user_id: int, group_id: int, poll_id: int, data
         poll_vote_schedule = [PollVotingTypeForAgainst(author=poll_vote,
                                                        proposal_id=proposal,
                                                        vote=True)
-                              for proposal in enumerate(data['votes'])]
+                              for proposal in data['votes']]
         PollVotingTypeForAgainst.objects.filter(author=poll_vote).delete()
         PollVotingTypeForAgainst.objects.bulk_create(poll_vote_schedule)
 
@@ -239,23 +247,20 @@ def poll_proposal_vote_count(*, poll_id: int) -> None:
                              filter=Q(vote=False)) * Subquery(mandate_subquery)))
 
             # Set score to the same as priority for user votes
-            user_votes = PollVotingTypeRanking.objects.filter(author__poll=poll
-                                                              ).values('pk').annotate(
-                score=total_proposals - (Count('author__pollvotingtyperanking', filter=Q(vote=True)) -
-                                         Count('author__pollvotingtyperanking', filter=Q(vote=False))))
+            user_votes = PollVotingTypeForAgainst.objects.filter(author__poll=poll, vote=True)
 
             for i in user_votes:
-                PollVotingTypeRanking.objects.filter(id=i['pk']).update(score=i['score'])
+                PollVotingTypeForAgainst.objects.filter(id=i['pk']).update(score=i['score'])
 
             for i in delegate_votes:
-                PollVotingTypeRanking.objects.filter(id=i['pk']).update(score=i['score'])
+                PollVotingTypeForAgainst.objects.filter(id=i['pk']).update(score=i['score'])
 
             # TODO make this work, replace both above (Copied from ranking comment)
             # PollVotingTypeSchedule.objects.bulk_update(delegate_votes | user_votes, fields=('score',))
 
             # Update scores on each proposal, Summarize both regular votes and delegate votes
             proposals = PollProposal.objects.filter(poll_id=poll_id).values('pk') \
-                .annotate(score=Sum('pollvotingtypeschedule__score'))
+                .annotate(score=Sum('pollvotingtypeforagainst__score'))
 
             for i in proposals:
                 PollProposal.objects.filter(id=i['pk']).update(score=i['score'])

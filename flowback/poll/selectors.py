@@ -27,6 +27,8 @@ class BasePollFilter(django_filters.FilterSet):
 
 
 class BasePollProposalFilter(django_filters.FilterSet):
+    group = django_filters.NumberFilter(field_name='created_by__group_id', lookup_expr='exact')
+
     class Meta:
         model = PollProposal
         fields = dict(id=['exact'],
@@ -54,10 +56,13 @@ class BasePollProposalScheduleFilter(django_filters.FilterSet):
         )
     )
 
+    group = django_filters.NumberFilter(field_name='created_by.group_id', lookup_expr='exact')
     start_date__lt = django_filters.DateTimeFilter(field_name='pollproposaltypeschedule.start_date', lookup_expr='lt')
     start_date__gt = django_filters.DateTimeFilter(field_name='pollproposaltypeschedule.start_date', lookup_expr='gt')
     end_date__lt = django_filters.DateTimeFilter(field_name='pollproposaltypeschedule.end_date', lookup_expr='lt')
     end_date__gt = django_filters.DateTimeFilter(field_name='pollproposaltypeschedule.end_date', lookup_expr='gt')
+    poll_title = django_filters.CharFilter(field_name='poll.title', lookup_expr='exact')
+    poll_title__icontains = django_filters.CharFilter(field_name='poll.title', lookup_expr='icontains')
 
     class Meta:
         model = PollProposal
@@ -85,23 +90,34 @@ def poll_list(*, fetched_by: User, group_id: Union[int, None], filters=None):
         qs = Poll.objects.filter(created_by__group_id=group_id).all()
 
     else:
-        qs = Poll.objects.filter(Q(created_by__group__groupuser__in=[fetched_by]) | Q(public=True)).all()
+        qs = Poll.objects.filter(Q(created_by__group__groupuser__user__in=[fetched_by]) | Q(public=True)).all()
 
     return BasePollFilter(filters, qs).qs
 
 
 def poll_proposal_list(*, fetched_by: User, group_id: int, poll_id: int, filters=None):
-    poll = get_object(Poll, id=poll_id)
-    if not poll.public:
-        group_user_permissions(group=group_id, user=fetched_by)
+    if group_id and poll_id:
+        poll = get_object(Poll, id=poll_id)
+        if not poll.public:
+            group_user_permissions(group=group_id, user=fetched_by)
 
+        filters = filters or {}
+        qs = PollProposal.objects.filter(created_by__group_id=group_id, poll=poll).all()
+
+        if poll.poll_type == Poll.PollType.SCHEDULE:
+            return BasePollProposalScheduleFilter(filters, qs).qs
+        else:
+            return BasePollProposalFilter(filters, qs).qs
+
+
+def poll_user_schedule_list(*, fetched_by: User, filters=None):
     filters = filters or {}
-    qs = PollProposal.objects.filter(created_by__group_id=group_id, poll=poll).all()
+    qs = PollProposal.objects.filter(created_by__group__groupuser__user__in=[fetched_by],
+                                     poll__poll_type=Poll.PollType.SCHEDULE,
+                                     poll__finished=True).order_by('created_by__group', 'score')\
+        .distinct('created_by__group').all()
 
-    if poll.poll_type == Poll.PollType.SCHEDULE:
-        return BasePollProposalScheduleFilter(filters, qs).qs
-    else:
-        return BasePollProposalFilter(filters, qs).qs
+    return BasePollProposalScheduleFilter(filters, qs).qs
 
 
 def poll_vote_list(*, fetched_by: User, group_id: int, poll_id: int, delegates: bool = False, filters=None):
@@ -124,10 +140,10 @@ def poll_vote_list(*, fetched_by: User, group_id: int, poll_id: int, delegates: 
     if poll.poll_type == Poll.PollType.SCHEDULE:
         if delegates:
             qs = PollVotingTypeForAgainst.objects.filter(proposal__poll=poll,
-                                                         author_delegate__isnull=False).order_by('-priority').all()
+                                                         author_delegate__isnull=False).order_by('-vote').all()
         else:
             qs = PollVotingTypeForAgainst.objects.filter(proposal__poll=poll,
-                                                         author__created_by=group_user).order_by('-priority').all()
+                                                         author__created_by=group_user).order_by('-vote').all()
 
         return BasePollVoteForAgainstFilter(filters, qs).qs
 

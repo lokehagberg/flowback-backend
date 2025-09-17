@@ -71,9 +71,10 @@ def group_message_list(*, user: User, group: int, filters=None):
 
 def group_message_preview(*, user: User, filters=None):
     filters = filters or {}
-    qs = GroupMessage.objects.filter(groupuser__user__in=[user]
-                                     ).order_by('group_id', '-created_at').distinct('group_id').all().qs
-    return BaseGroupMessagePreviewFilter(filters, qs)
+    qs = GroupMessage.objects.filter(group_user__user__in=[user]
+                                     ).order_by('group_user__group_id', '-created_at')\
+        .distinct('group_user__group_id').all()
+    return BaseGroupMessagePreviewFilter(filters, qs).qs
 
 
 def direct_message_list(*, user: User, target: int, filters=None):

@@ -42,7 +42,7 @@ class PollProposal(BaseModel):
     created_by = models.ForeignKey(GroupUser, on_delete=models.CASCADE)
     poll = models.ForeignKey(Poll, on_delete=models.CASCADE)
 
-    title = models.CharField(max_length=255)
+    title = models.CharField(max_length=255, null=True, blank=True)
     description = models.TextField(null=True, blank=True)
     score = models.IntegerField(null=True, blank=True)
 
