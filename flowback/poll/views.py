@@ -2,9 +2,11 @@ from django.shortcuts import render
 
 # Create your views here.
 from rest_framework import serializers, status
+from rest_framework.exceptions import ValidationError
 from rest_framework.views import APIView, Response
 
 from flowback.common.pagination import LimitOffsetPagination, get_paginated_response
+from flowback.common.services import get_object
 from flowback.poll.models import Poll, PollProposal, PollVotingTypeRanking
 from flowback.poll.selectors import poll_list, poll_proposal_list, poll_vote_list, poll_delegates_list
 from flowback.poll.services import poll_create, poll_update, poll_delete, poll_proposal_create, poll_proposal_delete, \
@@ -107,6 +109,10 @@ class PollProposalListAPI(APIView):
         title = serializers.CharField(required=False)
         title__icontains = serializers.CharField(required=False)
 
+    class FilterSerializerTypeSchedule(FilterSerializer):
+        start_date = serializers.DateTimeField(required=False)
+        end_date = serializers.DateTimeField(required=False)
+
     class OutputSerializer(serializers.ModelSerializer):
         class Meta:
             model = PollProposal
@@ -117,16 +123,36 @@ class PollProposalListAPI(APIView):
                       'description',
                       'score')
 
+    class OutputSerializerTypeSchedule(OutputSerializer):
+        class Meta:
+            model = PollProposal
+            fields = ('id',
+                      'created_by',
+                      'poll',
+                      'title',
+                      'description',
+                      'score',
+                      'start_date',
+                      'end_date')
+
     def get(self, request, group: int, poll: int):
-        filter_serializer = self.FilterSerializer(data=request.query_params)
+        poll = get_object(poll)
+        if poll.poll_type == Poll.PollType.RANKING:
+            filter_serializer = self.FilterSerializer(data=request.query_params)
+            output_serializer = self.OutputSerializer
+
+        else:
+            filter_serializer = self.FilterSerializerTypeSchedule(data=request.query_params)
+            output_serializer = self.OutputSerializerTypeSchedule
+
         filter_serializer.is_valid(raise_exception=True)
-        poll_refresh_cheap(poll_id=poll)  # TODO get celery
-        proposals = poll_proposal_list(fetched_by=request.user, group_id=group, poll_id=poll,
+        poll_refresh_cheap(poll_id=poll.id)  # TODO get celery
+        proposals = poll_proposal_list(fetched_by=request.user, group_id=group, poll_id=poll.id,
                                        filters=filter_serializer.validated_data)
 
         return get_paginated_response(
             pagination_class=self.Pagination,
-            serializer_class=self.OutputSerializer,
+            serializer_class=output_serializer,
             queryset=proposals,
             request=request,
             view=self
@@ -134,13 +160,33 @@ class PollProposalListAPI(APIView):
 
 
 class PollProposalCreateAPI(APIView):
-    class InputSerializer(serializers.ModelSerializer):
+    class InputSerializerDefault(serializers.ModelSerializer):
         class Meta:
             model = PollProposal
             fields = ('title', 'description')
 
+    class InputSerializerSchedule(serializers.ModelSerializer):
+        start_date = serializers.DateTimeField()
+        end_date = serializers.DateTimeField()
+
+        def validate(self, data):
+            if data.get('start_date') >= data.get('end_date'):
+                raise ValidationError('Start date can\'t be the same or later than End date')
+
+            return data
+
+        class Meta:
+            model = PollProposal
+            fields = ('title', 'description', 'start_date', 'end_date')
+
     def post(self, request, group: int, poll: int):
-        serializer = self.InputSerializer(data=request.data)
+        poll = get_object(Poll, id=poll)
+        if poll.type == Poll.PollType.SCHEDULE:
+            serializer = self.InputSerializerSchedule(data=request.data)
+
+        else:
+            serializer = self.InputSerializerDefault(data=request.data)
+
         serializer.is_valid(raise_exception=True)
         poll_refresh_cheap(poll_id=poll)  # TODO get celery
         proposal = poll_proposal_create(user_id=request.user.id, group_id=group, poll_id=poll, **serializer.validated_data)
@@ -193,11 +239,12 @@ class PollProposalVoteListAPI(APIView):
 
 # TODO change serializer based upon poll type
 class PollProposalVoteUpdateAPI(APIView):
-    class InputSerializerRanking(serializers.Serializer):
+    # For Ranking, Schedule
+    class InputSerializerDefault(serializers.Serializer):
         votes = serializers.ListField(child=serializers.IntegerField())
 
     def post(self, request, group: int, poll: int):
-        serializer = self.InputSerializerRanking(data=request.data)
+        serializer = self.InputSerializerDefault(data=request.data)
         serializer.is_valid(raise_exception=True)
         poll_refresh_cheap(poll_id=poll)  # TODO get celery
         poll_proposal_vote_update(user_id=request.user.id, group_id=group, poll_id=poll, data=serializer.validated_data)
@@ -235,11 +282,12 @@ class PollDelegatesListAPI(APIView):
 
 # TODO change serializer based upon poll type
 class PollProposalDelegateVoteUpdateAPI(APIView):
-    class InputSerializerRanking(serializers.Serializer):
+    # For Ranking, Schedule
+    class InputSerializerDefault(serializers.Serializer):
         votes = serializers.ListField(child=serializers.IntegerField())
 
     def post(self, request, group: int, poll: int):
-        serializer = self.InputSerializerRanking(data=request.data)
+        serializer = self.InputSerializerDefault(data=request.data)
         serializer.is_valid(raise_exception=True)
         poll_refresh_cheap(poll_id=poll)  # TODO get celery
         poll_proposal_delegate_vote_update(user_id=request.user.id, group_id=group,

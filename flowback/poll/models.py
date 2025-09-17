@@ -48,7 +48,7 @@ class PollProposal(BaseModel):
 
 
 class PollProposalTypeSchedule(BaseModel):
-    proposal = models.ForeignKey(PollProposal, on_delete=models.CASCADE)
+    proposal = models.OneToOneField(PollProposal, on_delete=models.CASCADE)
     start_date = models.DateTimeField()
     end_date = models.DateTimeField()
 

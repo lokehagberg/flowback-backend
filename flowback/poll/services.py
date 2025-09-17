@@ -62,7 +62,7 @@ def poll_delete(*, user_id: int, group_id: int, poll_id: int) -> None:
     poll.delete()
 
 
-def poll_proposal_create(*, user_id: int, group_id: int, poll_id: int, title: str, description: str, data) -> PollProposal:
+def poll_proposal_create(*, user_id: int, group_id: int, poll_id: int, title: str, description: str, **data) -> PollProposal:
     group_user = group_user_permissions(user=user_id, group=group_id)
     poll = get_object(Poll, id=poll_id)
 

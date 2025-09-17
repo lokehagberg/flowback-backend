@@ -45,11 +45,25 @@ class BasePollVoteRankingFilter(django_filters.FilterSet):
 
 
 class BasePollProposalScheduleFilter(django_filters.FilterSet):
+    order_by = django_filters.OrderingFilter(
+        fields=(
+            ('start_date', 'start_date_asc'),
+            ('-start_date', 'start_date_desc'),
+            ('end_date', 'end_date_asc'),
+            ('-end_date', 'end_date_desc')
+        )
+    )
+
+    start_date__lt = django_filters.DateTimeFilter(field_name='pollproposaltypeschedule.start_date', lookup_expr='lt')
+    start_date__gt = django_filters.DateTimeFilter(field_name='pollproposaltypeschedule.start_date', lookup_expr='gt')
+    end_date__lt = django_filters.DateTimeFilter(field_name='pollproposaltypeschedule.end_date', lookup_expr='lt')
+    end_date__gt = django_filters.DateTimeFilter(field_name='pollproposaltypeschedule.end_date', lookup_expr='gt')
+
     class Meta:
-        model = PollProposalTypeSchedule
-        fields = dict(proposal=['exact'],
-                      start_date=['lt', 'gt'],
-                      end_date=['lt', 'gt'])
+        model = PollProposal
+        fields = dict(id=['exact'],
+                      created_by=['exact'],
+                      title=['exact', 'icontains'])
 
 
 class BasePollVoteForAgainstFilter(django_filters.FilterSet):
