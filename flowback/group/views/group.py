@@ -8,7 +8,7 @@ from flowback.group.selectors import group_list, group_detail
 from flowback.group.services import group_delete, group_update, group_create
 
 
-class GroupListAPI(APIView):
+class GroupListApi(APIView):
     class Pagination(LimitOffsetPagination):
         default_limit = 1
 
@@ -47,7 +47,7 @@ class GroupListAPI(APIView):
         )
 
 
-class GroupDetailSerializer(APIView):
+class GroupDetailApi(APIView):
     class OutputSerializer(serializers.ModelSerializer):
         class Meta:
             model = Group
@@ -69,7 +69,7 @@ class GroupDetailSerializer(APIView):
         return Response(serializer.data)
 
 
-class GroupCreateAPI(APIView):
+class GroupCreateApi(APIView):
     class InputSerializer(serializers.ModelSerializer):
         class Meta:
             model = Group

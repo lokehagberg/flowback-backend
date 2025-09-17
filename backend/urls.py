@@ -16,8 +16,10 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from flowback.user.urls import user_patterns
+from flowback.group.urls import group_patterns
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', include((user_patterns, 'user')))
+    path('', include((user_patterns, 'user'))),
+    path('group/', include((group_patterns, 'group')))
 ]

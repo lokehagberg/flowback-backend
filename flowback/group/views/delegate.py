@@ -43,7 +43,7 @@ class GroupUserDelegateListApi(APIView):
 class GroupUserDelegateApi(APIView):
     class InputSerializer(serializers.Serializer):
         delegate = serializers.IntegerField()
-        tags = serializers.IntegerField(many=True)
+        tags = serializers.ListField(child=serializers.IntegerField())
 
     def post(self, request, group: int):
         serializer = self.InputSerializer(data=request.data)
@@ -56,7 +56,7 @@ class GroupUserDelegateApi(APIView):
 class GroupUserDelegateUpdateApi(APIView):
     class InputSerializer(serializers.Serializer):
         delegate_id = serializers.IntegerField(source='delegate')
-        tags = serializers.IntegerField(many=True)
+        tags = serializers.ListField(child=serializers.IntegerField())
 
     def post(self, request, group: int):
         serializer = self.InputSerializer(data=request.data)
