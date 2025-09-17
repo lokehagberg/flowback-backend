@@ -30,3 +30,21 @@ class Poll(BaseModel):
     # Optional dynamic counting support
     live_count = models.IntegerField(default=0)
     dynamic = models.BooleanField()
+
+
+class PollProposal(BaseModel):
+    created_by = models.ForeignKey(GroupUser, on_delete=models.CASCADE)
+
+    title = models.CharField(max_length=255)
+    description = models.TextField(null=True, blank=True)
+    value = models.TextField(null=True, blank=True)
+
+
+class PollVoting(BaseModel):
+    created_by = models.ForeignKey(GroupUser, on_delete=models.CASCADE)
+
+    proposal = models.ForeignKey(PollProposal, on_delete=models.CASCADE)
+    value = models.IntegerField(null=True, blank=True)
+
+    class Meta:
+        unique_together = ('created_by', 'proposal')
