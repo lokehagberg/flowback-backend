@@ -21,8 +21,8 @@ class GroupUserDelegatePoolListApi(APIView):
     class OutputSerializer(serializers.Serializer):
         class Delegates(serializers.Serializer):
             delegate_id = serializers.IntegerField(source='id')
-            group_user_id = serializers.IntegerField(source='user_id')
-            user_id = serializers.IntegerField(source='user.user_id')
+            group_user_id = serializers.IntegerField()
+            user_id = serializers.IntegerField(source='group_user.user_id')
 
         id = serializers.IntegerField()
         delegates = Delegates(many=True,
@@ -64,8 +64,8 @@ class GroupUserDelegateListApi(APIView):
     class OutputSerializer(serializers.ModelSerializer):
         class Delegates(serializers.Serializer):
             delegate_id = serializers.IntegerField(source='id')
-            group_user_id = serializers.IntegerField(source='user_id')
-            user_id = serializers.IntegerField(source='user.user_id')
+            group_user_id = serializers.IntegerField()
+            user_id = serializers.IntegerField(source='group_user.user_id')
 
         class Tags(serializers.ModelSerializer):
             class Meta:

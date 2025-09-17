@@ -2,8 +2,9 @@ from django.db.models import Sum, Q, Count, F
 from rest_framework.exceptions import ValidationError
 from flowback.common.services import get_object, model_update
 from flowback.group.models import GroupUserDelegatePool
-from flowback.poll.models import Poll, PollProposal, PollVoting, PollVotingTypeRanking
+from flowback.poll.models import Poll, PollProposal, PollVoting, PollVotingTypeRanking, PollDelegateVoting
 from flowback.group.selectors import group_user_permissions
+from django.utils import timezone
 from datetime import datetime
 
 
@@ -49,8 +50,12 @@ def poll_delete(*, user_id: int, group_id: int, poll_id: int) -> None:
     if not poll.created_by == group_user or not group_user.is_admin:
         raise ValidationError('Permission denied')
 
-    if poll.created_by == group_user and poll.finished:
-        raise ValidationError('Only group admins (or above) can delete finished polls')
+    if (poll.created_by == group_user and not group_user.is_admin
+    and not group_user.group.created_by == group_user) and poll.start_date < timezone.now():
+        raise ValidationError('Only group admins (or above) can delete ongoing polls')
+
+    if poll.finished:
+        raise ValidationError('Only site admins (or above) can delete finished polls')
 
     poll.delete()
 
@@ -100,37 +105,72 @@ def poll_proposal_vote_update(*, user_id: int, group_id: int, poll_id: int, data
         raise ValidationError('Unknown poll type')
 
 
+# TODO update in future for delegate pool
+def poll_proposal_delegate_vote_update(*, user_id: int, group_id: int, poll_id: int, data) -> None:
+    group_user = group_user_permissions(user=user_id, group=group_id)
+    delegate_pool = get_object(GroupUserDelegatePool, group_user_delegate__group_user=group_user)
+    poll = get_object(Poll, id=poll_id)
+
+    if poll.poll_type == Poll.PollType.RANKING:
+        proposals = poll.pollproposal_set.filter(id__in=[x for x in data]).all()
+        if len(proposals) != len(data):
+            raise ValidationError('Not all proposals are available to vote for')
+
+        poll_vote, created = PollDelegateVoting.objects.get_or_create(created_by=delegate_pool, poll=poll)
+        poll_vote_ranking = [PollVotingTypeRanking(author_delegate=poll_vote,
+                                                   proposal_id=proposal,
+                                                   priority=priority) for priority, proposal in enumerate(data)]
+        PollVotingTypeRanking.objects.filter(author_delegate=poll_vote).delete()
+        PollVotingTypeRanking.objects.bulk_create(poll_vote_ranking)
+
+    else:
+        raise ValidationError('Unknown poll type')
+
+
 def poll_proposal_vote_count(*, poll_id: int) -> None:
     poll = get_object(Poll, id=poll_id)
 
     if poll.poll_type == Poll.PollType.RANKING:
         if poll.tag:
             mandate = GroupUserDelegatePool.objects.filter(polldelegatevoting__poll=poll).aggregate(
-                mandate=Sum(Count('groupuserdelegator',
-                                  filter=~Q(delegator__pollvoting__poll=poll) &
-                                  Q(tags__in=[poll.tag]))))['mandate']
+                mandate=Count('groupuserdelegator',
+                              filter=~Q(groupuserdelegator__delegator__pollvoting__poll=poll) &
+                              Q(groupuserdelegator__tags__in=[poll.tag])))['mandate']
 
             # Count mandate for each delegate, multiply it by score
-            delegate_votes = PollVotingTypeRanking.objects.filter(author_delegate__poll=poll).values('id').annotate(
+            delegate_votes = PollVotingTypeRanking.objects.filter(author_delegate__poll=poll).values('pk').annotate(
                 score=F('priority') *
                 Count('author_delegate__created_by__groupuserdelegator',
-                      filter=~Q(delegator__pollvoting__poll=poll) &
-                      Q(tags__in=[poll.tag])))
+                      filter=~Q(author_delegate__created_by__groupuserdelegator__delegator__pollvoting__poll=poll) &
+                      Q(author_delegate__created_by__groupuserdelegator__tags__in=[poll.tag])))
 
             # Set score to the same as priority for user votes
             user_votes = PollVotingTypeRanking.objects.filter(author__poll=poll
-                                                              ).values('id').annotate(score=F('priority'))
+                                                              ).values('pk').annotate(score=F('priority'))
 
-            PollVotingTypeRanking.objects.bulk_update(delegate_votes | user_votes, fields=('score',))
+            for i in user_votes:
+                print(i)
+                PollVotingTypeRanking.objects.filter(id=i['pk']).update(score=i['score'])
+
+            for i in delegate_votes:
+                print(i)
+                PollVotingTypeRanking.objects.filter(id=i['pk']).update(score=i['score'])
+
+            # TODO make this work, replace both above
+            # PollVotingTypeRanking.objects.bulk_update(delegate_votes | user_votes, fields=('score',))
 
             # Update scores on each proposal, Summarize both regular votes and delegate votes
-            proposals = PollProposal.objects.filter(poll_id=poll_id).values('id') \
-                .annotate(score=Sum('pollvoting__pollvotingtyperanking__priority') +
-                          Sum('polldelegatevoting__pollvotingtyperanking__score'))
+            proposals = PollProposal.objects.filter(poll_id=poll_id).values('pk') \
+                .annotate(score=Sum('pollvotingtyperanking__priority'))
 
-            PollProposal.objects.bulk_update(proposals, fields=('score',))
+            for i in proposals:
+                print(i)
+                PollProposal.objects.filter(id=i['pk']).update(score=i['score'])
 
-            poll.score = mandate + len(user_votes.distinct().count())
+            # TODO make this work aswell, replace above
+            # PollProposal.objects.bulk_update(proposals, fields=('score',))
+
+            poll.live_count = mandate + user_votes.distinct('author').count()
             poll.save()
 
 

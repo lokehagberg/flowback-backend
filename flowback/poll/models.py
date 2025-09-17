@@ -30,7 +30,7 @@ class Poll(BaseModel):
     result = models.BooleanField(default=False)
 
     # Optional dynamic counting support
-    live_count = models.IntegerField(default=0)
+    participants = models.IntegerField(default=0)
     dynamic = models.BooleanField()
 
 

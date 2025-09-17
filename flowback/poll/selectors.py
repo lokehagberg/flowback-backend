@@ -9,6 +9,7 @@ from flowback.group.selectors import group_user_permissions
 class BasePollFilter(django_filters.FilterSet):
     start_date = django_filters.DateFromToRangeFilter()
     end_date = django_filters.DateFromToRangeFilter()
+    tag_name = django_filters.CharFilter(lookup_expr=['exact', 'icontains'], field_name='tag__name')
 
     class Meta:
         model = Poll
@@ -16,8 +17,7 @@ class BasePollFilter(django_filters.FilterSet):
                       created_by=['exact'],
                       title=['exact', 'icontains'],
                       poll_type=['exact'],
-                      tag=['exact', 'icontains'],
-                      active=['exact'],
+                      tag=['exact'],
                       finished=['exact'])
 
 
