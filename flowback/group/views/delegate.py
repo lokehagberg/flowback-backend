@@ -22,7 +22,7 @@ class GroupUserDelegatePoolListApi(APIView):
         class Delegates(serializers.Serializer):
             delegate_id = serializers.IntegerField(source='id')
             group_user_id = serializers.IntegerField(source='user_id')
-            user_id = serializers.IntegerField(source='user_user_id')
+            user_id = serializers.IntegerField(source='user.user_id')
 
         id = serializers.IntegerField()
         delegates = Delegates(many=True,
