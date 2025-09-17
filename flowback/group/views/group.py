@@ -119,10 +119,10 @@ class GroupMailApi(APIView):
         title = serializers.CharField()
         message = serializers.CharField()
 
-    def post(self, request):
+    def post(self, request, group: int):
         serializer = self.InputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        group_mail(fetched_by=request.user.id, **serializer.validated_data)
+        group_mail(fetched_by=request.user.id, group=group, **serializer.validated_data)
 
         return Response(status=status.HTTP_200_OK)

@@ -215,11 +215,11 @@ def poll_refresh(*, poll_id: int) -> None:
 # TODO setup celery
 def poll_refresh_cheap(*, poll_id: int) -> None:
     poll = get_object(Poll, id=poll_id)
+    if poll.end_date <= timezone.now():
+        poll.finished = True
+        poll.save()
 
     if poll.finished and not poll.result or poll.dynamic and not poll.finished:
-        if poll.end_date <= timezone.now():
-            poll.finished = True
-            poll.save()
         poll_proposal_vote_count(poll_id=poll_id)
         poll.refresh_from_db()
         poll.result = True

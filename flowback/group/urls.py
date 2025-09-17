@@ -7,7 +7,7 @@ from .views.user import (GroupUserListApi,
                          GroupLeaveApi,
                          GroupInviteApi,
                          GroupInviteAcceptApi,
-                         GroupInviteRejectApi)
+                         GroupInviteRejectApi, GroupInviteListApi)
 from .views.permission import (GroupPermissionListApi,
                                GroupPermissionCreateApi,
                                GroupPermissionUpdateApi,
@@ -36,6 +36,8 @@ group_patterns = [
     path('<int:group>/user/update', GroupUserUpdateApi.as_view(), name='group_user_update'),
     path('<int:group>/join', GroupJoinApi.as_view(), name='group_join'),
     path('<int:group>/leave', GroupLeaveApi.as_view(), name='group_leave'),
+    path('<int:group>/invites', GroupInviteListApi.as_view(), name='group_invite'),
+    path('invites', GroupInviteListApi.as_view(), name='group_invite_list'),
     path('<int:group>/invite', GroupInviteApi.as_view(), name='group_invite'),
     path('<int:group>/invite/accept', GroupInviteAcceptApi.as_view(), name='group_invite_accept'),
     path('<int:group>/invite/reject', GroupInviteRejectApi.as_view(), name='group_invite_reject'),
