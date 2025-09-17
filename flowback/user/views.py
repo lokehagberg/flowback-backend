@@ -1,4 +1,5 @@
 from rest_framework import serializers, status
+from rest_framework.permissions import AllowAny
 from flowback.common.pagination import LimitOffsetPagination, get_paginated_response
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -10,6 +11,7 @@ from flowback.user.services import (user_create, user_create_verify, user_forgot
 
 
 class UserCreateApi(APIView):
+    permission_classes = [AllowAny]
     class InputSerializer(serializers.ModelSerializer):
         class Meta:
             model = OnboardUser
@@ -25,6 +27,8 @@ class UserCreateApi(APIView):
 
 
 class UserCreateVerifyApi(APIView):
+    permission_classes = [AllowAny]
+
     class InputSerializer(serializers.Serializer):
         email = serializers.EmailField()
         verification_code = serializers.UUIDField()
@@ -40,6 +44,8 @@ class UserCreateVerifyApi(APIView):
 
 
 class UserForgotPasswordApi(APIView):
+    permission_classes = [AllowAny]
+
     class InputSerializer(serializers.Serializer):
         email = serializers.EmailField()
 
@@ -53,6 +59,8 @@ class UserForgotPasswordApi(APIView):
 
 
 class UserForgotPasswordVerifyApi(APIView):
+    permission_classes = [AllowAny]
+
     class InputSerializer(serializers.Serializer):
         email = serializers.EmailField()
         verification_code = serializers.UUIDField()
