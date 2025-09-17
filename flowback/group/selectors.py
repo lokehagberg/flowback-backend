@@ -1,8 +1,8 @@
 # TODO groups, groupusers, groupinvites, groupuserinvites,
 #  groupdefaultpermission, grouppermissions, grouptags, groupuserdelegates
 import django_filters
-from typing import Union, Literal, overload
-from django.db.models import Q, Exists, OuterRef
+from typing import Union
+from django.db.models import Q, Exists, OuterRef, Count
 from django.forms import model_to_dict
 
 from flowback.common.services import get_object
@@ -10,24 +10,6 @@ from flowback.user.models import User
 from flowback.group.models import Group, GroupUser, GroupUserInvite, GroupPermissions, GroupTags, GroupUserDelegator, \
     GroupUserDelegatePool
 from rest_framework.exceptions import ValidationError
-
-#
-# @overload
-# def group_user_permissions(*
-#                            group: int,
-#                            user: Union[User, int],
-#                            permissions: list[str] = None,
-#                            raise_exception: Literal[True]) -> GroupUser:
-#     return group_user_permissions(group=group, user=user, permissions=permissions, raise_exception=True)
-#
-#
-# @overload
-# def group_user_permissions(*
-#                            group: int,
-#                            user: Union[User, int],
-#                            permissions: list[str] = None,
-#                            raise_exception: Literal[False]) -> Union[GroupUser, bool]:
-#     return group_user_permissions(group=group, user=user, permissions=permissions, raise_exception=False)
 
 
 def group_default_permissions(*, group: int):
@@ -77,7 +59,7 @@ def group_user_permissions(*,
         permissions.remove('creator')
 
     failed_permissions = [key for key in permissions if user_permissions[key] is False]
-    if failed_permissions or (requires_permissions and not failed_permissions):
+    if failed_permissions or (requires_permissions and failed_permissions):
         if raise_exception:
             raise ValidationError('Permission denied')
         else:
@@ -109,12 +91,11 @@ class BaseGroupUserFilter(django_filters.FilterSet):
 
 
 class BaseGroupUserInviteFilter(django_filters.FilterSet):
-    username = django_filters.CharFilter(field_name='user__username')
     username__icontains = django_filters.CharFilter(field_name='user__username', lookup_expr='icontains')
 
     class Meta:
         model = GroupUser
-        fields = ['user']
+        fields = ['user', 'group']
 
 
 class BaseGroupPermissionsFilter(django_filters.FilterSet):
@@ -133,8 +114,8 @@ class BaseGroupTagsFilter(django_filters.FilterSet):
 
 class BaseGroupUserDelegatePoolFilter(django_filters.FilterSet):
     id = django_filters.NumberFilter()
-    delegate_id = django_filters.NumberFilter(field_name='groupuserdelegate__user_id')
-    group_user_id = django_filters.NumberFilter(field_name='groupuserdelegate_id')
+    delegate_id = django_filters.NumberFilter(field_name='groupuserdelegate__id')
+    group_user_id = django_filters.NumberFilter(field_name='groupuserdelegate__group_user_id')
 
 
 class BaseGroupUserDelegateFilter(django_filters.FilterSet):
@@ -158,21 +139,21 @@ def _group_get_visible_for(user: User):
 def group_list(*, fetched_by: User, filters=None):
     filters = filters or {}
     joined_groups = Group.objects.filter(id=OuterRef('pk'), groupuser__user__in=[fetched_by])
-    qs = _group_get_visible_for(user=fetched_by).annotate(joined=Exists(joined_groups)).all().distinct('id')
+    qs = _group_get_visible_for(user=fetched_by).annotate(joined=Exists(joined_groups),
+                                                          member_count=Count('groupuser')).order_by('created_at').all()
     qs = BaseGroupFilter(filters, qs).qs
-
     return qs
 
 
 def group_detail(*, fetched_by: User, group_id: int):
     group_user = group_user_permissions(group=group_id, user=fetched_by)
-    return group_user.group
+    return Group.objects.annotate(member_count=Count('groupuser')).get(id=group_user.group.id)
 
 
 def group_user_list(*, group: int, fetched_by: User, filters=None):
     group_user_permissions(group=group, user=fetched_by)
     filters = filters or {}
-    is_delegate = GroupUser.objects.filter(group_id=group, groupuserdelegate__user=OuterRef('pk'),
+    is_delegate = GroupUser.objects.filter(group_id=group, groupuserdelegate__group_user=OuterRef('pk'),
                                            groupuserdelegate__group=OuterRef('group'))
     qs = GroupUser.objects.filter(group_id=group).annotate(delegate=Exists(is_delegate)).all()
     return BaseGroupUserFilter(filters, qs).qs
@@ -186,9 +167,14 @@ def group_user_delegate_pool_list(*, group: int, fetched_by: User, filters=None)
 
 
 def group_user_invite_list(*, group: int, fetched_by: User, filters=None):
-    group_user_permissions(group=group, user=fetched_by, permissions=['invite_user'])
+    if group:
+        group_user_permissions(group=group, user=fetched_by, permissions=['invite_user', 'admin'])
+        qs = GroupUserInvite.objects.filter(group_id=group).all()
+
+    else:
+        qs = GroupUserInvite.objects.filter(user=fetched_by).all()
+
     filters = filters or {}
-    qs = GroupUserInvite.objects.filter(group_id=group).all()
     return BaseGroupUserFilter(filters, qs).qs
 
 

@@ -17,9 +17,12 @@ from pathlib import Path
 env = environ.Env(DEBUG=(bool, False),
                   DJANGO_SECRET=str,
                   FLOWBACK_URL=(str, None),
-
+                  PG_SERVICE=(str, 'flowback'),
+                  REDIS_IP=(str, 'localhost'),
+                  REDIS_PORT=(str, '6379'),
                   FLOWBACK_ALLOW_GROUP_CREATION=(bool, True),
-
+                  FLOWBACK_GROUP_ADMIN_USER_LIST_ACCESS_ONLY=(bool, False),
+                  FLOWBACK_DEFAULT_PERMISSION=(str, 'rest_framework.permissions.IsAuthenticated'),
                   EMAIL_HOST=(str, None),
                   EMAIL_PORT=(str, None),
                   EMAIL_HOST_USER=(str, None),
@@ -42,6 +45,7 @@ SECRET_KEY = env('DJANGO_SECRET')
 DEBUG = True
 
 FLOWBACK_URL = env('FLOWBACK_URL')
+PG_SERVICE = env('PG_SERVICE')
 ALLOWED_HOSTS = [FLOWBACK_URL or '*']
 CORS_ALLOW_ALL_ORIGINS = not bool(FLOWBACK_URL)
 if not CORS_ALLOW_ALL_ORIGINS:
@@ -51,6 +55,7 @@ if not CORS_ALLOW_ALL_ORIGINS:
 # Application definition
 
 INSTALLED_APPS = [
+    'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -61,8 +66,11 @@ INSTALLED_APPS = [
     'rest_framework',
     'django_extensions',
     'rest_framework.authtoken',
+    'pgtrigger',
     'flowback.user',
-    'flowback.group'
+    'flowback.group',
+    'flowback.poll',
+    'flowback.chat'
 ]
 
 REST_FRAMEWORK = {
@@ -70,7 +78,7 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.TokenAuthentication'
     ],
     'DEFAULT_PERMISSION_CLASSES': (
-        'rest_framework.permissions.IsAuthenticated',
+        env('FLOWBACK_DEFAULT_PERMISSION'),
     ),
     'EXCEPTION_HANDLER': 'flowback.common.exception_handlers.drf_default_with_modifications_exception_handler'
 }
@@ -112,6 +120,17 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'backend.wsgi.application'
 
+ASGI_APPLICATION = "backend.asgi.application"
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [(env('REDIS_IP'), env('REDIS_PORT'))],
+        },
+    },
+}
+
 
 # Database
 # https://docs.djangoproject.com/en/4.0/ref/settings/#databases
@@ -120,7 +139,7 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
         'OPTIONS': {
-            'service': 'flowback',
+            'service': PG_SERVICE,
             'passfile': '.flowback_pgpass',
         },
     }

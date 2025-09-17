@@ -18,12 +18,17 @@ from django.urls import path, include
 from backend.settings import DEBUG, MEDIA_URL, MEDIA_ROOT
 from flowback.user.urls import user_patterns
 from flowback.group.urls import group_patterns
+from flowback.poll.urls import poll_patterns, PollListApi
+from flowback.chat.urls import chat_patterns
 from django.conf.urls.static import static
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include((user_patterns, 'user'))),
-    path('group/', include((group_patterns, 'group')))
+    path('group/', include((group_patterns, 'group'))),
+    path('chat/', include((chat_patterns, 'chat'))),
+    path('group/<int:group>/poll/', include((poll_patterns, 'poll'))),
+    path('home/polls', PollListApi.as_view(), name='home_polls')
 ]
 
 if DEBUG:

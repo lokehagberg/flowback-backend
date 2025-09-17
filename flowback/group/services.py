@@ -1,8 +1,9 @@
 from typing import Union
 
+from django.core.mail import send_mass_mail
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
-from backend.settings import env
+from backend.settings import env, EMAIL_HOST_USER
 from rest_framework.exceptions import ValidationError
 from flowback.user.models import User
 from flowback.group.models import Group, GroupUser, GroupUserInvite, GroupUserDelegator, GroupTags, GroupPermissions, \
@@ -56,17 +57,19 @@ def group_permission_create(*,
                             create_poll: bool,
                             allow_vote: bool,
                             kick_members: bool,
-                            ban_members: bool) -> None:
+                            ban_members: bool) -> GroupPermissions:
     group_user_permissions(group=group, user=user, permissions=['admin'])
-    group_permissions = GroupPermissions(role_name=role_name,
-                                         author_id=group,
-                                         invite_user=invite_user,
-                                         create_poll=create_poll,
-                                         allow_vote=allow_vote,
-                                         kick_members=kick_members,
-                                         ban_members=ban_members)
-    group_permissions.full_clean()
-    group_permissions.save()
+    group_permission = GroupPermissions(role_name=role_name,
+                                        author_id=group,
+                                        invite_user=invite_user,
+                                        create_poll=create_poll,
+                                        allow_vote=allow_vote,
+                                        kick_members=kick_members,
+                                        ban_members=ban_members)
+    group_permission.full_clean()
+    group_permission.save()
+
+    return group_permission
 
 
 def group_permission_update(*, user: int, group: int, permission_id: int, data) -> GroupPermissions:
@@ -86,6 +89,16 @@ def group_permission_delete(*, user: int, group: int, permission_id: int) -> Non
     get_object(GroupPermissions, id=permission_id).delete()
 
 
+def group_mail(*, fetched_by: int, group: int, title: str, message: str) -> None:
+    group_user = group_user_permissions(group=group, user=fetched_by, permissions=['admin'])
+
+    subject = f'[{group_user.group.name}] - {title}'
+    targets = GroupUser.objects.filter(group_id=group).values('user__email').all()
+
+    send_mass_mail([subject, message, EMAIL_HOST_USER,
+                   [target['user__email']]] for target in targets)
+
+
 def group_join(*, user: int, group: int) -> Union[GroupUser, GroupUserInvite]:
     user = get_object(User, id=user)
     group = get_object(Group, id=group)
@@ -97,7 +110,7 @@ def group_join(*, user: int, group: int) -> Union[GroupUser, GroupUserInvite]:
     get_object(GroupUserInvite, 'User already requested invite', reverse=True, user=user, group=group)
 
     if not group.direct_join:
-        user_status = GroupUserInvite(user=user, group=group)
+        user_status = GroupUserInvite(user=user, group=group, external=True)
 
     else:
         user_status = GroupUser(user=user, group=group)
@@ -149,16 +162,32 @@ def group_invite_remove(*, user: int, group: int, to: int) -> None:
     invite.delete()
 
 
-def group_invite_accept(*, user: int, group: int) -> None:
-    get_object(GroupUser, 'User already joined', reverse=True, user=user, group=group)
-    invite = get_object(GroupUserInvite, 'User has not been invited', user_id=user, group_id=group)
-    GroupUser.objects.create(user_id=user, group_id=group)
+def group_invite_accept(*, fetched_by: int, group: int, to: int = None) -> None:
+    to = to or fetched_by
+    get_object(GroupUser, 'User already joined', reverse=True, user_id=to, group=group)
+
+    if fetched_by == to:
+        invite = get_object(GroupUserInvite, 'User has not requested invite', user_id=to, group_id=group, external=True)
+
+    else:
+        group_user_permissions(group=group, user=fetched_by, permissions=['invite_user', 'admin'])
+        invite = get_object(GroupUserInvite, 'User has not been invited', user_id=to, group_id=group, external=False)
+
+    GroupUser.objects.create(user_id=to, group_id=group)
     invite.delete()
 
 
-def group_invite_reject(*, user: int, group: int) -> None:
-    get_object(GroupUser, 'User already joined', reverse=True, user_id=user, group_id=group)
-    invite = get_object(GroupUserInvite, 'User has not been invited', user_id=user, group_id=group)
+def group_invite_reject(*, fetched_by: id, group: int, to: int = None) -> None:
+    to = to or fetched_by
+    get_object(GroupUser, 'User already joined', reverse=True, user_id=to, group_id=group)
+
+    if fetched_by == to:
+        invite = get_object(GroupUserInvite, 'User has not requested invite', user_id=to, group_id=group, external=True)
+
+    else:
+        group_user_permissions(group=group, user=fetched_by, permissions=['invite_user', 'admin'])
+        invite = get_object(GroupUserInvite, 'User has not been invited', user_id=to, group_id=group, external=False)
+
     invite.delete()
 
 
@@ -256,24 +285,26 @@ def group_user_delegate_remove(*, user_id: int, group_id: int, delegate_pool_id:
     delegate_rel.delete()
 
 
-def group_user_delegate_pool_create(*, user: int, group: int):
+def group_user_delegate_pool_create(*, user: int, group: int) -> GroupUserDelegatePool:
     group_user = group_user_permissions(user=user, group=group)
 
     # To avoid duplicates (for now)
-    get_object(GroupUserDelegate, reverse=True, group=group, user=group_user)
+    get_object(GroupUserDelegate, reverse=True, group=group, group_user=group_user)
 
     delegate_pool = GroupUserDelegatePool(group_id=group)
     delegate_pool.full_clean()
     delegate_pool.save()
-    user_delegate = GroupUserDelegate(group_id=group, user=group_user, pool=delegate_pool)
+    user_delegate = GroupUserDelegate(group_id=group, group_user=group_user, pool=delegate_pool)
     user_delegate.full_clean()
     user_delegate.save()
+
+    return delegate_pool
 
 
 def group_user_delegate_pool_delete(*, user: int, group: int):
     group_user = group_user_permissions(user=user, group=group)
 
-    delegate_user = get_object(GroupUserDelegate, user=group_user, group_id=group)
+    delegate_user = get_object(GroupUserDelegate, group_user=group_user, group_id=group)
     delegate_pool = get_object(GroupUserDelegatePool, id=delegate_user.pool_id)
 
     delegate_pool.delete()

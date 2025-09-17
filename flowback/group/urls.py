@@ -1,13 +1,13 @@
 from django.urls import path
 
-from .views.group import GroupListApi, GroupDetailApi, GroupCreateApi, GroupUpdateApi, GroupDeleteApi
+from .views.group import GroupListApi, GroupDetailApi, GroupCreateApi, GroupUpdateApi, GroupDeleteApi, GroupMailApi
 from .views.user import (GroupUserListApi,
                          GroupUserUpdateApi,
                          GroupJoinApi,
                          GroupLeaveApi,
                          GroupInviteApi,
                          GroupInviteAcceptApi,
-                         GroupInviteRejectApi)
+                         GroupInviteRejectApi, GroupInviteListApi)
 from .views.permission import (GroupPermissionListApi,
                                GroupPermissionCreateApi,
                                GroupPermissionUpdateApi,
@@ -30,11 +30,14 @@ group_patterns = [
     path('create', GroupCreateApi.as_view(), name='group_create'),
     path('<int:group>/update', GroupUpdateApi.as_view(), name='group_update'),
     path('<int:group>/delete', GroupDeleteApi.as_view(), name='group_delete'),
+    path('<int:group>/mail', GroupMailApi.as_view(), name='group_mail'),
 
     path('<int:group>/users', GroupUserListApi.as_view(), name='group_users'),
     path('<int:group>/user/update', GroupUserUpdateApi.as_view(), name='group_user_update'),
     path('<int:group>/join', GroupJoinApi.as_view(), name='group_join'),
     path('<int:group>/leave', GroupLeaveApi.as_view(), name='group_leave'),
+    path('<int:group>/invites', GroupInviteListApi.as_view(), name='group_invite'),
+    path('invites', GroupInviteListApi.as_view(), name='group_invite_list'),
     path('<int:group>/invite', GroupInviteApi.as_view(), name='group_invite'),
     path('<int:group>/invite/accept', GroupInviteAcceptApi.as_view(), name='group_invite_accept'),
     path('<int:group>/invite/reject', GroupInviteRejectApi.as_view(), name='group_invite_reject'),

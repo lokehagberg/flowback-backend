@@ -91,7 +91,7 @@ class UserListApi(APIView):
         filter_serializer = self.FilterSerializer(data=request.query_params)
         filter_serializer.is_valid(raise_exception=True)
 
-        users = user_list(filters=filter_serializer.validated_data)
+        users = user_list(fetched_by=request.user, filters=filter_serializer.validated_data)
 
         return get_paginated_response(pagination_class=self.Pagination,
                                       serializer_class=self.OutputSerializer,
