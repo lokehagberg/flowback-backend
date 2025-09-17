@@ -101,7 +101,8 @@ class BaseGroupUserFilter(django_filters.FilterSet):
 
     class Meta:
         model = GroupUser
-        fields = dict(user_id=['exact'],
+        fields = dict(id=['exact'],
+                      user_id=['exact'],
                       is_admin=['exact'],
                       permission=['in'])
 
@@ -118,13 +119,14 @@ class BaseGroupUserInviteFilter(django_filters.FilterSet):
 class BaseGroupPermissionsFilter(django_filters.FilterSet):
     class Meta:
         model = GroupPermissions
-        fields = ['role_name']
+        fields = dict(id=['exact'], role_name=['exact', 'icontains'])
 
 
 class BaseGroupTagsFilter(django_filters.FilterSet):
     class Meta:
         model = GroupTags
-        fields = dict(tag_name=['exact', 'icontains'],
+        fields = dict(id=['exact'],
+                      tag_name=['exact', 'icontains'],
                       active=['exact'])
 
 

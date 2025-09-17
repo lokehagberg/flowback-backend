@@ -3,10 +3,9 @@ from flowback.common.pagination import LimitOffsetPagination, get_paginated_resp
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from flowback.group.models import Group, GroupPermissions
+from flowback.group.models import Group
 from flowback.group.selectors import group_list, group_detail
-from flowback.group.services import group_delete, group_update, group_permission_create, group_create, \
-    group_permission_update
+from flowback.group.services import group_delete, group_update, group_create
 
 
 class GroupListAPI(APIView):
@@ -101,36 +100,3 @@ class GroupDeleteApi(APIView):
     def post(self, request, group: int):
         group_delete(user=request.user.id, group=group)
         return Response(status=status.HTTP_200_OK)
-
-
-class GroupPermissionCreateApi(APIView):
-    class InputSerializer(serializers.ModelSerializer):
-        class Meta:
-            model = GroupPermissions
-            fields = ('role_name', 'invite_user', 'create_poll',
-                      'allow_vote', 'kick_members', 'ban_members')
-
-    def post(self, request, group: int):
-        serializer = self.InputSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        group_permission_create(user=request.user, group=group, **serializer.validated_data)
-
-
-class GroupPermissionUpdateApi(APIView):
-    class InputSerializer(serializers.Serializer):
-        permission_id = serializers.IntegerField(source='permission')
-        role_name = serializers.BooleanField(default=False)
-        invite_user = serializers.BooleanField(default=False)
-        create_poll = serializers.BooleanField(default=False)
-        allow_vote = serializers.BooleanField(default=False)
-        kick_members = serializers.BooleanField(default=False)
-        ban_members = serializers.BooleanField(default=False)
-
-    def post(self, request, group: int):
-        serializer = self.InputSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        permission_id = serializer.validated_data.pop('permission_id')
-        group_permission_update(user=request.user,
-                                group=group,
-                                permission_id=permission_id,
-                                **serializer.validated_data)
