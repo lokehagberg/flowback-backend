@@ -28,13 +28,19 @@ class KanbanEntryListApi(APIView):
             profile_image = serializers.ImageField(source='user.profile_image')
             username = serializers.CharField(source='user.username')
 
+        class GroupSerializer(serializers.Serializer):
+            id = serializers.IntegerField(source='group.id')
+            name = serializers.CharField(source='group.name')
+            image = serializers.ImageField(source='group.image')
+
+
         assignee = UserSerializer(read_only=True)
         created_by = UserSerializer(read_only=True)
-        group_id = serializers.IntegerField(source='created_by.group.id')
+        group = GroupSerializer(read_only=True, source='created_by')
 
         class Meta:
             model = KanbanEntry
-            fields = ('id', 'group_id', 'created_by', 'assignee', 'title', 'description', 'tag')
+            fields = ('id', 'group', 'created_by', 'assignee', 'title', 'description', 'tag')
 
     def get(self, request, group_id: int = None):
         serializer = self.FilterSerializer(data=request.query_params)
