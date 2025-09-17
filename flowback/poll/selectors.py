@@ -116,7 +116,7 @@ def poll_user_schedule_list(*, fetched_by: User, filters=None):
     qs = PollProposal.objects.filter(created_by__group__groupuser__user__in=[fetched_by],
                                      poll__poll_type=Poll.PollType.SCHEDULE,
                                      poll__finished=True).order_by('created_by__group', 'score')\
-        .distinct('created_by__group').all()
+        .distinct('poll').all()
 
     return BasePollProposalScheduleFilter(filters, qs).qs
 

@@ -30,11 +30,13 @@ class PollListApi(APIView):
         finished = serializers.NullBooleanField(required=False, default=None)
 
     class OutputSerializer(serializers.ModelSerializer):
+        group_id = serializers.IntegerField(source='created_by.group_id')
         tag_name = serializers.CharField(source='tag.tag_name')
 
         class Meta:
             model = Poll
             fields = ('id',
+                      'group_id',
                       'created_by',
                       'title',
                       'description',
@@ -175,6 +177,7 @@ class PollUserScheduleListAPI(APIView):
         end_date = serializers.DateTimeField(required=False)
 
     class OutputSerializer(serializers.ModelSerializer):
+        group_id = serializers.IntegerField(source='created_by.group_id')
         title = serializers.CharField(source='poll.title')
         description = serializers.CharField(source='poll.description')
         start_date = serializers.DateTimeField(source='pollproposaltypeschedule.start_date')
@@ -182,7 +185,8 @@ class PollUserScheduleListAPI(APIView):
 
         class Meta:
             model = PollProposal
-            fields = ('id',
+            fields = ('group_id',
+                      'id',
                       'created_by',
                       'title',
                       'description',
