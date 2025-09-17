@@ -90,7 +90,7 @@ def poll_proposal_vote_update(*, user_id: int, group_id: int, poll_id: int, data
 
     if poll.poll_type == Poll.PollType.RANKING:
         if not data['votes']:
-
+            PollVoting.objects.filter(created_by=group_user, poll=poll).delete()
             return
 
         proposals = poll.pollproposal_set.filter(id__in=[x for x in data['votes']]).all()
@@ -116,6 +116,10 @@ def poll_proposal_delegate_vote_update(*, user_id: int, group_id: int, poll_id: 
     poll = get_object(Poll, id=poll_id)
 
     if poll.poll_type == Poll.PollType.RANKING:
+        if not data['votes']:
+            PollDelegateVoting.objects.filter(created_by=delegate_pool, poll=poll).delete()
+            return
+
         proposals = poll.pollproposal_set.filter(id__in=data['votes']).all()
         if len(proposals) != len(data['votes']):
             raise ValidationError('Not all proposals are available to vote for')
