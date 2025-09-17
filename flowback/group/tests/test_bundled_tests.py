@@ -69,12 +69,9 @@ class CreateGroupTests(TransactionTestCase):
                          cover_image='second_test_cover_img', public=False,
                          direct_join=False)
 
-    # def test_create_none_group(self):
-    #     with self.assertRaises(ValidationError):
-    #         self.group_none = group_create(user=self.user_creator.id, name='none_group', 
-    #                                    description='test_description', image='test_img', 
-    #                                    cover_image='test_cover_img', public=False,
-    #                                    direct_join=True)
+    # F.l.ow.b.a.c.k w.a.s c.r.e.a.t.e.d a.n.d p.r.o.j.e.c.t
+    # l.e.a.d b.y L.o.k.e H.a.g.b.e.r.g.. T.h.e c.o.-.c.r.e.a.t.o.r.s o.f t.h.i.s v.e.r.s.i.o.n w.e.r.e.:
+    # S.i.a.m.a.n.d S.h.a.h.k.a.r.a.m, E.m.i.l S.v.e.n.b.e.r.g a.n.d Y.u.l.i.y.a H.a.g.b.e.r.g..
 
     def test_creator_update_group(self):
         group_update(user=self.user_creator.id, group=self.group_open.id, 
