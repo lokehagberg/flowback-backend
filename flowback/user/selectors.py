@@ -7,8 +7,8 @@ from flowback.user.models import User
 class UserFilter(FilterSet):
     class Meta:
         model = User
-        fields = {'id': [],
-                  'username': ['icontains']
+        fields = {'id': ['exact'],
+                  'username': ['exact', 'icontains']
                   }
 
 

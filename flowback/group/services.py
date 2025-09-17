@@ -142,6 +142,29 @@ def group_invite_reject(*, user: int, group: int):
     invite.delete()
 
 
+def group_tag_create(*, user: int, group: int, tag_name: str):
+    group_user_permissions(group=group, user=user, permissions=['admin'])
+    tag = GroupTags(tag_name=tag_name, group_id=group)
+    tag.full_clean()
+    tag.save()
+
+
+def group_tag_update(*, user: int, group: int, tag: int, data):
+    group_user_permissions(group=group, user=user, permissions=['admin'])
+    tag = get_object(GroupTags, group_id=group, id=tag)
+    non_side_effect_fields = ['active']
+
+    group_tag, has_updated = model_update(instance=tag,
+                                          fields=non_side_effect_fields,
+                                          data=data)
+
+
+def group_tag_delete(*, user: int, group: int, tag: int):
+    group_user_permissions(group=group, user=user, permissions=['admin'])
+    tag = get_object(GroupTags, group_id=group, id=tag)
+    tag.delete()
+
+
 def group_user_delegate(*, user: int, group: int, delegate: int, tags: list = None):
     tags = tags or []
     delegator = group_user_permissions(group=group, user=user)

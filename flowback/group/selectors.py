@@ -45,9 +45,13 @@ def group_user_permissions(*,
 
 
 class BaseGroupFilter(django_filters.FilterSet):
+    joined = django_filters.NumberFilter(field_name='group_user__user', lookup_expr='exact')
+
     class Meta:
         model = Group
-        fields = ('id', 'name__icontains', 'direct_join', 'group_user__user')
+        fields = dict(id=['exact'],
+                      name=['exact', 'icontains'],
+                      direct_join=['exact'])
 
 
 class BaseGroupUserFilter(django_filters.FilterSet):
@@ -55,36 +59,43 @@ class BaseGroupUserFilter(django_filters.FilterSet):
 
     class Meta:
         model = GroupUser
-        fields = ('user_id', 'username__icontains', 'is_delegate', 'is_admin', 'permission__in')
+        fields = dict(user_id=['exact'],
+                      username=['exact', 'icontains'],
+                      is_delegate=['exact'],
+                      is_admin=['exact'],
+                      permission=['in'])
 
 
 class BaseGroupUserInviteFilter(django_filters.FilterSet):
     username = django_filters.CharFilter(field_name='user__username')
+    username__icontains = django_filters.CharFilter(field_name='user__username', lookup_expr='icontains')
 
     class Meta:
         model = GroupUser
-        fields = ('user_id', 'username__icontains')
+        fields = ['user']
 
 
 class BaseGroupPermissionsFilter(django_filters.FilterSet):
     class Meta:
         model = GroupPermissions
-        fields = ('role_name',)
+        fields = ['role_name']
 
 
 class BaseGroupTagsFilter(django_filters.FilterSet):
     class Meta:
         model = GroupTags
-        fields = ('tag_name', 'active')
+        fields = dict(tag_name=['exact', 'icontains'],
+                      active=['exact'])
 
 
 class BaseGroupUserDelegateFilter(django_filters.FilterSet):
-    delegate = django_filters.CharFilter(field_name='delegate__username')
-    tag = django_filters.CharFilter(field_name='tags__tag_name__icontains')
+    delegate_name__icontains = django_filters.CharFilter(field_name='delegate__username__icontains')
+    tag_name = django_filters.CharFilter(field_name='tags__tag_name')
+    tag_name__icontains = django_filters.CharFilter(field_name='tags__tag_name', lookup_expr='icontains')
 
     class Meta:
         model = GroupUserDelegate
-        fields = ('delegate', 'tag')
+        fields = ['delegate', 'tag']
 
 
 def group_get_visible_for(user: User):
@@ -95,6 +106,10 @@ def group_get_visible_for(user: User):
 def group_list(*, fetched_by: User, filters=None):
     filters = filters or {}
     qs = group_get_visible_for(user=fetched_by).all()
+
+    if filters.get('joined') is True:
+        filters['joined'] = fetched_by.id
+
     return BaseGroupFilter(filters, qs).qs
 
 
