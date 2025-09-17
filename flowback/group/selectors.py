@@ -1,16 +1,39 @@
 # TODO groups, groupusers, groupinvites, groupuserinvites,
 #  groupdefaultpermission, grouppermissions, grouptags, groupuserdelegates
 import django_filters
+from typing import Union
 from django.db.models import Q
 from flowback.common.services import get_object
 from flowback.user.models import User
-from flowback.group.models import Group, GroupUser, GroupUserInvite
+from flowback.group.models import Group, GroupUser, GroupUserInvite, GroupPermissions, GroupTags, GroupUserDelegate
 from rest_framework.exceptions import ValidationError
 
 
-def group_user_permissions(*, group: id, user: User, permissions: list[str] = None, raise_exception=True):
+def group_user_permissions(*,
+                           group: id,
+                           user: Union[User, int],
+                           permissions: list[str] = None,
+                           raise_exception=True) -> Union[GroupUser, bool]:
+    if type(user) == int:
+        user = get_object(User, user_id=user)
     permissions = permissions or []
-    user_permissions = get_object(GroupUser, 'User is not in group', group=group, user=user).permission.values()
+    user = get_object(GroupUser, 'User is not in group', group=group, user=user)
+    user_permissions = user.permission.values()
+
+    # Check if admin permission is present
+    if 'admin' in permissions or user.user.is_superuser:
+        if user.is_admin:
+            return user
+
+        permissions.remove('admin')
+
+    # Check if creator permission is present
+    if 'creator' in permissions:
+        if user.group.created_by == user.user or user.user.is_superuser:
+            return user
+
+        permissions.remove('creator')
+
     failed_permissions = [key for key in permissions if user_permissions[key] is False]
     if failed_permissions:
         if raise_exception:
@@ -18,7 +41,7 @@ def group_user_permissions(*, group: id, user: User, permissions: list[str] = No
         else:
             return False
 
-    return True
+    return user
 
 
 class BaseGroupFilter(django_filters.FilterSet):
@@ -41,6 +64,27 @@ class BaseGroupUserInviteFilter(django_filters.FilterSet):
     class Meta:
         model = GroupUser
         fields = ('user_id', 'username__icontains')
+
+
+class BaseGroupPermissionsFilter(django_filters.FilterSet):
+    class Meta:
+        model = GroupPermissions
+        fields = ('role_name',)
+
+
+class BaseGroupTagsFilter(django_filters.FilterSet):
+    class Meta:
+        model = GroupTags
+        fields = ('tag_name', 'active')
+
+
+class BaseGroupUserDelegateFilter(django_filters.FilterSet):
+    delegate = django_filters.CharFilter(field_name='delegate__username')
+    tag = django_filters.CharFilter(field_name='tags__tag_name__icontains')
+
+    class Meta:
+        model = GroupUserDelegate
+        fields = ('delegate', 'tag')
 
 
 def group_get_visible_for(user: User):
@@ -66,3 +110,21 @@ def group_user_invite_list(*, group: id, fetched_by: User, filters=None):
     filters = filters or {}
     qs = GroupUserInvite.objects.filter(group_id=group).all()
     return BaseGroupUserFilter(filters, qs).qs
+
+
+def group_permissions_list(*, group: id, fetched_by: User, filters=None):
+    group_user_permissions(group=group, user=fetched_by)
+    filters = filters or {}
+    qs = GroupPermissions.objects.filter(group_id=group).all()
+    return BaseGroupPermissionsFilter(qs, filters).qs
+
+
+def group_tags_list(*, group: id, fetched_by: User, filters=None):
+    filters = filters or {}
+    group_user_permissions(group=group, user=fetched_by)
+    query = Q(group_id=group, active=False)
+    if group_user_permissions(group=group, user=fetched_by, permissions=['admin'], raise_exception=False):
+        query = Q(group_id=group)
+
+    qs = GroupTags.objects.filter(query).all()
+    return BaseGroupTagsFilter(qs, filters).qs

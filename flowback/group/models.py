@@ -16,7 +16,7 @@ class Group(BaseModel):
 
     # Determines the default permission for every user get when they join
     # TODO return basic permissions by default if field is NULL
-    default_permission = models.OneToOneField('GroupPermission',
+    default_permission = models.OneToOneField('GroupPermissions',
                                               null=True,
                                               blank=True,
                                               on_delete=models.SET_NULL)
@@ -30,7 +30,7 @@ class Group(BaseModel):
 
 
 # Permission class for each Group
-class GroupPermission(BaseModel):
+class GroupPermissions(BaseModel):
     role_name = models.TextField()
     author = models.ForeignKey('Group', on_delete=models.CASCADE)
     invite_user = models.BooleanField(default=False)
@@ -56,7 +56,7 @@ class GroupUser(BaseModel):
     group = models.ForeignKey(Group, on_delete=models.CASCADE)
     is_delegate = models.BooleanField(default=False)
     is_admin = models.BooleanField(default=False)
-    permission = models.ForeignKey(GroupPermission, null=True, blank=True, on_delete=models.SET_NULL)
+    permission = models.ForeignKey(GroupPermissions, null=True, blank=True, on_delete=models.SET_NULL)
 
     class Meta:
         unique_together = ('user', 'group')

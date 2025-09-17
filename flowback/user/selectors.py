@@ -12,7 +12,7 @@ class UserFilter(FilterSet):
                   }
 
 
-def get_user(*, user: int):
+def get_user(user: int):
     return User.objects.get(user=user)
 
 

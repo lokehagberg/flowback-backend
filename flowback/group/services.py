@@ -4,6 +4,7 @@ from rest_framework.exceptions import ValidationError
 from flowback.user.models import User
 from flowback.user.selectors import get_user
 from flowback.group.models import Group, GroupUser, GroupUserInvite
+from flowback.group.selectors import group_user_permissions
 from flowback.common.services import model_update, get_object
 # TODO Leave, Invite_Request, Invite, Invite_Reject, Invite_Verify, Delegate, Remove_Delegate
 
@@ -22,18 +23,10 @@ def group_create(*, user: int, name: str, description: str, image: str, cover_im
 
 
 def group_update(*, user: int, group: int, data) -> Group:
-    user = get_object(GroupUser, 'User is not in group', user_id=user, group=group)
-    group = get_object_or_404(Group, id=group)
+    user = group_user_permissions(group=group, user=user, permissions=['admin'])
     non_side_effect_fields = ['name', 'description', 'image', 'cover_image', 'public', 'direct_join']
 
-    if not user:
-        raise ValidationError('User is not in group')
-    if not group:
-        raise ValidationError('Group does not exist')
-    if not user.is_admin:
-        raise ValidationError('Permission denied')
-
-    group, has_updated = model_update(instance=group,
+    group, has_updated = model_update(instance=user.group,
                                       fields=non_side_effect_fields,
                                       data=data)
 
@@ -41,20 +34,11 @@ def group_update(*, user: int, group: int, data) -> Group:
 
 
 def group_delete(*, user: int, group: int) -> None:
-    user = get_object(User, 'User does not exist', id=user)
-    group = get_object_or_404(Group, id=group)
-
-    if not (group.created_by == user or user.is_staff):
-        raise ValidationError('Permission denied')
-
-    if user == group.created_by:
-        group.delete()
-
-    return
+    group_user_permissions(group=group, user=user, permissions=['creator']).group.delete()
 
 
 def group_join(*, user: int, group: int) -> None:
-    user = get_object(User, 'User does not exist', id=user)
+    user = get_user(user)
     group = get_object_or_404(Group, id=group)
 
     if not group.public:
@@ -71,3 +55,7 @@ def group_join(*, user: int, group: int) -> None:
 
     else:
         GroupUser.objects.create(user=user, group=group)
+
+
+def group_leave(*, user: int, group: int) -> None:
+    group_user_permissions(group=group, user=user).delete()
