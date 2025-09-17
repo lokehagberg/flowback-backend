@@ -141,7 +141,7 @@ def group_list(*, fetched_by: User, filters=None):
     filters = filters or {}
     joined_groups = Group.objects.filter(id=OuterRef('pk'), groupuser__user__in=[fetched_by])
     qs = _group_get_visible_for(user=fetched_by).annotate(joined=Exists(joined_groups),
-                                                          member_count=Count('groupuser')).all()
+                                                          member_count=Count('groupuser')).order_by('created_at').all()
     qs = BaseGroupFilter(filters, qs).qs
     return qs
 
