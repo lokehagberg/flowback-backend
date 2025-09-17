@@ -7,6 +7,7 @@ from rest_framework.views import APIView, Response
 
 from flowback.common.pagination import LimitOffsetPagination, get_paginated_response
 from flowback.common.services import get_object
+from flowback.group.serializers import BasicGroupUserSerializer
 from flowback.poll.models import Poll, PollProposal, PollVotingTypeRanking, PollVotingTypeForAgainst
 from flowback.poll.selectors import poll_list, poll_proposal_list, poll_vote_list, poll_delegates_list, \
     poll_user_schedule_list
@@ -20,7 +21,7 @@ class PollListApi(APIView):
 
     class FilterSerializer(serializers.Serializer):
         id = serializers.IntegerField(required=False)
-        created_by = serializers.IntegerField(required=False)
+
         title = serializers.CharField(required=False)
         title__icontains = serializers.CharField(required=False)
         poll_type = serializers.ChoiceField((0, 1, 2), required=False)
@@ -30,14 +31,17 @@ class PollListApi(APIView):
         finished = serializers.NullBooleanField(required=False, default=None)
 
     class OutputSerializer(serializers.ModelSerializer):
+        created_by = BasicGroupUserSerializer()
         group_id = serializers.IntegerField(source='created_by.group_id')
         tag_name = serializers.CharField(source='tag.tag_name')
+        hide_poll_users = serializers.BooleanField(source='created_by.group.hide_poll_users')
 
         class Meta:
             model = Poll
             fields = ('id',
                       'group_id',
                       'created_by',
+                      'hide_poll_users',
                       'title',
                       'description',
                       'poll_type',
@@ -170,13 +174,14 @@ class PollUserScheduleListAPI(APIView):
 
     class FilterSerializer(serializers.Serializer):
         id = serializers.IntegerField(required=False)
-        created_by = serializers.IntegerField(required=False)
         poll_title = serializers.CharField(required=False)
         poll_title__icontains = serializers.CharField(required=False)
         start_date = serializers.DateTimeField(required=False)
         end_date = serializers.DateTimeField(required=False)
 
     class OutputSerializer(serializers.ModelSerializer):
+        created_by = BasicGroupUserSerializer()
+        hide_poll_users = serializers.BooleanField(source='created_by.group.hide_poll_users')
         group_id = serializers.IntegerField(source='created_by.group_id')
         title = serializers.CharField(source='poll.title')
         description = serializers.CharField(source='poll.description')
@@ -188,6 +193,7 @@ class PollUserScheduleListAPI(APIView):
             fields = ('group_id',
                       'id',
                       'created_by',
+                      'hide_poll_users',
                       'title',
                       'description',
                       'poll',

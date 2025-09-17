@@ -27,6 +27,7 @@ class Group(BaseModel):
     description = models.TextField()
     image = models.ImageField(upload_to='group/image')
     cover_image = models.ImageField(upload_to='group/cover_image')
+    hide_poll_users = models.BooleanField(default=False)  # Hides users in polls, TODO remove bool from views
 
     jitsi_room = models.UUIDField(unique=True, default=uuid.uuid4)
 
