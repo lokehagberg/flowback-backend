@@ -79,9 +79,9 @@ class BasePollDelegateVotingFilter(django_filters.FilterSet):
 
 
 def poll_list(*, fetched_by: User, group_id: Union[int, None], filters=None):
-    group_user_permissions(group=group_id, user=fetched_by)
     filters = filters or {}
     if group_id:
+        group_user_permissions(group=group_id, user=fetched_by)
         qs = Poll.objects.filter(created_by__group_id=group_id).all()
 
     else:
