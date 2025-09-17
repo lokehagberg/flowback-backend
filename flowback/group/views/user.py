@@ -13,7 +13,7 @@ from flowback.group.services import group_join, group_user_update, group_leave, 
 
 class GroupUserListApi(APIView):
     class Pagination(LimitOffsetPagination):
-        default_limit = 1
+        default_limit = 20
 
     class FilterSerializer(serializers.Serializer):
         id = serializers.IntegerField(required=False, source='group_user_id')
