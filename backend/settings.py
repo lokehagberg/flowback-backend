@@ -61,6 +61,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'django_extensions',
     'rest_framework.authtoken',
+    'pgtrigger',
     'flowback.user',
     'flowback.group',
     'flowback.poll'
