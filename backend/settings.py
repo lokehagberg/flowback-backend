@@ -15,7 +15,7 @@ from pathlib import Path
 
 
 env = environ.Env(DEBUG=(bool, False),
-                  SECURE_PROXY_SSL_HEADER=(bool, False),
+                  SECURE_PROXY_SSL_HEADERS=(bool, False),
                   DJANGO_SECRET=str,
                   FLOWBACK_URL=(str, None),
                   PG_SERVICE=(str, 'flowback'),
