@@ -148,7 +148,7 @@ def group_list(*, fetched_by: User, filters=None):
 
 def group_detail(*, fetched_by: User, group_id: int):
     group_user = group_user_permissions(group=group_id, user=fetched_by)
-    return get_object(Group, id=group_user.group.id).annotate(member_count=Count('groupuser'))
+    return Group.objects.annotate(member_count=Count('groupuser')).get(id=group_user.group.id)
 
 
 def group_user_list(*, group: int, fetched_by: User, filters=None):
