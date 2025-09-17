@@ -58,7 +58,7 @@ class GroupTagsCreateApi(APIView):
 class GroupTagsUpdateApi(APIView):
     class InputSerializer(serializers.Serializer):
         tag = serializers.IntegerField()
-        active = serializers.BooleanField(required=False)
+        active = serializers.BooleanField()
 
     def post(self, request, group: int):
         serializer = self.InputSerializer(data=request.data)

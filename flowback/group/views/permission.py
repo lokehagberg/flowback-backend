@@ -57,13 +57,13 @@ class GroupPermissionCreateApi(APIView):
 
 class GroupPermissionUpdateApi(APIView):
     class InputSerializer(serializers.Serializer):
-        permission_id = serializers.IntegerField(source='permission')
-        role_name = serializers.BooleanField()
-        invite_user = serializers.BooleanField()
-        create_poll = serializers.BooleanField()
-        allow_vote = serializers.BooleanField()
-        kick_members = serializers.BooleanField()
-        ban_members = serializers.BooleanField()
+        permission_id = serializers.IntegerField()
+        role_name = serializers.CharField()
+        invite_user = serializers.BooleanField(required=False)
+        create_poll = serializers.BooleanField(required=False)
+        allow_vote = serializers.BooleanField(required=False)
+        kick_members = serializers.BooleanField(required=False)
+        ban_members = serializers.BooleanField(required=False)
 
     def post(self, request, group: int):
         serializer = self.InputSerializer(data=request.data)
@@ -72,14 +72,14 @@ class GroupPermissionUpdateApi(APIView):
         group_permission_update(user=request.user.id,
                                 group=group,
                                 permission_id=permission_id,
-                                **serializer.validated_data)
+                                data=serializer.validated_data)
 
         return Response(status=status.HTTP_200_OK)
 
 
 class GroupPermissionDeleteApi(APIView):
     class InputSerializer(serializers.Serializer):
-        permission_id = serializers.IntegerField(source='permission')
+        permission_id = serializers.IntegerField()
 
     def post(self, request, group: int):
         serializer = self.InputSerializer(data=request.data)

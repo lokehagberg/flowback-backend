@@ -180,7 +180,7 @@ def group_user_invite_list(*, group: int, fetched_by: User, filters=None):
 def group_permissions_list(*, group: int, fetched_by: User, filters=None):
     group_user_permissions(group=group, user=fetched_by)
     filters = filters or {}
-    qs = GroupPermissions.objects.filter(group_id=group).all()
+    qs = GroupPermissions.objects.filter(author_id=group).all()
     return BaseGroupPermissionsFilter(filters, qs).qs
 
 
