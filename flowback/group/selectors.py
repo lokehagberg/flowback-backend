@@ -142,13 +142,13 @@ class BaseGroupUserDelegateFilter(django_filters.FilterSet):
 
 
 def _group_get_visible_for(user: User):
-    query = Q(public=True) | Q(Q(public=False) & Q(group_user__user__in=user))
+    query = Q(public=True) | Q(Q(public=False) & Q(groupuser__user__in=[user]))
     return Group.objects.filter(query)
 
 
 def group_list(*, fetched_by: User, filters=None):
     filters = filters or {}
-    joined_groups = Group.objects.filter(id=OuterRef('pk'), group_user__user__in=fetched_by)
+    joined_groups = Group.objects.filter(id=OuterRef('pk'), groupuser__user__in=[fetched_by])
     qs = _group_get_visible_for(user=fetched_by).annotate(joined=Exists(joined_groups)).all()
 
     if filters.get('joined') is True:

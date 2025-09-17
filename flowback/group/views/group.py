@@ -83,12 +83,14 @@ class GroupCreateApi(APIView):
 
 
 class GroupUpdateApi(APIView):
-    class InputSerializer(serializers.ModelSerializer):
-
-        class Meta:
-            model = Group
-            fields = ('name', 'description', 'image', 'cover_image', 'public',
-                      'direct_join', 'default_permission')
+    class InputSerializer(serializers.Serializer):
+        name = serializers.CharField(required=False)
+        description = serializers.CharField(required=False)
+        image = serializers.ImageField(required=False)
+        cover_image = serializers.ImageField(required=False)
+        public = serializers.BooleanField(required=False)
+        direct_join = serializers.BooleanField(required=False)
+        default_permission = serializers.IntegerField(required=False, allow_null=True)
 
     def post(self, request, group: int):
         serializer = self.InputSerializer(data=request.data)
