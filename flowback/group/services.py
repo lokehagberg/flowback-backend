@@ -1,8 +1,9 @@
 from typing import Union
 
+from django.core.mail import send_mass_mail
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
-from backend.settings import env
+from backend.settings import env, EMAIL_HOST_USER
 from rest_framework.exceptions import ValidationError
 from flowback.user.models import User
 from flowback.group.models import Group, GroupUser, GroupUserInvite, GroupUserDelegator, GroupTags, GroupPermissions, \
@@ -86,6 +87,16 @@ def group_permission_update(*, user: int, group: int, permission_id: int, data) 
 def group_permission_delete(*, user: int, group: int, permission_id: int) -> None:
     group_user_permissions(group=group, user=user, permissions=['admin'])
     get_object(GroupPermissions, id=permission_id).delete()
+
+
+def group_mail(*, fetched_by: int, group: int, title: str, message: str) -> None:
+    group_user = group_user_permissions(group=group, user=fetched_by, permissions=['admin'])
+
+    subject = f'[{group_user.group.name}] - {title}'
+    targets = GroupUser.objects.filter(group_id=group).values('user__email').all()
+
+    send_mass_mail([subject, message, EMAIL_HOST_USER,
+                   [target['user__email']]] for target in targets)
 
 
 def group_join(*, user: int, group: int) -> Union[GroupUser, GroupUserInvite]:

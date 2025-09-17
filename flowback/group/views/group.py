@@ -5,7 +5,7 @@ from rest_framework.views import APIView
 
 from flowback.group.models import Group
 from flowback.group.selectors import group_list, group_detail
-from flowback.group.services import group_delete, group_update, group_create
+from flowback.group.services import group_delete, group_update, group_create, group_mail
 
 
 class GroupListApi(APIView):
@@ -81,9 +81,9 @@ class GroupCreateApi(APIView):
         serializer = self.InputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        group_create(user=request.user.id, **serializer.validated_data)
+        group = group_create(user=request.user.id, **serializer.validated_data)
 
-        return Response(status=status.HTTP_200_OK)
+        return Response(status=status.HTTP_200_OK, data=group.id)
 
 
 class GroupUpdateApi(APIView):
@@ -106,4 +106,18 @@ class GroupUpdateApi(APIView):
 class GroupDeleteApi(APIView):
     def post(self, request, group: int):
         group_delete(user=request.user.id, group=group)
+        return Response(status=status.HTTP_200_OK)
+
+
+class GroupMailApi(APIView):
+    class InputSerializer(serializers.Serializer):
+        title = serializers.CharField()
+        message = serializers.CharField()
+
+    def post(self, request):
+        serializer = self.InputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        group_mail(fetched_by=request.user.id, **serializer.validated_data)
+
         return Response(status=status.HTTP_200_OK)

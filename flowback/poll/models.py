@@ -23,6 +23,9 @@ class Poll(BaseModel):
     # Determines the visibility of this poll
     active = models.BooleanField(default=True)
 
+    # Determines if poll is visible outside of group
+    public = models.BooleanField(default=False)
+
     # Determines the state of this poll
     start_date = models.DateTimeField()
     end_date = models.DateTimeField()

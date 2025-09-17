@@ -36,6 +36,7 @@ class PollListApi(APIView):
                       'title',
                       'description',
                       'poll_type',
+                      'public',
                       'tag',
                       'tag_name',
                       'start_date',
@@ -45,7 +46,7 @@ class PollListApi(APIView):
                       'participants',
                       'dynamic')
 
-    def get(self, request, group: int):
+    def get(self, request, group: int = None):
         filter_serializer = self.FilterSerializer(data=request.query_params)
         filter_serializer.is_valid(raise_exception=True)
 
@@ -66,7 +67,7 @@ class PollCreateAPI(APIView):
 
         class Meta:
             model = Poll
-            fields = ('title', 'description', 'start_date', 'end_date', 'poll_type', 'tag', 'dynamic')
+            fields = ('title', 'description', 'start_date', 'end_date', 'poll_type', 'public', 'tag', 'dynamic')
 
     def post(self, request, group: int):
         serializer = self.InputSerializer(data=request.data)

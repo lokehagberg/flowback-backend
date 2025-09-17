@@ -1,4 +1,7 @@
+from typing import Union
+
 import django_filters
+from django.db.models import Q
 
 from flowback.common.services import get_object
 from flowback.poll.models import Poll, PollProposal, PollVotingTypeRanking, PollDelegateVoting, PollVoting
@@ -17,6 +20,7 @@ class BasePollFilter(django_filters.FilterSet):
                       created_by=['exact'],
                       title=['exact', 'icontains'],
                       poll_type=['exact'],
+                      public=['exact'],
                       tag=['exact'],
                       finished=['exact'])
 
@@ -45,16 +49,23 @@ class BasePollDelegateVotingFilter(django_filters.FilterSet):
         fields = dict(created_by=['exact'])
 
 
-def poll_list(*, fetched_by: User, group_id: int, filters=None):
+def poll_list(*, fetched_by: User, group_id: Union[int, None], filters=None):
     group_user_permissions(group=group_id, user=fetched_by)
     filters = filters or {}
-    qs = Poll.objects.filter(created_by__group_id=group_id).all()
+    if group_id:
+        qs = Poll.objects.filter(created_by__group_id=group_id).all()
+
+    else:
+        qs = Poll.objects.filter(Q(created_by__group__groupuser__in=[fetched_by]) | Q(public=True)).all()
+
     return BasePollFilter(filters, qs).qs
 
 
 def poll_proposal_list(*, fetched_by: User, group_id: int, poll_id: int, filters=None):
     poll = get_object(Poll, id=poll_id)
-    group_user_permissions(group=group_id, user=fetched_by)
+    if not poll.public:
+        group_user_permissions(group=group_id, user=fetched_by)
+
     filters = filters or {}
     qs = PollProposal.objects.filter(created_by__group_id=group_id, poll=poll).all()
     return BasePollProposalFilter(filters, qs).qs
