@@ -5,6 +5,7 @@ from django.db.models import Count, Q, Sum, OuterRef, Case, When, F, Subquery
 from django.db.models.functions import Cast
 from django.utils import timezone
 
+from backend.settings import DEBUG
 from flowback.common.services import get_object
 from flowback.group.models import GroupTags, GroupUser, GroupUserDelegatePool
 from flowback.group.selectors.tags import group_tags_list
@@ -21,6 +22,7 @@ from flowback.schedule.services import create_event
 
 @shared_task
 def poll_area_vote_count(poll_id: int):
+    tag = None
     poll = get_object(Poll, id=poll_id)
     statement = PollAreaStatement.objects.filter(poll=poll).annotate(
         result=Count('pollareastatementvote', filter=Q(pollareastatementvote__vote=True)) -
@@ -39,15 +41,17 @@ def poll_area_vote_count(poll_id: int):
                 action=NotificationChannel.Action.UPDATED,
                 poll=poll)
 
-    return poll
+    return (f"Poll {poll_id} area task completed. "
+            f"{'No tags have won.' if not tag else 
+                f'Tag: {tag.name} has won with {statement.pollareastatementvote_set.all().count()} points.'}")
 
 
 @shared_task
-def poll_prediction_bet_count(poll_id: int, debug_msg: bool = False):
+def poll_prediction_bet_count(poll_id: int):
     # For one prediction, assuming no bias and stationary predictors
 
     def dprint(*args, **kwargs):
-        if debug_msg:
+        if DEBUG:
             print(*args, **kwargs)
 
     # Get every predictor participating in poll

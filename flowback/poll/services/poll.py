@@ -1,4 +1,6 @@
 from rest_framework.exceptions import ValidationError
+
+from backend.settings import DEBUG
 from flowback.common.services import get_object, model_update
 from flowback.files.services import upload_collection
 from flowback.group.notify import notify_group_poll
@@ -102,8 +104,10 @@ def poll_create(*, user_id: int,
     poll.save()
 
     poll_area_vote_count.apply_async(kwargs=dict(poll_id=poll.id), eta=poll.area_vote_end_date)
-    poll_prediction_bet_count.apply_async(kwargs=dict(poll_id=poll.id), eta=poll.prediction_bet_end_date)
-    poll_proposal_vote_count.apply_async(kwargs=dict(poll_id=poll.id), eta=poll.end_date)
+    poll_prediction_bet_count.apply_async(kwargs=dict(poll_id=poll.id),
+                                          eta=poll.prediction_bet_end_date)
+    poll_proposal_vote_count.apply_async(kwargs=dict(poll_id=poll.id),
+                                         eta=poll.end_date)
 
     notify_group_poll(message="A new poll has been posted",
                       action=NotificationChannel.Action.CREATED,
