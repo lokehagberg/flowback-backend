@@ -4,7 +4,7 @@ import sys
 import environ
 from pathlib import Path
 
-VERSION = "1.0"
+VERSION = "1.0.0"
 
 env = environ.Env(DEBUG=(bool, True),
                   DEBUG_REGISTER_BYPASS_EMAIL_VERIFICATION=(bool, False),
