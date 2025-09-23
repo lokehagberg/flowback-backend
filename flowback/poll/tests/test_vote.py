@@ -10,7 +10,7 @@ from ..views.vote import (PollProposalDelegateVoteUpdateAPI,
 from ...common.tests import generate_request
 from ...files.tests.factories import FileSegmentFactory
 from ...group.tests.factories import GroupFactory, GroupUserFactory, GroupUserDelegateFactory, GroupTagsFactory, \
-    GroupUserDelegatePoolFactory, GroupUserDelegatorFactory
+    GroupUserDelegatePoolFactory, GroupUserDelegatorFactory, GroupPermissionsFactory
 from ...user.models import User
 
 
@@ -246,3 +246,201 @@ class PollDelegateVoteTest(APITestCase):
 
         votes = PollDelegateVoting.objects.get(created_by=self.delegate.pool).pollvotingtypecardinal_set
         self.assertEqual(votes.filter(id__in=data['proposals']).count(), 2)
+
+    def test_delegate_vote_count_with_permissions(self):
+        """Test poll_proposal_vote_count where delegate has delegators with and without voting permissions"""
+        # Create a poll with tag
+        tag = GroupTagsFactory(group=self.group)
+        poll = PollFactory(created_by=self.group_user_creator, poll_type=Poll.PollType.CARDINAL, tag=tag,
+                          **generate_poll_phase_kwargs('delegate_vote'))
+        
+        # Create proposals for the poll
+        proposal_one = PollProposalFactory(created_by=self.group_user_creator, poll=poll)
+        proposal_two = PollProposalFactory(created_by=self.group_user_creator, poll=poll)
+        
+        # Create a delegate
+        delegate = GroupUserDelegateFactory(group=self.group)
+        
+        # Create permissions - one allowing vote, one denying vote
+        permission_allow_vote = GroupPermissionsFactory(author=self.group, allow_vote=True)
+        permission_deny_vote = GroupPermissionsFactory(author=self.group, allow_vote=False)
+        
+        # Create delegators with different permissions
+        # 2 delegators with voting permission
+        delegator_with_permission_1 = GroupUserFactory(group=self.group, permission=permission_allow_vote)
+        delegator_with_permission_2 = GroupUserFactory(group=self.group, permission=permission_allow_vote)
+
+        # 2 delegators without voting permission
+        delegator_without_permission_1 = GroupUserFactory(group=self.group, permission=permission_deny_vote)
+        delegator_without_permission_2 = GroupUserFactory(group=self.group, permission=permission_deny_vote)
+
+        # Create delegator relationships
+        delegator_pool_1 = GroupUserDelegatorFactory(group=self.group, delegator=delegator_with_permission_1,
+                                                     delegate_pool=delegate.pool)
+        delegator_pool_2 = GroupUserDelegatorFactory(group=self.group, delegator=delegator_with_permission_2,
+                                                     delegate_pool=delegate.pool)
+        delegator_pool_3 = GroupUserDelegatorFactory(group=self.group, delegator=delegator_without_permission_1,
+                                                     delegate_pool=delegate.pool)
+        delegator_pool_4 = GroupUserDelegatorFactory(group=self.group, delegator=delegator_without_permission_2,
+                                                     delegate_pool=delegate.pool)
+
+        # Add tag to all delegators
+        for delegator_pool in [delegator_pool_1, delegator_pool_2, delegator_pool_3, delegator_pool_4]:
+            delegator_pool.tags.add(tag)
+
+        # Have the delegate vote
+        factory = APIRequestFactory()
+        user = delegate.group_user.user
+        view = PollProposalDelegateVoteUpdateAPI.as_view()
+        data = dict(proposals=[proposal_one.id, proposal_two.id], scores=[100, 50])
+
+        request = factory.post('', data)
+        force_authenticate(request, user=user)
+        response = view(request, poll=poll.id)
+        self.assertEqual(response.status_code, 200)
+
+        # Verify delegate voting record was created
+        delegate_vote = PollDelegateVoting.objects.get(created_by=delegate.pool, poll=poll)
+        self.assertIsNotNone(delegate_vote)
+
+        # Change poll phase to result phase and call vote count
+        Poll.objects.filter(id=poll.id).update(**generate_poll_phase_kwargs('result'))
+        poll_proposal_vote_count(poll_id=poll.id)
+
+        # Refresh delegate vote to get updated mandate
+        delegate_vote.refresh_from_db()
+
+        # Verify that only delegators with voting permission are counted
+        # Should be 2 (delegators with permission) - only delegators count toward mandate, not the delegate
+        expected_mandate = 2  # Only the 2 delegators with voting permission should be counted
+        self.assertEqual(delegate_vote.mandate, expected_mandate, 
+                        f"Expected mandate of {expected_mandate} but got {delegate_vote.mandate}")
+        
+        # Verify proposals got correct scores based on only counting delegators with permission
+        proposal_one.refresh_from_db()
+        proposal_two.refresh_from_db()
+        
+        # Each delegator with permission contributes their weight to the delegate's vote
+        # Delegate vote: proposal_one=100, proposal_two=50
+        # With mandate of 2, final scores should be: proposal_one=200, proposal_two=100
+        self.assertEqual(proposal_one.score, 200, f"Expected proposal_one score of 200 but got {proposal_one.score}")
+        self.assertEqual(proposal_two.score, 100, f"Expected proposal_two score of 100 but got {proposal_two.score}")
+        
+        # Verify poll status is not failed (participants met requirements)
+        poll.refresh_from_db()
+        self.assertNotEqual(poll.status, -1, "Poll should not have failed status")
+
+    def test_delegate_vote_permission_scenarios(self):
+        """Test that permission changes actually affect vote count outcomes"""
+        # Create a poll with tag
+        tag = GroupTagsFactory(group=self.group)
+        poll = PollFactory(created_by=self.group_user_creator, poll_type=Poll.PollType.CARDINAL, tag=tag,
+                          **generate_poll_phase_kwargs('delegate_vote'))
+
+        # Create proposals for the poll
+        proposal_one = PollProposalFactory(created_by=self.group_user_creator, poll=poll)
+        proposal_two = PollProposalFactory(created_by=self.group_user_creator, poll=poll)
+
+        # Create a delegate
+        delegate = GroupUserDelegateFactory(group=self.group)
+
+        # Test Scenario 1: All delegators with voting permission
+        permission_allow_vote = GroupPermissionsFactory(author=self.group, allow_vote=True)
+
+        # Create 3 delegators, all with voting permission
+        delegators_with_permission = [
+            GroupUserFactory(group=self.group, permission=permission_allow_vote) for _ in range(3)
+        ]
+
+        # Create delegator relationships
+        delegator_pools = [
+            GroupUserDelegatorFactory(group=self.group, delegator=delegator, delegate_pool=delegate.pool)
+            for delegator in delegators_with_permission
+        ]
+
+        # Add tag to all delegators
+        for delegator_pool in delegator_pools:
+            delegator_pool.tags.add(tag)
+
+        # Have the delegate vote
+        factory = APIRequestFactory()
+        user = delegate.group_user.user
+        view = PollProposalDelegateVoteUpdateAPI.as_view()
+        data = dict(proposals=[proposal_one.id, proposal_two.id], scores=[100, 50])
+
+        request = factory.post('', data)
+        force_authenticate(request, user=user)
+        response = view(request, poll=poll.id)
+        self.assertEqual(response.status_code, 200)
+
+        # Change poll phase to result and call vote count
+        Poll.objects.filter(id=poll.id).update(**generate_poll_phase_kwargs('result'))
+        poll_proposal_vote_count(poll_id=poll.id)
+
+        # Check mandate with all delegators having permission
+        delegate_vote = PollDelegateVoting.objects.get(created_by=delegate.pool, poll=poll)
+        self.assertEqual(delegate_vote.mandate, 3, "All 3 delegators should count toward mandate")
+
+        # Check proposal scores
+        proposal_one.refresh_from_db()
+        proposal_two.refresh_from_db()
+        self.assertEqual(proposal_one.score, 300, "Score should be 100 * 3 = 300")
+        self.assertEqual(proposal_two.score, 150, "Score should be 50 * 3 = 150")
+
+        # Now test Scenario 2: Change permissions to deny voting for all delegators
+        permission_deny_vote = GroupPermissionsFactory(author=self.group, allow_vote=False)
+
+        # Update all delegators to have no voting permission
+        for delegator in delegators_with_permission:
+            delegator.permission = permission_deny_vote
+            delegator.save()
+
+        # Now test Scenario 2: Create a new poll with delegators having no voting permission
+        # Create a new poll for the second scenario
+        poll_2 = PollFactory(created_by=self.group_user_creator, poll_type=Poll.PollType.CARDINAL, tag=tag,
+                            **generate_poll_phase_kwargs('delegate_vote'))
+
+        # Create new proposals for the second poll
+        proposal_three = PollProposalFactory(created_by=self.group_user_creator, poll=poll_2)
+        proposal_four = PollProposalFactory(created_by=self.group_user_creator, poll=poll_2)
+
+        # Create a new delegate for the second scenario
+        delegate_2 = GroupUserDelegateFactory(group=self.group)
+
+        # Create 3 new delegators with no voting permission
+        delegators_without_permission = [
+            GroupUserFactory(group=self.group, permission=permission_deny_vote) for _ in range(3)
+        ]
+
+        # Create delegator relationships for the second delegate
+        delegator_pools_2 = [
+            GroupUserDelegatorFactory(group=self.group, delegator=delegator, delegate_pool=delegate_2.pool)
+            for delegator in delegators_without_permission
+        ]
+
+        # Add tag to all delegators in second scenario
+        for delegator_pool in delegator_pools_2:
+            delegator_pool.tags.add(tag)
+
+        # Have the second delegate vote
+        user_2 = delegate_2.group_user.user
+        data_2 = dict(proposals=[proposal_three.id, proposal_four.id], scores=[100, 50])
+
+        request_2 = factory.post('', data_2)
+        force_authenticate(request_2, user=user_2)
+        response_2 = view(request_2, poll=poll_2.id)
+        self.assertEqual(response_2.status_code, 200)
+
+        # Change poll phase to result and call vote count for second poll
+        Poll.objects.filter(id=poll_2.id).update(**generate_poll_phase_kwargs('result'))
+        poll_proposal_vote_count(poll_id=poll_2.id)
+
+        # Check mandate with no delegators having permission
+        delegate_vote_2 = PollDelegateVoting.objects.get(created_by=delegate_2.pool, poll=poll_2)
+        self.assertEqual(delegate_vote_2.mandate, 0, "No delegators should count toward mandate")
+
+        # Check proposal scores - should be 0 since no delegators have permission
+        proposal_three.refresh_from_db()
+        proposal_four.refresh_from_db()
+        self.assertEqual(proposal_three.score, 0, "Score should be 0 with no voting delegators")
+        self.assertEqual(proposal_four.score, 0, "Score should be 0 with no voting delegators")
