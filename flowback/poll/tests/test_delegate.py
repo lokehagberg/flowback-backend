@@ -17,6 +17,11 @@ class PollDelegateTests(APITestCase):
         self.group_user_creator = GroupUserFactory(group=self.group)
         self.delegate = GroupUserDelegateFactory(group=self.group)
         self.delegator = GroupUserFactory(group=self.group)
+        
+        # Create additional group users with different roles for comprehensive testing
+        self.regular_group_user = GroupUserFactory(group=self.group, is_admin=False)
+        self.admin_group_user = GroupUserFactory(group=self.group, is_admin=True)
+        self.another_regular_user = GroupUserFactory(group=self.group, is_admin=False)
         (self.poll_one,
          self.poll_two,
          self.poll_three) = [PollFactory(created_by=self.group_user_creator, poll_type=4,
@@ -81,8 +86,75 @@ class PollDelegateTests(APITestCase):
             data=dict(group_id=self.group.id, delegate_pool_id=self.delegate.pool.id)
         )
 
-        print(response.data['results'])
+        self.assertEqual(response.status_code, 200)
+        # Should return polls where this delegate has voted
+        self.assertGreaterEqual(len(response.data['results']), 1)
 
+        # Test that ALL group users have permission to preview delegate votes
+        # This expands the test as requested in the issue description
+        
+        # Test as regular group user (non-admin, non-delegate)
+        response = generate_request(
+            api=DelegatePollVoteListAPI,
+            user=self.regular_group_user.user,
+            data=dict(group_id=self.group.id)
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['results']), 3)  # Should return all 3 polls
+        
+        # Test as admin group user
+        response = generate_request(
+            api=DelegatePollVoteListAPI,
+            user=self.admin_group_user.user,
+            data=dict(group_id=self.group.id)
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['results']), 3)  # Should return all 3 polls
+        
+        # Test as another regular group user
+        response = generate_request(
+            api=DelegatePollVoteListAPI,
+            user=self.another_regular_user.user,
+            data=dict(group_id=self.group.id)
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['results']), 3)  # Should return all 3 polls
+        
+        # Test as delegator user
+        response = generate_request(
+            api=DelegatePollVoteListAPI,
+            user=self.delegator.user,
+            data=dict(group_id=self.group.id)
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['results']), 3)  # Should return all 3 polls
+        
+        # Test as group creator
+        response = generate_request(
+            api=DelegatePollVoteListAPI,
+            user=self.group_user_creator.user,
+            data=dict(group_id=self.group.id)
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['results']), 3)  # Should return all 3 polls
+        
+        # Verify that all group users can also access with filters
+        # Test regular user with poll_id filter
+        response = generate_request(
+            api=DelegatePollVoteListAPI,
+            user=self.regular_group_user.user,
+            data=dict(group_id=self.group.id, poll_id=self.poll_two.id)
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data['results']), 1)  # Should return only poll_two
+        self.assertEqual(response.data['results'][0]['poll_id'], self.poll_two.id)
+        
+        # Test admin user with delegate_pool_id filter
+        response = generate_request(
+            api=DelegatePollVoteListAPI,
+            user=self.admin_group_user.user,
+            data=dict(group_id=self.group.id, delegate_pool_id=self.delegate.pool.id)
+        )
         self.assertEqual(response.status_code, 200)
         # Should return polls where this delegate has voted
         self.assertGreaterEqual(len(response.data['results']), 1)
