@@ -177,6 +177,7 @@ def poll_prediction_bet_count(poll_id: int):
             to_delete.append(j)
 
     previous_outcomes = [j for n, j in enumerate(previous_outcomes) if n not in to_delete]
+
     for i in range(len(previous_bets)):
         previous_bets[i] = [j for n, j in enumerate(previous_bets[i]) if n not in to_delete]
 
