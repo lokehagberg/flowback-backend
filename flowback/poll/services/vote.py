@@ -94,7 +94,12 @@ def poll_proposal_vote_update(*, user_id: int, poll_id: int, data: dict) -> None
 def poll_proposal_delegate_vote_update(*, user_id: int, poll_id: int, data) -> None:
     poll = Poll.objects.get(id=poll_id)
     group_user = group_user_permissions(user=user_id, group=poll.created_by.group.id)
-    delegate_pool = GroupUserDelegatePool.objects.get(groupuserdelegate__group_user=group_user)
+
+    try:
+        delegate_pool = GroupUserDelegatePool.objects.get(groupuserdelegate__group_user=group_user)
+
+    except GroupUserDelegatePool.DoesNotExist:
+        raise ValidationError("User is not a delegate")
 
     if group_user.group.id != poll.created_by.group.id:
         raise ValidationError('Permission denied')
