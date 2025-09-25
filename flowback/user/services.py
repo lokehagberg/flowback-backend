@@ -36,6 +36,8 @@ def user_create(*, email: str) -> OnboardUser | None:
             else:
                 raise ValidationError('Username already exists.')
 
+    print(email)
+    print(OnboardUser.objects.filter(email=email).__dict__)
     user, created = OnboardUser.objects.update_or_create(email=email, defaults=dict(is_verified=False,
                                                                                     verification_code=uuid.uuid4().hex))
 

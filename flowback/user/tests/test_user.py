@@ -15,7 +15,7 @@ from flowback.notification.models import NotificationObject, Notification, Notif
 from flowback.poll.models import Poll
 from flowback.poll.tests.factories import PollFactory
 from flowback.user.models import User, UserChatInvite
-from flowback.user.services import user_create, user_create_verify
+from flowback.user.services import user_create, user_create_verify, user_delete
 from flowback.user.tests.factories import UserFactory
 from flowback.user.views.home import UserHomeFeedAPI
 from flowback.user.views.user import UserDeleteAPI, UserGetChatChannelAPI, UserUpdateApi, UserChatInviteAPI, UserGetApi, UserNotificationSubscribeAPI
@@ -50,13 +50,16 @@ class UserTest(APITestCase):
                                  user.schedule]))
 
     def test_user_create(self):
-        user_create(email="test@example.com")  # Test twice for unique conflicts
-        onboard_user = user_create(email="test@example.com")
-        user = user_create_verify(username="test_user",
-                                  verification_code=str(onboard_user.verification_code),
-                                  password="TestPassword!=27")
+        for i in range(3):
+            user_create(email="test@example.com")
+            onboard_user = user_create(email="test@example.com")  # Test twice for unique conflicts
+            user = user_create_verify(username="test_user",
+                                      verification_code=str(onboard_user.verification_code),
+                                      password="TestPassword!=27")
 
-        self.assertTrue(User.objects.filter(id=user.id).exists())
+            self.assertTrue(User.objects.filter(id=user.id).exists())
+
+            user_delete(user_id=user.id)  # Test if user can create new account after deletion
 
     def test_user_update(self):
         user = UserFactory()

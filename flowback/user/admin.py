@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
-from flowback.user.models import User, Report
+from flowback.user.models import User, Report, OnboardUser
 from flowback.user.services import user_delete
 
 
@@ -33,6 +33,9 @@ class UserAdmin(BaseUserAdmin):
         user_delete(user_id=obj.id)
 
 
+
+
+
 @admin.register(Report)
 class ReportAdmin(admin.ModelAdmin):
     readonly_fields = ['created_at']
@@ -50,3 +53,23 @@ class ReportAdmin(admin.ModelAdmin):
 
     search_fields = ('user__username', 'user__email', 'title', 'description')
     ordering = ('created_at',)
+
+
+@admin.register(OnboardUser)
+class OnboardUserAdmin(admin.ModelAdmin):
+    readonly_fields = ['verification_code', 'created_at', 'updated_at']
+    
+    list_display = ('email', 'is_verified', 'created_at')
+    list_filter = ('is_verified', 'created_at')
+    
+    fieldsets = [
+        (None, {'fields': ['email', 'is_verified']}),
+        ('System Info', {'fields': ['verification_code', 'created_at', 'updated_at']}),
+    ]
+    
+    add_fieldsets = [
+        (None, {'fields': ['email']}),
+    ]
+    
+    search_fields = ('email',)
+    ordering = ('-created_at',)
