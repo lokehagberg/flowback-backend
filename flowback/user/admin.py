@@ -32,8 +32,9 @@ class UserAdmin(BaseUserAdmin):
     def delete_model(self, request, obj):
         user_delete(user_id=obj.id)
 
-
-
+    def delete_queryset(self, request, queryset):
+        for user in queryset:
+            user_delete(user_id=user.id)
 
 
 @admin.register(Report)
