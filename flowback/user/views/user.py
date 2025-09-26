@@ -23,10 +23,8 @@ from flowback.user.services import (user_create, user_create_verify, user_forgot
 class UserCreateApi(APIView):
     permission_classes = [AllowAny]
 
-    class InputSerializer(serializers.ModelSerializer):
-        class Meta:
-            model = OnboardUser
-            fields = ('email',)
+    class InputSerializer(serializers.Serializer):
+        email = serializers.EmailField()
 
     def post(self, request):
         serializer = self.InputSerializer(data=request.data)

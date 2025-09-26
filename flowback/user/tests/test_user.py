@@ -18,7 +18,9 @@ from flowback.user.models import User, UserChatInvite
 from flowback.user.services import user_create, user_create_verify, user_delete
 from flowback.user.tests.factories import UserFactory
 from flowback.user.views.home import UserHomeFeedAPI
-from flowback.user.views.user import UserDeleteAPI, UserGetChatChannelAPI, UserUpdateApi, UserChatInviteAPI, UserGetApi, UserNotificationSubscribeAPI
+from flowback.user.views.user import UserDeleteAPI, UserGetChatChannelAPI, UserUpdateApi, UserChatInviteAPI, UserGetApi, \
+    UserNotificationSubscribeAPI, UserCreateApi
+from flowback.user.models import OnboardUser
 
 
 class UserTest(APITestCase):
@@ -53,6 +55,7 @@ class UserTest(APITestCase):
         for i in range(3):
             user_create(email="test@example.com")
             onboard_user = user_create(email="test@example.com")  # Test twice for unique conflicts
+            generate_request(UserCreateApi, data=dict(email="test@example.com"))
             user = user_create_verify(username="test_user",
                                       verification_code=str(onboard_user.verification_code),
                                       password="TestPassword!=27")
@@ -60,6 +63,36 @@ class UserTest(APITestCase):
             self.assertTrue(User.objects.filter(id=user.id).exists())
 
             user_delete(user_id=user.id)  # Test if user can create new account after deletion
+
+    def test_user_create_api_with_existing_onboard_user(self):
+        """Test UserCreateApi when an OnboardUser with the same email already exists"""
+        test_email = "duplicate@example.com"
+        
+        # First, create an OnboardUser directly
+        OnboardUser.objects.create(email=test_email)
+        self.assertTrue(OnboardUser.objects.filter(email=test_email).exists())
+        
+        # Then create another user with the same email through the API
+        response = generate_request(UserCreateApi, data=dict(email=test_email))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        
+        # Verify that the one OnboardUser exists
+        onboard_users = OnboardUser.objects.filter(email=test_email)
+        self.assertEqual(onboard_users.count(), 1)
+
+    def test_user_create_api_with_existing_user_email(self):
+        """Test UserCreateApi when a User with the same email already exists"""
+        test_email = "existing_user@example.com"
+        
+        # Create a full User
+        UserFactory(email=test_email)
+        
+        # Then create an OnboardUser with the same email through the API
+        response = generate_request(UserCreateApi, data=dict(email=test_email))
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        
+        # Verify no OnboardUser was created
+        self.assertFalse(OnboardUser.objects.filter(email=test_email).exists())
 
     def test_user_update(self):
         user = UserFactory()
