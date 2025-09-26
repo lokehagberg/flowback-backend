@@ -28,6 +28,7 @@ user_kanban = KanbanManager(origin_type='user')
 
 
 def user_create(*, email: str) -> OnboardUser | None:
+    print("Statement has run from here")
     email = email.lower()
     users = User.objects.filter(email=email)
     if users.exists():
@@ -48,6 +49,8 @@ def user_create(*, email: str) -> OnboardUser | None:
 
         except IntegrityError:
             raise ValidationError('IntegrityError got hit')
+
+    print("Passed")
 
     link = f'Use this code to create your account: {user.verification_code}'
     if URL_USER_CREATE:
