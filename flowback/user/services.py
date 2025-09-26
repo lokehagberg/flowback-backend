@@ -29,8 +29,8 @@ def user_create(*, email: str) -> OnboardUser | None:
     email = email.lower()
     users = User.objects.filter(email=email)
     if users.exists():
-        for user in users:
-            if user.email == email:
+        for onboard_user in users:
+            if onboard_user.email == email:
                 raise ValidationError('Email already exists.')
 
             else:
@@ -38,22 +38,27 @@ def user_create(*, email: str) -> OnboardUser | None:
 
     print(email)
     print(OnboardUser.objects.filter(email=email).__dict__)
-    user, created = OnboardUser.objects.update_or_create(email=email, defaults=dict(is_verified=False,
+    onboard_user, created = OnboardUser.objects.get_or_create(email=email, defaults=dict(is_verified=False,
                                                                                     verification_code=uuid.uuid4().hex))
 
-    link = f'Use this code to create your account: {user.verification_code}'
+    if onboard_user:
+        onboard_user.is_verified = False
+        onboard_user.verification_code = uuid.uuid4().hex
+        onboard_user.save()
+
+    link = f'Use this code to create your account: {onboard_user.verification_code}'
     if URL_USER_CREATE:
         link = (f"Use this link to create your account: {URL_USER_CREATE}"
-                f"?email={email}&verification_code={user.verification_code}")
+                f"?email={email}&verification_code={onboard_user.verification_code}")
 
     if EMAIL_HOST:
         send_mail('Flowback Verification Code', link, DEFAULT_FROM_EMAIL, [email])
 
     else:
         logging.info("Email host not configured. Email not sent, but code was sent to the console.")
-        print(f"Verification code for '{user.email}': {user.verification_code}")
+        print(f"Verification code for '{onboard_user.email}': {onboard_user.verification_code}")
 
-    return user
+    return onboard_user
 
 
 def user_create_verify(*, username: str, verification_code: str, password: str):
