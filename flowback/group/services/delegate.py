@@ -15,7 +15,7 @@ def group_user_delegate(*, user: int, group: int, delegate_pool_id: int, tags: l
     delegate_pool = get_object(GroupUserDelegatePool, 'Delegate pool does not exist', id=delegate_pool_id, group=group)
 
     if GroupUserDelegate.objects.filter(group_user=delegator).exists():
-        raise ValidationError('Delegator cannot be a delegate')
+        raise ValidationError('Delegate cannot be a delegator')
 
     db_tags = GroupTags.objects.filter(id__in=tags, active=True).all()
 

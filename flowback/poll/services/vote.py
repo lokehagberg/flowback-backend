@@ -16,7 +16,7 @@ def poll_proposal_vote_update(*, user_id: int, poll_id: int, data: dict) -> None
                                         group=poll.created_by.group.id,
                                         permissions=['allow_vote', 'admin'])
 
-    poll.check_phase('delegate_vote', 'vote', 'dynamic', 'schedule')
+    poll.check_phase('vote', 'dynamic', 'schedule')
 
     if poll.poll_type == Poll.PollType.RANKING:
         if not data['proposals']:
