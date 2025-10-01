@@ -48,7 +48,8 @@ def group_tags_list(*, group_id: int, fetched_by: User = None, filters: dict = N
     update_poll_prediction_statement_outcomes(statements)
 
     # Calculate IMAC
-    tags = tags.annotate(sum_combined_bet=Sum('poll__pollpredictionstatement__combined_bet'),
+    tags = tags.annotate(sum_combined_bet=Sum('poll__pollpredictionstatement__combined_bet',
+                                              filter=Q(poll__pollpredictionstatement__outcome__isnull=False)),
 
                          number_of_evaluated_predictions=Sum(
                              Case(When(poll__pollpredictionstatement__outcome__isnull=False, then=1),
@@ -56,8 +57,7 @@ def group_tags_list(*, group_id: int, fetched_by: User = None, filters: dict = N
                                   output_field=models.DecimalField(max_digits=13, decimal_places=8))),
 
                          sum_outcome=Sum(Case(When(poll__pollpredictionstatement__outcome=True, then=1),
-                                              When(Q(poll__pollpredictionstatement__outcome=False)
-                                                   | Q(poll__pollpredictionstatement__outcome=None), then=0),
+                                              default=0,
                                               output_field=models.DecimalField(max_digits=13, decimal_places=8))),
 
                          imac=Case(When(~Q(number_of_evaluated_predictions=0),
