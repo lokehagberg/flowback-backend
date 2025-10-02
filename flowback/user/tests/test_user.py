@@ -54,8 +54,12 @@ class UserTest(APITestCase):
     def test_user_create(self):
         for i in range(3):
             user_create(email="test@example.com")
-            onboard_user = user_create(email="test@example.com")  # Test twice for unique conflicts
             generate_request(UserCreateApi, data=dict(email="test@example.com"))
+            onboard_user = user_create(email="test@example.com")  # Test twice for unique conflicts
+
+
+            print(onboard_user.verification_code, OnboardUser.objects.get(id=onboard_user.id).verification_code)
+
             user = user_create_verify(username="test_user",
                                       verification_code=str(onboard_user.verification_code),
                                       password="TestPassword!=27")

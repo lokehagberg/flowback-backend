@@ -34,8 +34,9 @@ def user_create(*, email: str) -> OnboardUser | None:
             else:
                 raise ValidationError('Username already exists.')
 
-    onboard_user, created = OnboardUser.objects.update_or_create(email=email, defaults=dict(is_verified=False,
-                                                                                    verification_code=uuid.uuid4().hex))
+    onboard_user, created = OnboardUser.objects.update_or_create(email=email,
+                                                                 defaults=dict(is_verified=False,
+                                                                               verification_code=uuid.uuid4()))
 
     link = f'Use this code to create your account: {onboard_user.verification_code}'
     if URL_USER_CREATE:
