@@ -2,6 +2,7 @@ from django.contrib.auth import logout
 from drf_spectacular.utils import extend_schema
 from phonenumber_field.serializerfields import PhoneNumberField
 from rest_framework import serializers, status
+from rest_framework.authtoken.models import Token
 from rest_framework.permissions import AllowAny
 from tutorial.quickstart.serializers import UserSerializer
 
@@ -51,9 +52,9 @@ class UserCreateVerifyApi(APIView):
         serializer = self.InputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        user_create_verify(**serializer.validated_data)
-
-        return Response(status=status.HTTP_201_CREATED)
+        user = user_create_verify(**serializer.validated_data)
+        token, created = Token.objects.get_or_create(user=user)
+        return Response(status=status.HTTP_201_CREATED, data={'token': token.key})
 
 
 class UserForgotPasswordApi(APIView):
