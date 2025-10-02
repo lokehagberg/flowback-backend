@@ -1,9 +1,11 @@
 from typing import Union
 
 import django_filters
+from django.db.models import Q
 from django.forms import model_to_dict
 from rest_framework.exceptions import ValidationError, PermissionDenied
 
+from flowback.group.literals import GroupPermission
 from flowback.group.models import Group, GroupUser, WorkGroup, WorkGroupUser, GroupPermissions
 from flowback.user.models import User
 
@@ -88,6 +90,25 @@ def group_user_permissions(*,
 
     return group_user
 
+
+def permission_q(group_user_q_root: str, *permissions: GroupPermission):
+    """
+    Returns a Q object that checks if a group user has the required permissions
+    :param group_user_q_root: The root of the Q object that leads to the group user e.g.
+     "groupuserdelegate__group_user"
+    :param permissions: The permission to check for e.g. "allow_vote"
+    """
+    # Check if the user has permission set
+    q1 = Q(**{f'{group_user_q_root}__permission__isnull': False})
+    for p in permissions:
+        q1 &= Q(**{f'{group_user_q_root}__permission__{p}': True})
+
+    # Otherwise, check the group default permission
+    q2 = Q(**{f'{group_user_q_root}__permission__isnull': True})
+    for p in permissions:
+        q2 &= Q(**{f'{group_user_q_root}__group__default_permission__{p}': True})
+
+    return q1 | q2
 
 class BaseGroupPermissionsFilter(django_filters.FilterSet):
     class Meta:

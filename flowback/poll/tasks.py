@@ -42,8 +42,8 @@ def poll_area_vote_count(poll_id: int):
                 poll=poll)
 
     return (f"Poll {poll_id} area task completed. "
-            f"{'No tags have won.' if not tag else 
-                f'Tag: {tag.name} has won with {statement.pollareastatementvote_set.all().count()} points.'}")
+            f"{'No tags have won.' if not tag else
+            f'Tag: {tag.name} has won with {statement.pollareastatementvote_set.all().count()} points.'}")
 
 
 @shared_task
@@ -339,7 +339,16 @@ def poll_proposal_vote_count(poll_id: int) -> None:
         return
 
     # Count delegators participating in poll
-    mandate = GroupUserDelegatePool.objects.filter(polldelegatevoting__poll=poll).aggregate(
+    mandate = GroupUserDelegatePool.objects.filter(
+        Q(polldelegatevoting__poll=poll)
+
+        # Group permissions
+        & Q(Q(groupuserdelegate__group_user__permission__isnull=False)
+            & Q(groupuserdelegate__group_user__permission__allow_vote=True)
+            | Q(groupuserdelegate__group_user__permission__isnull=True)
+            & Q(groupuserdelegate__group_user__group__default_permission__allow_vote=True))
+
+    ).aggregate(
         mandate=Count('groupuserdelegator',
                       filter=~Q(groupuserdelegator__delegator__pollvoting__poll=poll)
                              & Q(groupuserdelegator__tags__in=[poll.tag])
@@ -376,7 +385,8 @@ def poll_proposal_vote_count(poll_id: int) -> None:
                                    & Q(Q(created_by__groupuserdelegator__delegator__permission__isnull=False)
                                        & Q(created_by__groupuserdelegator__delegator__permission__allow_vote=True)
                                        | Q(created_by__groupuserdelegator__delegator__permission__isnull=True)
-                                       & Q(created_by__groupuserdelegator__delegator__group__default_permission__allow_vote=True))
+                                       & Q(
+                                created_by__groupuserdelegator__delegator__group__default_permission__allow_vote=True))
                             )).values('total_mandate')
 
     PollDelegateVoting.objects.update(mandate=Subquery(total_mandate))

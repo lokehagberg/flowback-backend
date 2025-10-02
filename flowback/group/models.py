@@ -1,6 +1,5 @@
 import logging
 import uuid
-from datetime import timezone
 
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db.models import Q
@@ -62,7 +61,7 @@ class GroupPermissions(BaseModel):
     force_delete_comment = models.BooleanField(default=False)
 
     @staticmethod
-    def negate_field_perms():
+    def negate_field_perms() -> list[str]:
         return ['id', 'created_at', 'updated_at', 'role_name', 'author']
 
 
