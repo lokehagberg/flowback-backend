@@ -91,22 +91,22 @@ def group_user_permissions(*,
     return group_user
 
 
-def permission_q(group_user_q_root: str, *permissions: GroupPermission):
+def permission_q(root: str, *permissions: GroupPermission):
     """
     Returns a Q object that checks if a group user has the required permissions
-    :param group_user_q_root: The root of the Q object that leads to the group user e.g.
+    :param root: The root of the Q object that leads to the group user e.g.
      "groupuserdelegate__group_user"
     :param permissions: The permission to check for e.g. "allow_vote"
     """
     # Check if the user has permission set
-    q1 = Q(**{f'{group_user_q_root}__permission__isnull': False})
+    q1 = Q(**{f'{root}__permission__isnull': False})
     for p in permissions:
-        q1 &= Q(**{f'{group_user_q_root}__permission__{p}': True})
+        q1 &= Q(**{f'{root}__permission__{p}': True})
 
     # Otherwise, check the group default permission
-    q2 = Q(**{f'{group_user_q_root}__permission__isnull': True})
+    q2 = Q(**{f'{root}__permission__isnull': True})
     for p in permissions:
-        q2 &= Q(**{f'{group_user_q_root}__group__default_permission__{p}': True})
+        q2 &= Q(**{f'{root}__group__default_permission__{p}': True})
 
     return q1 | q2
 

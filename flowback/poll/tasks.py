@@ -8,6 +8,7 @@ from django.utils import timezone
 from backend.settings import DEBUG
 from flowback.common.services import get_object
 from flowback.group.models import GroupTags, GroupUser, GroupUserDelegatePool
+from flowback.group.selectors.permission import permission_q
 from flowback.group.selectors.tags import group_tags_list
 from flowback.notification.models import NotificationChannel
 from flowback.poll.models import Poll, PollAreaStatement, PollPredictionBet, PollPredictionStatement, \
@@ -341,24 +342,14 @@ def poll_proposal_vote_count(poll_id: int) -> None:
     # Count delegators participating in poll
     mandate = GroupUserDelegatePool.objects.filter(
         Q(polldelegatevoting__poll=poll)
-
-        # Group permissions
-        & Q(Q(groupuserdelegate__group_user__permission__isnull=False)
-            & Q(groupuserdelegate__group_user__permission__allow_vote=True)
-            | Q(groupuserdelegate__group_user__permission__isnull=True)
-            & Q(groupuserdelegate__group_user__group__default_permission__allow_vote=True))
+        & permission_q('groupuserdelegate__group_user', 'allow_vote')
 
     ).aggregate(
         mandate=Count('groupuserdelegator',
                       filter=~Q(groupuserdelegator__delegator__pollvoting__poll=poll)
                              & Q(groupuserdelegator__tags__in=[poll.tag])
                              & Q(groupuserdelegator__delegator__active=True)
-
-                             # Group permissions
-                             & Q(Q(groupuserdelegator__delegator__permission__isnull=False)
-                                 & Q(groupuserdelegator__delegator__permission__allow_vote=True)
-                                 | Q(groupuserdelegator__delegator__permission__isnull=True)
-                                 & Q(groupuserdelegator__delegator__group__default_permission__allow_vote=True))
+                             & permission_q('groupuserdelegator__delegator', 'allow_vote')
                       ))['mandate']
 
     mandate_subquery = GroupUserDelegatePool.objects.filter(id=OuterRef('author_delegate__created_by')).annotate(
@@ -366,12 +357,7 @@ def poll_proposal_vote_count(poll_id: int) -> None:
                       filter=~Q(groupuserdelegator__delegator__pollvoting__poll=poll)
                              & Q(groupuserdelegator__tags__in=[poll.tag])
                              & Q(groupuserdelegator__delegator__active=True)
-
-                             # Group permissions
-                             & Q(Q(groupuserdelegator__delegator__permission__isnull=False)
-                                 & Q(groupuserdelegator__delegator__permission__allow_vote=True)
-                                 | Q(groupuserdelegator__delegator__permission__isnull=True)
-                                 & Q(groupuserdelegator__delegator__group__default_permission__allow_vote=True))
+                             & permission_q('groupuserdelegator__delegator', 'allow_vote')
                       )).values('mandate')
 
     # Count mandate for each delegate, save it to PollDelegateVoting account
@@ -380,13 +366,8 @@ def poll_proposal_vote_count(poll_id: int) -> None:
                             filter=~Q(created_by__groupuserdelegator__delegator__pollvoting__poll=poll)
                                    & Q(created_by__groupuserdelegator__tags__in=[poll.tag])
                                    & Q(created_by__groupuserdelegator__delegator__active=True)
-
-                                   # Group permissions
-                                   & Q(Q(created_by__groupuserdelegator__delegator__permission__isnull=False)
-                                       & Q(created_by__groupuserdelegator__delegator__permission__allow_vote=True)
-                                       | Q(created_by__groupuserdelegator__delegator__permission__isnull=True)
-                                       & Q(
-                                created_by__groupuserdelegator__delegator__group__default_permission__allow_vote=True))
+                                   & permission_q('created_by__groupuserdelegator__delegator',
+                                                  'allow_vote')
                             )).values('total_mandate')
 
     PollDelegateVoting.objects.update(mandate=Subquery(total_mandate))
