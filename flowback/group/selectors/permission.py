@@ -108,7 +108,7 @@ def permission_q(root: str, *permissions: GroupPermission):
     for p in permissions:
         q2 &= Q(**{f'{root}__group__default_permission__{p}': True})
 
-    return q1 | q2
+    return Q(q1 | q2)
 
 class BaseGroupPermissionsFilter(django_filters.FilterSet):
     class Meta:
