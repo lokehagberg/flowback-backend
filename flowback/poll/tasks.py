@@ -343,7 +343,6 @@ def poll_proposal_vote_count(poll_id: int) -> None:
     mandate = GroupUserDelegatePool.objects.filter(
         Q(polldelegatevoting__poll=poll)
         & permission_q('groupuserdelegate__group_user', 'allow_vote')
-
     ).aggregate(
         mandate=Count('groupuserdelegator',
                       filter=~Q(groupuserdelegator__delegator__pollvoting__poll=poll)
