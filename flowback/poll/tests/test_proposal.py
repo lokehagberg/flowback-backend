@@ -20,6 +20,7 @@ class ProposalTest(APITestCase):
          self.group_user_two,
          self.group_user_three) = GroupUserFactory.create_batch(3, group=self.group)
         self.poll_schedule = PollFactory(created_by=self.group_user_one, poll_type=Poll.PollType.SCHEDULE,
+                                         dynamic=True,
                                          **generate_poll_phase_kwargs('proposal'))
         self.poll_cardinal = PollFactory(created_by=self.group_user_one, poll_type=Poll.PollType.CARDINAL,
                                          **generate_poll_phase_kwargs('proposal'))
