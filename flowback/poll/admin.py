@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Poll, PollProposal, PollPredictionBet, PollPhaseTemplate
+from .models import Poll, PollProposal, PollPredictionBet, PollPhaseTemplate, PollAreaStatement, PollAreaStatementVote, PollAreaStatementSegment
 
 
 @admin.register(Poll)
@@ -62,3 +62,27 @@ class PollPhaseTemplateAdmin(admin.ModelAdmin):
     )
 
     ordering = ('-created_at', 'created_at')
+
+
+@admin.register(PollAreaStatement)
+class PollAreaStatementAdmin(admin.ModelAdmin):
+    list_display = ('poll', 'created_by', 'created_at')
+    list_filter = ('created_at',)
+    search_fields = ('poll__title', 'created_by__user__username')
+    date_hierarchy = 'created_at'
+
+
+@admin.register(PollAreaStatementVote)
+class PollAreaStatementVoteAdmin(admin.ModelAdmin):
+    list_display = ('poll_area_statement', 'created_by', 'vote', 'created_at')
+    list_filter = ('vote', 'created_at')
+    search_fields = ('poll_area_statement__poll__title', 'created_by__user__username')
+    date_hierarchy = 'created_at'
+
+
+@admin.register(PollAreaStatementSegment)
+class PollAreaStatementSegmentAdmin(admin.ModelAdmin):
+    list_display = ('poll_area_statement', 'tag', 'created_at')
+    list_filter = ('tag', 'created_at')
+    search_fields = ('poll_area_statement__poll__title', 'tag__name')
+    date_hierarchy = 'created_at'

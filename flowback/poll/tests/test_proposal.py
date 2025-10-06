@@ -1,6 +1,8 @@
 from django.utils import timezone
 from django.core.exceptions import ObjectDoesNotExist
-from rest_framework.test import APIRequestFactory, force_authenticate, APITestCase
+from rest_framework.test import APITestCase
+
+from flowback.common.tests import generate_request
 from .factories import PollFactory, PollProposalFactory, PollProposalTypeScheduleFactory
 
 from .utils import generate_poll_phase_kwargs
@@ -36,25 +38,17 @@ class ProposalTest(APITestCase):
                                                                    poll=self.poll_cardinal) for x in group_users]
 
     def test_proposal_list_cardinal(self):
-        factory = APIRequestFactory()
-        user = self.group_user_one.user
-        view = PollProposalListAPI.as_view()
-        request = factory.get('')
-        force_authenticate(request, user=user)
-
-        response = view(request, poll=self.poll_cardinal.id)
+        response = generate_request(api=PollProposalListAPI,
+                                  user=self.group_user_one.user,
+                                  url_params={'poll': self.poll_cardinal.id})
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data.get('count'), 3)
 
     def test_proposal_list_schedule(self):
-        factory = APIRequestFactory()
-        user = self.group_user_one.user
-        view = PollProposalListAPI.as_view()
-        request = factory.get('')
-        force_authenticate(request, user=user)
-
-        response = view(request, poll=self.poll_schedule.id)
+        response = generate_request(api=PollProposalListAPI,
+                                  user=self.group_user_one.user,
+                                  url_params={'poll': self.poll_schedule.id})
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data.get('count'), 3)
@@ -63,13 +57,9 @@ class ProposalTest(APITestCase):
         self.group.hide_poll_users = True
         self.group.save()
 
-        factory = APIRequestFactory()
-        user = self.group_user_one.user
-        view = PollProposalListAPI.as_view()
-        request = factory.get('')
-        force_authenticate(request, user=user)
-
-        response = view(request, poll=self.poll_schedule.id)
+        response = generate_request(api=PollProposalListAPI,
+                                  user=self.group_user_one.user,
+                                  url_params={'poll': self.poll_schedule.id})
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data.get('count'), 3)
@@ -82,14 +72,13 @@ class ProposalTest(APITestCase):
                         event__start_date=None,
                         attachments=None,
                         event__end_date=None):
-        factory = APIRequestFactory()
-        view = PollProposalCreateAPI.as_view()
         data = {x: y for x, y in
                 dict(title=title, description=description, start_date=event__start_date, end_date=event__end_date,
                      attachments=attachments).items() if y is not None}
-        request = factory.post('', data=data)
-        force_authenticate(request, user)
-        return view(request, poll=poll.id)
+        return generate_request(api=PollProposalCreateAPI,
+                              data=data,
+                              user=user,
+                              url_params={'poll': poll.id})
 
     def test_proposal_create(self):
         response = self.proposal_create(user=self.group_user_one.user, poll=self.poll_cardinal,
@@ -130,12 +119,9 @@ class ProposalTest(APITestCase):
 
     @staticmethod
     def proposal_delete(proposal, user):
-        factory = APIRequestFactory()
-        view = PollProposalDeleteAPI.as_view()
-        request = factory.post('')
-        force_authenticate(request, user=user)
-
-        return view(request, proposal=proposal.id)
+        return generate_request(api=PollProposalDeleteAPI,
+                              user=user,
+                              url_params={'proposal': proposal.id})
 
     def test_proposal_delete(self):
         user = self.group_user_one.user
