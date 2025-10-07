@@ -1,4 +1,3 @@
-from django.contrib.postgres.aggregates import ArrayAgg
 from rest_framework.exceptions import ValidationError
 
 from flowback.common.services import get_object

@@ -1,6 +1,9 @@
+from datetime import datetime
+
 from rest_framework.test import APITestCase
 from rest_framework.exceptions import ValidationError
-from .factories import PollFactory, PollProposalFactory
+from .factories import (PollFactory, PollProposalFactory, PollVotingFactory, PollDelegateVotingFactory,
+                        PollVotingTypeCardinalFactory, PollVotingTypeForAgainstFactory)
 from .utils import generate_poll_phase_kwargs
 from ..models import PollDelegateVoting, PollVotingTypeCardinal, Poll, PollProposal, PollVoting, \
     PollVotingTypeForAgainst
@@ -217,6 +220,118 @@ class PollVoteTest(APITestCase):
 
         self.assertEqual(event.start_date, self.poll_schedule_proposal_three.pollproposaltypeschedule.event.start_date)
         self.assertEqual(event.end_date, self.poll_schedule_proposal_three.pollproposaltypeschedule.event.end_date)
+
+    def test_hundreds_of_polls_vote_count(self):
+        """Test poll_proposal_vote_count with hundreds of Schedule and Cardinal polls with proposals, votes and delegate votes"""
+        
+        # Create additional group users for variety
+        additional_users = GroupUserFactory.create_batch(10, group=self.group)
+        all_users = [self.group_user_one, self.group_user_two, self.group_user_three] + additional_users
+        
+        # Create delegates for delegate voting
+        delegates = GroupUserDelegateFactory.create_batch(5, group=self.group)
+        
+        # Create delegators for each delegate
+        for delegate in delegates:
+            delegators = GroupUserDelegatorFactory.create_batch(3, group=self.group, delegate_pool=delegate.pool)
+            # Add tags to some delegators
+            for delegator in delegators[:2]:  # Only first 2 delegators get tags
+                delegator.tags.add(self.poll_cardinal.tag)
+        
+        polls_created = []
+        
+        # Create 200 Schedule polls
+        for i in range(200):
+            poll = PollFactory(
+                created_by=all_users[i % len(all_users)],
+                poll_type=Poll.PollType.SCHEDULE,
+                tag=self.poll_cardinal.tag,
+                dynamic=True,  # Required for Schedule polls
+                **generate_poll_phase_kwargs('result')
+            )
+            polls_created.append(poll)
+            
+            # Create 3-5 proposals per poll
+            num_proposals = 3 + (i % 3)  # 3, 4, or 5 proposals
+            proposals = []
+            for j in range(num_proposals):
+                proposal = PollProposalFactory(poll=poll, created_by=poll.created_by, title=f"Schedule Proposal {i}-{j}")
+                proposals.append(proposal)
+            
+            # Create regular votes from users
+            for j, user in enumerate(all_users[:5 + (i % 3)]):  # 5-7 users vote
+                voting = PollVotingFactory(created_by=user, poll=poll)
+                # Vote for 2-3 proposals
+                voted_proposals = proposals[:2 + (j % 2)]
+                for proposal in voted_proposals:
+                    PollVotingTypeForAgainstFactory(author=voting, proposal=proposal, vote=True)
+            
+            # Create delegate votes
+            if i % 3 == 0:  # Every 3rd poll gets delegate votes
+                delegate = delegates[i % len(delegates)]
+                delegate_voting = PollDelegateVotingFactory(created_by=delegate.pool, poll=poll)
+                # Delegate votes for some proposals
+                for proposal in proposals[:2]:
+                    PollVotingTypeForAgainstFactory(author_delegate=delegate_voting, proposal=proposal, vote=True)
+        
+        # Create 200 Cardinal polls  
+        for i in range(200):
+            poll = PollFactory(
+                created_by=all_users[i % len(all_users)],
+                poll_type=Poll.PollType.CARDINAL,
+                tag=self.poll_cardinal.tag,
+                **generate_poll_phase_kwargs('result')
+            )
+            polls_created.append(poll)
+            
+            # Create 3-5 proposals per poll
+            num_proposals = 3 + (i % 3)  # 3, 4, or 5 proposals
+            proposals = []
+            for j in range(num_proposals):
+                proposal = PollProposalFactory(poll=poll, created_by=poll.created_by, title=f"Cardinal Proposal {i}-{j}")
+                proposals.append(proposal)
+            
+            # Create regular votes from users
+            for j, user in enumerate(all_users[:5 + (i % 3)]):  # 5-7 users vote
+                voting = PollVotingFactory(created_by=user, poll=poll)
+                # Vote for all proposals with random scores
+                for k, proposal in enumerate(proposals):
+                    score = 10 + (i + j + k) % 90  # Scores between 10-99
+                    PollVotingTypeCardinalFactory(author=voting, proposal=proposal, raw_score=score, score=score)
+            
+            # Create delegate votes
+            if i % 4 == 0:  # Every 4th poll gets delegate votes
+                delegate = delegates[i % len(delegates)]
+                delegate_voting = PollDelegateVotingFactory(created_by=delegate.pool, poll=poll)
+                # Delegate votes for all proposals
+                for k, proposal in enumerate(proposals):
+                    score = 20 + (i + k) % 80  # Delegate scores between 20-99
+                    PollVotingTypeCardinalFactory(author_delegate=delegate_voting, proposal=proposal, raw_score=score, score=score)
+        
+        self.assertEqual(len(polls_created), 400, "Should have created 400 polls total")
+        
+        # Run poll_proposal_vote_count for all polls
+        successful_counts = 0
+        time = datetime.now()
+        for poll in polls_created:
+            print(datetime.now() - time)
+            time = datetime.now()
+            poll_proposal_vote_count(poll_id=poll.id)
+            successful_counts += 1
+        
+        # Verify that most polls were processed successfully
+        self.assertGreater(successful_counts, 350, f"At least 350 polls should be processed successfully, got {successful_counts}")
+        
+        # Verify some polls have updated scores
+        updated_polls = Poll.objects.filter(id__in=[p.id for p in polls_created], result=True)
+        self.assertGreater(updated_polls.count(), 100, "At least 100 polls should have result=True")
+        
+        # Verify some proposals have scores > 0
+        proposals_with_scores = PollProposal.objects.filter(
+            poll__in=polls_created, 
+            score__gt=0
+        ).count()
+        self.assertGreater(proposals_with_scores, 500, "At least 500 proposals should have scores > 0")
 
 
 class PollDelegateVoteTest(APITestCase):

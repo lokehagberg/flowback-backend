@@ -98,6 +98,9 @@ def permission_q(root: str, *permissions: GroupPermission):
      "groupuserdelegate__group_user"
     :param permissions: The permission to check for e.g. "allow_vote"
     """
+    # Check if group user exists
+    q0 = Q(**{f'{root}__isnull': False})
+
     # Check if the user has permission set
     q1 = Q(**{f'{root}__permission__isnull': False})
     for p in permissions:
@@ -108,7 +111,7 @@ def permission_q(root: str, *permissions: GroupPermission):
     for p in permissions:
         q2 &= Q(**{f'{root}__group__default_permission__{p}': True})
 
-    return Q(q1 | q2)
+    return Q(q0 & Q(q1 | q2))
 
 class BaseGroupPermissionsFilter(django_filters.FilterSet):
     class Meta:

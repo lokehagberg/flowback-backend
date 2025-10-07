@@ -332,26 +332,24 @@ def poll_prediction_bet_count(poll_id: int):
 
 @shared_task
 def poll_proposal_vote_count(poll_id: int) -> None:
-    poll = get_object(Poll, id=poll_id)
+    # Count Mandate
+    # Skip ranking and work on cardinal, rename to Poll Score
+    # Count user votes
+    # Update scores for each vote (keep raw_score intact)
+    # Update proposal scores
+    # Update participants
+    # Check quorum
+    # Update poll status
+    # Update IMAC
+    # Set result to True
+    # Save and notify
+
+    poll = Poll.objects.get(id=poll_id)
     group = poll.created_by.group
-    total_proposals = poll.pollproposal_set.count()
 
-    if poll.status:
-        return
-
-    # Count delegators participating in poll
-    mandate = GroupUserDelegatePool.objects.filter(
-        Q(polldelegatevoting__poll=poll)
-        & permission_q('groupuserdelegate__group_user', 'allow_vote')
-    ).aggregate(
-        mandate=Count('groupuserdelegator',
-                      filter=~Q(groupuserdelegator__delegator__pollvoting__poll=poll)
-                             & Q(groupuserdelegator__tags__in=[poll.tag])
-                             & Q(groupuserdelegator__delegator__active=True)
-                             & permission_q('groupuserdelegator__delegator', 'allow_vote')
-                      ))['mandate']
-
-    mandate_subquery = GroupUserDelegatePool.objects.filter(id=OuterRef('author_delegate__created_by')).annotate(
+    # Update the delegate's mandate.
+    # Mandate is set to 0 by default
+    mandate = GroupUserDelegatePool.objects.filter(id=OuterRef('created_by')).annotate(
         mandate=Count('groupuserdelegator',
                       filter=~Q(groupuserdelegator__delegator__pollvoting__poll=poll)
                              & Q(groupuserdelegator__tags__in=[poll.tag])
@@ -359,121 +357,69 @@ def poll_proposal_vote_count(poll_id: int) -> None:
                              & permission_q('groupuserdelegator__delegator', 'allow_vote')
                       )).values('mandate')
 
-    # Count mandate for each delegate, save it to PollDelegateVoting account
-    total_mandate = PollDelegateVoting.objects.filter(id=OuterRef('id')).annotate(
-        total_mandate=Count('created_by__groupuserdelegator',
-                            filter=~Q(created_by__groupuserdelegator__delegator__pollvoting__poll=poll)
-                                   & Q(created_by__groupuserdelegator__tags__in=[poll.tag])
-                                   & Q(created_by__groupuserdelegator__delegator__active=True)
-                                   & permission_q('created_by__groupuserdelegator__delegator',
-                                                  'allow_vote')
-                            )).values('total_mandate')
+    PollDelegateVoting.objects.filter(
+        permission_q('created_by__groupuserdelegate__group_user', 'allow_vote'),
+        poll=poll).update(mandate=Subquery(mandate))
 
-    PollDelegateVoting.objects.update(mandate=Subquery(total_mandate))
+    # Query to get a delegate's mandate
+    delegate_mandate = PollDelegateVoting.objects.filter(
+        id=OuterRef('author_delegate')
+    ).values('mandate')
 
-    if poll.poll_type == Poll.PollType.RANKING:
-        if poll.tag:
-            delegate_votes = PollVotingTypeRanking.objects.filter(author_delegate__poll=poll).values('pk').annotate(
-                score=(total_proposals - (Count('author_delegate__pollvotingtyperanking') - F('priority'))
-                       ) * Subquery(mandate_subquery))
-
-            # Set score to the same as priority for user votes
-            user_votes = PollVotingTypeRanking.objects.filter(author__poll=poll
-                                                              ).values('pk').annotate(
-                score=total_proposals - (Count('author__pollvotingtyperanking') - F('priority')))
-
-            for i in user_votes:
-                PollVotingTypeRanking.objects.filter(id=i['pk']).update(score=i['score'])
-
-            for i in delegate_votes:
-                PollVotingTypeRanking.objects.filter(id=i['pk']).update(score=i['score'])
-
-            # TODO make this work, replace both above
-            # PollVotingTypeRanking.objects.bulk_update(delegate_votes | user_votes, fields=('score',))
-
-            # Update scores on each proposal, Summarize both regular votes and delegate votes
-            proposals = PollProposal.objects.filter(poll_id=poll_id).values('pk') \
-                .annotate(score=Sum('pollvotingtyperanking__score'))
-
-            for i in proposals:
-                PollProposal.objects.filter(id=i['pk']).update(score=i['score'])
-
-            # TODO make this work aswell, replace above
-            # PollProposal.objects.bulk_update(proposals, fields=('score',))
-
-            poll.participants = (mandate + PollVoting.objects.filter(poll=poll).all().count()) or 1
-            poll.save()
+    if poll.status or poll.poll_type == Poll.PollType.RANKING:
+        return
 
     if poll.poll_type == Poll.PollType.CARDINAL:
-        if poll.tag:
-            # Sets baseline scores to all votes
-            PollVotingTypeCardinal.objects.filter(author__isnull=False,
-                                                  proposal__poll=poll).update(score=F('raw_score'))
-            # Calculate final scores
-            multiplier = PollVotingTypeCardinal.objects.filter(id=OuterRef('id')).annotate(
-                multiplier=F('author_delegate__mandate')).values('multiplier')
+        # Update user vote scores
+        PollVotingTypeCardinal.objects.filter(
+            permission_q('author__created_by', 'allow_vote'),
+            author__poll=poll).update(score=F('raw_score'))
 
-            PollVotingTypeCardinal.objects.filter(author_delegate__isnull=False, proposal__poll=poll
-                                                  ).update(score=F('raw_score') * Subquery(multiplier))
+        # Update delegate vote scores
+        PollVotingTypeCardinal.objects.filter(author_delegate__poll=poll
+                                              ).update(score=F('raw_score') * Subquery(delegate_mandate))
 
-            proposal_scores = PollProposal.objects.filter(id=OuterRef('id')).annotate(
-                final_score=Sum('pollvotingtypecardinal__score')).values('final_score')
-            PollProposal.objects.update(score=Subquery(proposal_scores))
+        # Update proposal scores
+        proposal_scores = PollVotingTypeCardinal.objects.filter(
+            proposal=OuterRef('id')
+        ).values('proposal').annotate(
+            total_score=Sum('score')
+        ).values('total_score')
 
-            poll.participants = (mandate + PollVoting.objects.filter(poll=poll).all().count()) or 1
-            poll.save()
+        PollProposal.objects.filter(poll=poll).update(score=Subquery(proposal_scores))
 
     if poll.poll_type == Poll.PollType.SCHEDULE:
-        if poll.tag:
-            delegate_votes = PollVotingTypeForAgainst.objects.filter(author_delegate__poll=poll).values('pk').annotate(
-                score=(Count('author_delegate__pollvotingtypeforagainst',
-                             filter=Q(vote=True)) * Subquery(mandate_subquery) -
-                       Count('author_delegate__pollvotingtypeforagainst',
-                             filter=Q(vote=False)) * Subquery(mandate_subquery)))
+        # Update user vote scores
+        PollVotingTypeForAgainst.objects.filter(
+            permission_q('author__created_by', 'allow_vote'),
+            author__poll=poll).update(score=Case(When(vote=True, then=1), default=-1))
 
-            # Set score to the same as priority for user votes
-            user_votes = PollVotingTypeForAgainst.objects.filter(author__poll=poll, vote=True).values('pk', 'vote')
+        # Update delegate vote scores
+        PollVotingTypeForAgainst.objects.filter(author_delegate__poll=poll
+                                                ).update(score=Case(When(vote=True, then=1), default=-1)
+                                                               * Subquery(delegate_mandate))
 
-            for i in user_votes:
-                PollVotingTypeForAgainst.objects.filter(id=i['pk']).update(score=int(i['vote']))
+        # Update proposal scores
+        proposal_scores = PollVotingTypeForAgainst.objects.filter(
+            proposal=OuterRef('id')
+        ).values('proposal').annotate(
+            total_score=Sum('score')
+        ).values('total_score')
 
-            for i in delegate_votes:
-                PollVotingTypeForAgainst.objects.filter(id=i['pk']).update(score=int(i['vote']))
+        PollProposal.objects.filter(poll=poll).update(score=Subquery(proposal_scores))
 
-            # TODO make this work, replace both above (Copied from ranking comment)
-            # PollVotingTypeSchedule.objects.bulk_update(delegate_votes | user_votes, fields=('score',))
-
-            # Update scores on each proposal, Summarize both regular votes and delegate votes
-            proposals = PollProposal.objects.filter(poll_id=poll_id).values('pk') \
-                .annotate(score=Sum('pollvotingtypeforagainst__score'))
-
-            for i in proposals:
-                PollProposal.objects.filter(id=i['pk']).update(score=i['score'])
-
-            # TODO make this work aswell, replace above
-            # PollProposal.objects.bulk_update(proposals, fields=('score',))
-
-            poll.participants = (mandate + PollVoting.objects.filter(poll=poll).all().count()) or 1
-            poll.save()
-
+    # Check if quorum is fulfilled
     total_group_users = GroupUser.objects.filter(group=group).count()
     quorum = (poll.quorum if poll.quorum is not None else group.default_quorum) / 100
+    user_participants = PollVoting.objects.filter(permission_q('created_by','allow_vote'),
+                                                  poll=poll).count()
+    delegate_participants = PollDelegateVoting.objects.filter(poll=poll).aggregate(mandate=Sum('mandate'))['mandate']
+    participants = user_participants or 0 + delegate_participants or 0
+    poll.participants = participants
+    poll.save()
 
     if poll.finished and not poll.result:
-        if poll.poll_type == Poll.PollType.SCHEDULE:
-            winning_proposal = PollProposal.objects.filter(
-                poll_id=poll_id).order_by('-score', '-pollproposaltypeschedule__event__start_date').first()
-            if winning_proposal:
-                event = winning_proposal.pollproposaltypeschedule.event
-                create_event(schedule_id=group.schedule_id,
-                             title=poll.title,
-                             start_date=event.start_date,
-                             end_date=event.end_date,
-                             origin_name=poll.schedule_origin,
-                             origin_id=poll.id,
-                             description=poll.description)
-
-        print(f"Total Participants: {poll.participants}")
+        print(f"Total Participants: {participants}")
         print(f"Total Group Users: {total_group_users}")
         print(f"Quorum: {quorum}")
         poll.status = 1 if poll.participants > total_group_users * quorum else -1
@@ -485,3 +431,16 @@ def poll_proposal_vote_count(poll_id: int) -> None:
         notify_poll(message="Poll has ended and results have been counted",
                     action=NotificationChannel.Action.UPDATED,
                     poll=poll)
+
+        if poll.poll_type == Poll.PollType.SCHEDULE and poll.status == 1:
+            winning_proposal = PollProposal.objects.filter(
+                poll_id=poll_id).order_by('-score', '-pollproposaltypeschedule__event__start_date').first()
+            if winning_proposal:
+                event = winning_proposal.pollproposaltypeschedule.event
+                create_event(schedule_id=group.schedule_id,
+                             title=poll.title,
+                             start_date=event.start_date,
+                             end_date=event.end_date,
+                             origin_name=poll.schedule_origin,
+                             origin_id=poll.id,
+                             description=poll.description)
