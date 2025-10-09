@@ -217,7 +217,8 @@ def poll_prediction_bet_count(poll_id: int):
         dprint("Previous Bets Trimmed:", previous_bets_trimmed)
         for bets in previous_bets_trimmed:
             bets_trimmed = [i for i in bets if i is not None]
-            bias_adjustments.append(0 if len(bets) == 0 else previous_outcome_avg - (sum(bets_trimmed) /
+            bias_adjustments.append(0 if len(bets) == 0 else previous_outcome_avg - (0 if not bets_trimmed else
+                                                                                     sum(bets_trimmed) /
                                                                                      len(bets_trimmed)))
 
             predictor_errors.append(np.array([previous_outcomes[i] - bets[i]
