@@ -73,9 +73,9 @@ def poll_prediction_bet_count(poll_id: int):
                              output_field=models.IntegerField())),
         outcome_scores=Case(When(outcome_sum__gt=0, then=1),
                             When(outcome_sum__lt=0, then=0),
-                            default=0.5,
-                            output_field=models.FloatField())
-    ).order_by('-created_at').all()
+                            default=None,
+                            output_field=models.FloatField(null=True))
+    ).filter(outcome_scores__isnull=False).order_by('-created_at').all()
 
     previous_outcomes = list(statements.filter(~Q(poll=poll)).values_list('outcome_scores', flat=True))
     previous_outcome_avg = 0 if len(previous_outcomes) == 0 else sum(previous_outcomes) / len(previous_outcomes)
@@ -217,8 +217,7 @@ def poll_prediction_bet_count(poll_id: int):
         dprint("Previous Bets Trimmed:", previous_bets_trimmed)
         for bets in previous_bets_trimmed:
             bets_trimmed = [i for i in bets if i is not None]
-            bias_adjustments.append(0 if len(bets) == 0 else previous_outcome_avg - (0 if not bets_trimmed else
-                                                                                     sum(bets_trimmed) /
+            bias_adjustments.append(0 if len(bets) == 0 else previous_outcome_avg - (sum(bets_trimmed) /
                                                                                      len(bets_trimmed)))
 
             predictor_errors.append(np.array([previous_outcomes[i] - bets[i]
