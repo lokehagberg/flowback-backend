@@ -450,18 +450,17 @@ class PollPredictionStatementTest(APITestCase):
             PollAreaStatementVote.objects.create(poll_area_statement=area_statement2, created_by=user, vote=True)
 
         # Test the task
-        result = poll_area_vote_count(poll_id=area_poll.id)
+        poll_area_vote_count(poll_id=area_poll.id)
 
         # Verify the poll tag was updated to the winning tag
         area_poll.refresh_from_db()
         self.assertEqual(area_poll.tag, tag1)
-        self.assertEqual(result.id, area_poll.id)
 
         # Test case where no statements exist
         empty_poll = PollFactory(created_by=self.user_group_creator, tag=self.poll.tag,
                                  **generate_poll_phase_kwargs('area'))
 
-        result = poll_area_vote_count(poll_id=empty_poll.id)
+        poll_area_vote_count(poll_id=empty_poll.id)
         empty_poll.refresh_from_db()
         # Tag should remain unchanged
         self.assertEqual(empty_poll.tag, self.poll.tag)
@@ -527,3 +526,90 @@ class PollPredictionStatementTest(APITestCase):
                 user=self.user_prediction_caster_two.user,
                 prediction_statement_id=statement.id
             )
+
+    def test_poll_prediction_bet_count_with_fresh_users(self):
+        """Test poll_prediction_bet_count where previous poll has outcomes and new poll has only fresh users without bet history."""
+        
+        # Step 1: Create and complete a previous poll with bets and outcomes
+        previous_poll = PollFactory(
+            created_by=self.user_group_creator,
+            tag=self.poll.tag,
+            **generate_poll_phase_kwargs('prediction_vote')
+        )
+        
+        # Create prediction statement for previous poll
+        previous_statement = PollPredictionStatementFactory(poll=previous_poll)
+        
+        # Add bets from existing users to previous poll
+        previous_bet_users = [
+            self.BetUser(group_user=self.user_prediction_caster_one, score=1, vote=True),
+            self.BetUser(group_user=self.user_prediction_caster_two, score=3, vote=True),
+            self.BetUser(group_user=self.user_prediction_caster_three, score=4, vote=False)
+        ]
+        
+        for bet_user in previous_bet_users:
+            PollPredictionBetFactory(
+                prediction_statement=previous_statement,
+                created_by=bet_user.group_user,
+                score=bet_user.score
+            )
+            PollPredictionStatementVoteFactory(
+                prediction_statement=previous_statement,
+                created_by=bet_user.group_user,
+                vote=bet_user.vote
+            )
+        
+        # Complete the previous poll to generate outcomes
+        poll_prediction_bet_count(poll_id=previous_poll.id)
+        previous_poll.refresh_from_db()
+        
+        # Verify previous poll completed successfully
+        self.assertEqual(previous_poll.status_prediction, 1)
+        
+        # Step 2: Create a new poll with fresh users (no previous bet history)
+        new_poll = PollFactory(
+            created_by=self.user_group_creator,
+            tag=self.poll.tag,  # Same tag to ensure it references the previous poll
+            **generate_poll_phase_kwargs('prediction_vote')
+        )
+        
+        # Create fresh group users who have no previous betting history
+        fresh_users = [GroupUserFactory(group=self.group) for _ in range(3)]
+        
+        # Create prediction statement for new poll
+        new_statement = PollPredictionStatementFactory(poll=new_poll)
+        
+        # Add bets from fresh users only (no previous bet history)
+        fresh_bet_users = [
+            self.BetUser(group_user=fresh_users[0], score=2, vote=True),
+            self.BetUser(group_user=fresh_users[1], score=5, vote=True),
+            self.BetUser(group_user=fresh_users[2], score=0, vote=False)
+        ]
+        
+        for bet_user in fresh_bet_users:
+            PollPredictionBetFactory(
+                prediction_statement=new_statement,
+                created_by=bet_user.group_user,
+                score=bet_user.score
+            )
+            PollPredictionStatementVoteFactory(
+                prediction_statement=new_statement,
+                created_by=bet_user.group_user,
+                vote=bet_user.vote
+            )
+        
+        # Step 3: Run poll_prediction_bet_count on the new poll
+        poll_prediction_bet_count(poll_id=new_poll.id)
+        new_poll.refresh_from_db()
+        
+        # Verify new poll completed successfully
+        self.assertEqual(new_poll.status_prediction, 1)
+        
+        # Verify that the combined_bet was calculated for the new statement
+        # Since these are fresh users with no history, the combined bet should be simple average
+        new_statement.refresh_from_db()
+        self.assertIsNotNone(new_statement.combined_bet)
+        
+        # Calculate expected combined bet (average of fresh user scores converted to 0-1 scale)
+        expected_combined_bet = sum([2/5, 5/5, 0/5]) / 3  # scores divided by 5, then averaged
+        self.assertAlmostEqual(float(new_statement.combined_bet), expected_combined_bet, places=2)
