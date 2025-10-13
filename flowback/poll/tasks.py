@@ -183,10 +183,10 @@ def poll_prediction_bet_count(poll_id: int):
         current_bets = [u for i, u in enumerate(current_bets) if i not in to_delete]
         previous_bets = [u for i, u in enumerate(previous_bets) if i not in to_delete]
 
-    # Delete any previous_outcomes where outcome is 0.5 (that is, undecided)
+    # Delete any previous_outcomes where all corresponding previous bets are None
     to_delete = []
     for j, previous_outcome in enumerate(previous_outcomes):
-        if previous_outcome == 0.5:
+        if all(bets[j] is None for bets in previous_bets):
             to_delete.append(j)
 
     previous_outcomes = [j for n, j in enumerate(previous_outcomes) if n not in to_delete]
