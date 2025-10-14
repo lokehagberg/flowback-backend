@@ -1,5 +1,4 @@
 import inspect
-import json
 import re
 from datetime import timedelta, datetime
 from inspect import getfullargspec, isclass
@@ -8,12 +7,12 @@ from django.db import models
 from django.db.models import F, Q
 from django.db.models.fields.files import ImageFieldFile
 from django.db.models.signals import post_save
-from django.dispatch import receiver
 from django.utils import timezone
 
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.postgres.fields import ArrayField
+from future.utils import isint
 from rest_framework.exceptions import ValidationError
 from tree_queries.models import TreeNode
 
@@ -48,6 +47,7 @@ class NotificationObject(BaseModel):
     def post_save(cls, instance, created, *args, **kwargs):
         """
         Creates Notification for users on save for the given tag
+        If NotificationSubscriptionTag has reminders, creates a Notification for each reminder
         """
 
         subscription_filters = dict()
@@ -71,14 +71,22 @@ class NotificationObject(BaseModel):
             subscribers = NotificationSubscription.objects.filter(
                 *subscription_q_filters,
                 channel=instance.channel,
-                tags__contains=[instance.tag],
+                notificationsubscriptiontag__name__contains=[instance.tag],
                 **subscription_filters
             ).exclude(
                 *exclude_subscription_q_filters,
                 **exclude_subscription_filters
-            )
+            ).annotate(reminders=F('notificationsubscriptiontag__reminders'))
 
-            notifications = [Notification(user=x.user, notification_object=instance) for x in subscribers]
+            notifications = []
+            for subscriber in subscribers:
+                if subscriber.reminders:
+                    notifications.append(*[Notification(user=subscriber.user,
+                                                        notification_object=instance,
+                                                        reminder=i) for i in subscriber.reminders])
+
+                else:
+                    notifications.append(Notification(user=subscriber.user, notification_object=instance))
             Notification.objects.bulk_create(notifications)
 
 
@@ -92,23 +100,67 @@ class Notification(BaseModel):
     notification_object = models.ForeignKey("notification.NotificationObject", on_delete=models.CASCADE)
     read = models.BooleanField(default=False)
 
+    reminder = models.IntegerField(default=0, blank=True)
+
     class Meta:
-        unique_together = ('user', 'notification_object')
+        unique_together = ('user', 'notification_object', 'reminder')
 
 
 # Notification Subscription allows users to subscribe to the NotificationChannel, to get Notifications for themselves
+# TODO update all code that needs to use NotificationSubscription with the new tags
 class NotificationSubscription(BaseModel):
     user = models.ForeignKey('user.User', on_delete=models.CASCADE)
     channel = models.ForeignKey('notification.NotificationChannel', on_delete=models.CASCADE)
-    tags = ArrayField(models.CharField(max_length=255), help_text='Tags that user has subscribed to')
-
-    def clean(self):
-        if not all([tag in self.channel.tags for tag in self.tags]):
-            raise ValidationError(f'Not all categories exists for {self.channel.name}. '
-                                  f'Following options are available: {", ".join(self.channel.tags)}')
 
     class Meta:
         unique_together = ('user', 'channel')
+
+
+class NotificationSubscriptionTag(BaseModel):
+    subscription = models.ForeignKey('notification.NotificationSubscription', on_delete=models.CASCADE)
+    name = models.CharField(max_length=255)
+    reminders = ArrayField(models.IntegerField(), help_text='Reminder times for the given tag', null=True, blank=True)
+
+    def post_save(self, instance, created, update_fields, *args, **kwargs):
+        update_fields = update_fields or []
+
+        if update_fields:
+            if not all(isinstance(field, str) for field in update_fields):
+                update_fields = [field.name for field in update_fields]
+
+        # If there are upcoming reminders, remove all and replace with new ones
+        if created or 'reminders' in update_fields:
+            Notification.objects.filter(
+                ~Q(reminder=0),
+                user=self.subscription.user,
+                notification_object__tag=self.name
+            ).annotate(ts=F('notification_object__timestamp') - F('reminder')
+                       ).filter(ts__lte=timezone.now()).delete()
+
+            notification_objects = NotificationObject.objects.filter(tag=self.name,
+                                                                     notification__user=self.subscription.user)
+
+            # Add new reminders if any
+            if self.reminders and len(self.reminders) > 0:
+                return
+
+            notifications = []
+            for notification_object in notification_objects:
+                for i in self.reminders:
+                    if notification_object.timestamp - timedelta(seconds=i) > timezone.now():
+                        notifications.append(Notification(user=self.subscription.user,
+                                                          notification_object=notification_object,
+                                                          reminder=i))
+
+            Notification.objects.bulk_create(notifications)
+
+    def clean(self):
+        if not self.name in self.subscription.channel.tags:
+            raise ValidationError(f'Tag does not exist for NotificationChannel {self.subscription.channel.name}. '
+                                  f'Following options are available: {", ".join(self.subscription.channel.tags)}')
+
+
+post_save.connect(NotificationSubscriptionTag.post_save, NotificationSubscriptionTag)
 
 
 # For any model using Notification, it is recommended to use post_save to create a NotificationChannel object
@@ -270,7 +322,17 @@ class NotificationChannel(BaseModel, TreeNode):
             models.Index(fields=["content_type", "object_id"]),
         ]
 
-    def subscribe(self, *, user, tags: list[str] = None) -> NotificationSubscription | None:
+    def subscribe(self, *, user,
+                  tags: tuple[str] | tuple[tuple[str, tuple[int]]] = None) -> NotificationSubscription | None:
+        """
+        Subscribes user to the channel.
+        :param user: The subscriber
+        :param tags: A tuple of tags to subscribe to.
+         The tuple can either contain only tag names, or tuples consisting of a tag name
+         and a tuple of reminders (in seconds before the event creation)
+        :return: A NotificationSubscription object if successful, or None if no tags are provided (unsubscribe).
+        """
+
         # Delete subscription if no tags are present
         if not tags:
             try:
@@ -281,14 +343,37 @@ class NotificationChannel(BaseModel, TreeNode):
 
             return None
 
-        tags = list(dict.fromkeys(tags))
-        if not all([x in self.tags for x in tags]):
-            raise ValidationError(f'Not all tags exists for {self.name}. '
-                                  f'Following options are available: {", ".join(self.tags)}')
+        subscription_tags: list[NotificationSubscriptionTag] = []
+        for tag in tags:
+            if isinstance(tag, str):
+                if not tag in self.tags:
+                    raise ValidationError(f'Tag does not exist for {self.name}. '
+                                          f'Following options are available: {", ".join(self.tags)}')
+
+                subscription_tags.append(NotificationSubscriptionTag(tag=tag))
+
+            # Tuple of (tag_name<str>, reminders<tuple[int]>)
+            if isinstance(tag, tuple):
+                if not tag[0] in self.tags:
+                    raise ValidationError(f'Tag does not exist for {self.name}. '
+                                          f'Following options are available: {", ".join(self.tags)}')
+
+                if not all(isinstance(reminder, int) for reminder in tag[1]):
+                    raise ValueError('Reminders must be integers.')
+
+                if len(tag[1]) > 10:
+                    raise ValidationError('There can be no more than 10 reminders for a single tag.')
+
+                subscription_tags.append(NotificationSubscriptionTag(tag=tag, reminders=tag[1]))
 
         subscription, created = NotificationSubscription.objects.update_or_create(user=user,
-                                                                                  channel=self,
-                                                                                  defaults=dict(tags=tags))
+                                                                                  channel=self)
+
+        for subscription_tag in subscription_tags:
+            subscription_tag.subscription = subscription
+            subscription_tag.full_clean()
+
+        NotificationSubscriptionTag.objects.bulk_create(subscription_tags)
 
         return subscription
 
@@ -414,7 +499,7 @@ class NotifiableModel(models.Model):
                                 docstring_data[param_name] = description
 
                 else:
-                    notification_tags_doc += ("| Field | Type | Description |\n" 
+                    notification_tags_doc += ("| Field | Type | Description |\n"
                                               "| ----- | ---- | ----------- |\n")
 
                 exclude_params = inspect.signature(NotificationChannel.notify).parameters.keys()
