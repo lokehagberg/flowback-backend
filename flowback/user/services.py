@@ -87,7 +87,7 @@ def user_forgot_password(*, email: str) -> PasswordReset:
 
     if URL_USER_FORGOT_PASSWORD:
         link = (f'Use this link to reset your account password: {URL_USER_FORGOT_PASSWORD}'
-                f'?email={email}&verification_code={password_reset.verification_code}')
+                f'?verification_code={password_reset.verification_code}')
 
     if EMAIL_HOST:
         send_mail('Flowback Verification Code', link, DEFAULT_FROM_EMAIL, [email])
