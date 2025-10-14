@@ -129,7 +129,7 @@ class NotificationSubscriptionTag(BaseModel):
                 update_fields = [field.name for field in update_fields]
 
         # If there are upcoming reminders, remove all and replace with new ones
-        if created or 'reminders' in update_fields:
+        if (created and self.reminders is not None) or 'reminders' in update_fields:
             Notification.objects.filter(
                 ~Q(reminder=0),
                 user=self.subscription.user,
