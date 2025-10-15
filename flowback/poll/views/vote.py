@@ -12,6 +12,7 @@ from flowback.poll.models import Poll, PollVotingTypeRanking, PollVotingTypeForA
 from ..selectors.vote import poll_vote_list, delegate_poll_vote_list
 from ..serializers import PollSerializer
 from ..services.vote import poll_proposal_vote_update, poll_proposal_delegate_vote_update
+from ...group.serializers import GroupUserSerializer
 
 
 @extend_schema(tags=['poll/vote'])
@@ -104,8 +105,7 @@ class DelegatePollVoteListAPI(APIView):
             proposal_id = serializers.IntegerField()
             proposal_title = serializers.CharField(source='proposal.title')
             proposal_description = serializers.CharField(source='proposal.description')
-            proposal_created_by_id = serializers.IntegerField(source='proposal.created_by.user_id')
-            proposal_created_by_name = serializers.CharField(source='proposal.created_by.user.username')
+            proposal_created_by = GroupUserSerializer(source='proposal.created_by')
             priority = serializers.IntegerField()
             score = serializers.IntegerField()
 
@@ -116,8 +116,7 @@ class DelegatePollVoteListAPI(APIView):
             proposal_id = serializers.IntegerField()
             proposal_title = serializers.CharField(source='proposal.title')
             proposal_description = serializers.CharField(source='proposal.description')
-            proposal_created_by_id = serializers.IntegerField(source='proposal.created_by.user_id')
-            proposal_created_by_name = serializers.CharField(source='proposal.created_by.user.username')
+            proposal_created_by = GroupUserSerializer(source='proposal.created_by')
             score = serializers.IntegerField(allow_null=True)
             raw_score = serializers.IntegerField()
 
@@ -128,8 +127,7 @@ class DelegatePollVoteListAPI(APIView):
             proposal_id = serializers.IntegerField()
             proposal_title = serializers.CharField(source='proposal.title')
             proposal_description = serializers.CharField(source='proposal.description')
-            proposal_created_by_id = serializers.IntegerField(source='proposal.created_by.user_id')
-            proposal_created_by_name = serializers.CharField(source='proposal.created_by.user.username')
+            proposal_created_by = GroupUserSerializer(source='proposal.created_by')
             score = serializers.IntegerField()
             total_delegators = serializers.IntegerField()
 
