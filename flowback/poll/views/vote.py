@@ -10,6 +10,7 @@ from flowback.common.services import get_object
 from flowback.poll.models import Poll, PollVotingTypeRanking, PollVotingTypeForAgainst, PollVotingTypeCardinal
 
 from ..selectors.vote import poll_vote_list, delegate_poll_vote_list
+from ..serializers import PollSerializer
 from ..services.vote import poll_proposal_vote_update, poll_proposal_delegate_vote_update
 
 
@@ -87,7 +88,7 @@ class DelegatePollVoteListAPI(APIView):
     class InputSerializer(serializers.Serializer):
         group_id = serializers.IntegerField()
         delegate_pool_id = serializers.IntegerField(required=False)
-        poll_id = serializers.IntegerField(required=False)
+        poll = PollSerializer()
 
     class OutputSerializer(serializers.Serializer):
         poll_id = serializers.IntegerField()
