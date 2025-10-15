@@ -100,10 +100,14 @@ class NotificationSubscribeTemplateAPI(APIView):
 
     class FilterSerializer(serializers.Serializer):
         tags = CharacterSeparatedField(child=serializers.CharField(), required=False, allow_null=True, default=None)
-        reminders = CharacterSeparatedField(child=serializers.IntegerField(),
-                                            required=False,
-                                            allow_null=True,
-                                            default=None)
+        reminders = serializers.ListField(child=serializers.ListField(child=serializers.IntegerField(),
+                                                                      max_length=10),
+                                          required=False,
+                                          allow_null=True,
+                                          default=None,
+                                          help_text="A list containing reminders in seconds before the event. "
+                                                    "Make sure that the field index corresponds to the tags list. "
+                                                    "Use null to fill any gaps.")
 
     def post(self, request, *args, **kwargs):
         serializer = self.FilterSerializer(data=request.data)
