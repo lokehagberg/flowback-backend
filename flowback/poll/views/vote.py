@@ -89,23 +89,17 @@ class DelegatePollVoteListAPI(APIView):
     class InputSerializer(serializers.Serializer):
         group_id = serializers.IntegerField()
         delegate_pool_id = serializers.IntegerField(required=False)
-        poll = PollSerializer(required=False)
+        poll_id = serializers.IntegerField(required=False)
 
     class OutputSerializer(serializers.Serializer):
-        poll_id = serializers.IntegerField()
-        poll_title = serializers.CharField(source='poll.title')
-        poll_description = serializers.CharField(source='poll.description', allow_null=True)
-        poll_interval_mean_absolute_correctness = serializers.DecimalField(
-            max_digits=12, decimal_places=9,
-            source='poll.interval_mean_absolute_correctness',
-            allow_null=True)
+        poll = PollSerializer()
         vote = serializers.SerializerMethodField()
 
         class VoteRankingOutputSerializer(serializers.Serializer):
             proposal_id = serializers.IntegerField()
             proposal_title = serializers.CharField(source='proposal.title')
             proposal_description = serializers.CharField(source='proposal.description')
-            proposal_created_by = GroupUserSerializer(source='proposal.created_by')
+            proposal_created_by = GroupUserSerializer(source='proposal.created_by', hide_relevant_users=True)
             priority = serializers.IntegerField()
             score = serializers.IntegerField()
 
@@ -116,7 +110,7 @@ class DelegatePollVoteListAPI(APIView):
             proposal_id = serializers.IntegerField()
             proposal_title = serializers.CharField(source='proposal.title')
             proposal_description = serializers.CharField(source='proposal.description')
-            proposal_created_by = GroupUserSerializer(source='proposal.created_by')
+            proposal_created_by = GroupUserSerializer(source='proposal.created_by', hide_relevant_users=True)
             score = serializers.IntegerField(allow_null=True)
             raw_score = serializers.IntegerField()
 
@@ -127,7 +121,7 @@ class DelegatePollVoteListAPI(APIView):
             proposal_id = serializers.IntegerField()
             proposal_title = serializers.CharField(source='proposal.title')
             proposal_description = serializers.CharField(source='proposal.description')
-            proposal_created_by = GroupUserSerializer(source='proposal.created_by')
+            proposal_created_by = GroupUserSerializer(source='proposal.created_by', hide_relevant_users=True)
             score = serializers.IntegerField()
             total_delegators = serializers.IntegerField()
 
