@@ -89,7 +89,7 @@ class DelegatePollVoteListAPI(APIView):
     class InputSerializer(serializers.Serializer):
         group_id = serializers.IntegerField()
         delegate_pool_id = serializers.IntegerField(required=False)
-        poll = PollSerializer()
+        poll = PollSerializer(required=False)
 
     class OutputSerializer(serializers.Serializer):
         poll_id = serializers.IntegerField()
