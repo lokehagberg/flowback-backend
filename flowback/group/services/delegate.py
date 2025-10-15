@@ -127,14 +127,14 @@ def group_user_delegate_pool_delete(*, user: int, group: int):
     delegate_pool.delete()
 
 
-def group_user_delegate_pool_notification_subscribe(*, user: int, delegate_pool_id: int, tags: list[str] = None):
+def group_user_delegate_pool_notification_subscribe(*, user: int, delegate_pool_id: int, **kwargs):
     delegate_pool = GroupUserDelegatePool.objects.get(id=delegate_pool_id)
     group_user = group_user_permissions(user=user, group=delegate_pool.group)
 
     if not delegate_pool.groupuserdelegator_set.filter(delegator=group_user).exists():
         raise ValidationError('User is not a delegate in the pool')
 
-    delegate_pool.notification_channel.subscribe(user=user, tags=tags)
+    delegate_pool.notification_channel.subscribe(user=user, **kwargs)
 
 
 def group_delegate_pool_comment_create(*,

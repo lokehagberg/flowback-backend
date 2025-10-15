@@ -153,8 +153,8 @@ def user_delete(*, user_id: int) -> None:
         OnboardUser.objects.filter(email=user.email).delete()
 
 
-def user_notification_subscribe(*, user: User, tags: list[str]):
-    user.notification_channel.subscribe(user=user, tags=tags)
+def user_notification_subscribe(*, user: User, **kwargs):
+    user.notification_channel.subscribe(user=user, **kwargs)
 
 
 def user_schedule_event_create(*,

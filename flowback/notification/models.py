@@ -18,7 +18,6 @@ from tree_queries.models import TreeNode
 
 from flowback.common.models import BaseModel
 
-
 # NotificationObject is created containing data for each occurrence
 class NotificationObject(BaseModel):
     class Action(models.TextChoices):
@@ -107,7 +106,6 @@ class Notification(BaseModel):
 
 
 # Notification Subscription allows users to subscribe to the NotificationChannel, to get Notifications for themselves
-# TODO update all code that needs to use NotificationSubscription with the new tags
 class NotificationSubscription(BaseModel):
     user = models.ForeignKey('user.User', on_delete=models.CASCADE)
     channel = models.ForeignKey('notification.NotificationChannel', on_delete=models.CASCADE)

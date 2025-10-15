@@ -279,8 +279,8 @@ def poll_phase_template_delete(*, user_id: int, template_id: int):
     template.delete()
 
 
-def poll_notification_subscribe(*, user: User, poll_id: int, tags: list[str] = None):
+def poll_notification_subscribe(*, user: User, poll_id: int, **kwargs):
     poll = Poll.objects.get(id=poll_id)
     group_user = group_user_permissions(user=user, group=poll.created_by.group, work_group=poll.work_group)
 
-    poll.notification_channel.subscribe(user=group_user.user, tags=tags)
+    poll.notification_channel.subscribe(user=group_user.user, **kwargs)

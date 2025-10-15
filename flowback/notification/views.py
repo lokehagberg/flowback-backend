@@ -22,6 +22,7 @@ class NotificationListAPI(APIView):
         action = serializers.CharField(required=False)
         timestamp__lt = serializers.DateTimeField(required=False)
         timestamp__gt = serializers.DateTimeField(required=False)
+        exclude_reminders = serializers.BooleanField(default=False, required=False)
 
         channel_name = serializers.CharField(required=False)
         order_by = serializers.ChoiceField(required=False, choices=['timestamp_asc',
@@ -37,6 +38,7 @@ class NotificationListAPI(APIView):
         timestamp = serializers.DateTimeField(source='notification_object.timestamp')
         action = serializers.CharField(source='notification_object.action')
         tag = serializers.CharField(source='notification_object.tag')
+        reminder = serializers.IntegerField()
 
         channel_name = serializers.CharField(source='notification_object.channel.content_type.model')
         channel_data = serializers.JSONField(source='notification_object.channel.data')
@@ -63,8 +65,13 @@ class NotificationSubscriptionListAPI(APIView):
         channel_name = serializers.CharField(required=False)
 
     class OutputSerializer(serializers.Serializer):
+        class NotificationSubscriptionTagSerializer(serializers.Serializer):
+            tag = serializers.CharField()
+            reminders = serializers.ListField(child=serializers.IntegerField(), allow_null=True)
+
         channel_id = serializers.IntegerField()
         channel_name = serializers.CharField(source='channel.name')
+        tags = NotificationSubscriptionTagSerializer(many=True, source='notificationsubscriptiontag_set')
 
     def get(self, request):
         filter_serializer = self.FilterSerializer(data=request.query_params)
@@ -93,6 +100,10 @@ class NotificationSubscribeTemplateAPI(APIView):
 
     class FilterSerializer(serializers.Serializer):
         tags = CharacterSeparatedField(child=serializers.CharField(), required=False, allow_null=True, default=None)
+        reminders = CharacterSeparatedField(child=serializers.IntegerField(),
+                                            required=False,
+                                            allow_null=True,
+                                            default=None)
 
     def post(self, request, *args, **kwargs):
         serializer = self.FilterSerializer(data=request.data)

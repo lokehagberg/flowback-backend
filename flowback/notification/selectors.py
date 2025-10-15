@@ -22,6 +22,13 @@ class BaseNotificationFilter(django_filters.FilterSet):
 
     channel_name = django_filters.CharFilter(field_name='notification_object__channel__content_type__model',
                                              lookup_expr='iexact')
+    exclude_reminders = django_filters.BooleanFilter(method='filter_exclude_reminders')
+
+    def filter_exclude_reminders(self, queryset, name, value):
+        if value:
+            return queryset.filter(reminder=0)
+
+        return queryset
 
     class Meta:
         model = Notification
@@ -40,7 +47,13 @@ def notification_list(*, user: User, filters=None):
 class BaseNotificationSubscriptionFilter(django_filters.FilterSet):
     channel_id = django_filters.CharFilter(field_name='channel_id')
     channel_name = django_filters.CharFilter(field_name='channel__content_type__model', lookup_expr='iexact')
+    has_reminders = django_filters.BooleanFilter(method='filter_has_reminders')
 
+    def filter_has_reminders(self, queryset, name, value):
+        if value:
+            return queryset.filter(notificationsubscriptiontag__reminders__isnull=False)
+
+        return queryset
 
 def notification_subscription_list(*, user: User, filters=None):
     filters = filters or {}

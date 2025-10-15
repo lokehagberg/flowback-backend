@@ -43,6 +43,7 @@ class MessageListAPI(APIView):
                                       view=self)
 
 
+# TODO better to order by updated_at, and change updated_at each time user sends a message
 class MessageChannelPreviewAPI(APIView):
     class Pagination(LimitOffsetPagination):
         default_limit = 50

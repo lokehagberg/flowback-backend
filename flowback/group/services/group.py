@@ -175,6 +175,6 @@ def group_user_delete(*, user_id: int, group_id: int, target_user_id: int) -> No
     group_user_to_delete.delete()
 
 
-def group_notification_subscribe(*, user: User, group_id: int, tags: list[str]) -> None:
+def group_notification_subscribe(*, user: User, group_id: int, **kwargs) -> None:
     group_user = group_user_permissions(user=user, group=group_id)
-    group_user.group.notification_channel.subscribe(user=user, tags=tags)
+    group_user.group.notification_channel.subscribe(user=user, **kwargs)
