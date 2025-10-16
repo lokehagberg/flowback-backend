@@ -24,16 +24,26 @@ class GroupUserSerializer(serializers.Serializer):
     group_image = serializers.CharField(required=False, source='group.image')
 
     def get_permission_id(self, obj):
-        if obj.permission:
-            return obj.permission_id
+        if isinstance(obj, int):
+            group_user = GroupUser.objects.get(id=obj)
+        else:
+            group_user = obj
 
-        return obj.group.default_permission_id
+        if group_user.permission:
+            return group_user.permission_id
+
+        return group_user.group.default_permission_id
 
     def get_permission_name(self, obj):
-        if obj.permission:
-            return obj.permission.role_name
+        if isinstance(obj, int):
+            group_user = GroupUser.objects.get(id=obj)
+        else:
+            group_user = obj
 
-        return obj.group.default_permission.role_name
+        if group_user.permission:
+            return group_user.permission.role_name
+
+        return group_user.group.default_permission.role_name
 
     def __init__(self, *args, hide_relevant_users=False, **kwargs):
         self.hide_relevant_users = hide_relevant_users
