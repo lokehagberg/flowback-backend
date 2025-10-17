@@ -101,17 +101,20 @@ def permission_q(root: str, *permissions: GroupPermission):
     # Check if group user exists
     q0 = Q(**{f'{root}__isnull': False})
 
+    # Check if the user is admin in group
+    q1 = Q(**{f'{root}__is_admin': True})
+
     # Check if the user has permission set
-    q1 = Q(**{f'{root}__permission__isnull': False})
+    q2 = Q(**{f'{root}__permission__isnull': False})
     for p in permissions:
-        q1 &= Q(**{f'{root}__permission__{p}': True})
+        q2 &= Q(**{f'{root}__permission__{p}': True})
 
     # Otherwise, check the group default permission
-    q2 = Q(**{f'{root}__permission__isnull': True})
+    q3 = Q(**{f'{root}__permission__isnull': True})
     for p in permissions:
-        q2 &= Q(**{f'{root}__group__default_permission__{p}': True})
+        q3 &= Q(**{f'{root}__group__default_permission__{p}': True})
 
-    return Q(q0 & Q(q1 | q2))
+    return Q(q0 & Q(q1 | q2 | q3))
 
 class BaseGroupPermissionsFilter(django_filters.FilterSet):
     class Meta:
