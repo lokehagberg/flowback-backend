@@ -208,7 +208,7 @@ class PollUpdateAPI(APIView):
         return Response(status=status.HTTP_200_OK)
 
 
-@extend_schema(tags=['poll'], 
+@extend_schema(tags=['poll'],
                description="Forwards the poll into the next phase. For example: if the poll is in area vote, it will go to proposal creation")
 class PollFastForwardAPI(APIView):
     class InputSerializer(serializers.Serializer):
