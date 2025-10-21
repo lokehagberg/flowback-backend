@@ -47,6 +47,7 @@ class GroupListApi(APIView):
                       'cover_image',
                       'joined',
                       'chat_id',
+                      'default_quorum',
                       'member_count',
                       'pending_invite',
                       'pending_join',
