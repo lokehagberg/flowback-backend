@@ -83,9 +83,10 @@ class UserForgotPasswordVerifyApi(APIView):
         serializers = self.InputSerializer(data=request.data)
         serializers.is_valid(raise_exception=True)
 
-        user_forgot_password_verify(**serializers.validated_data)
+        user = user_forgot_password_verify(**serializers.validated_data)
+        token, created = Token.objects.get_or_create(user=user)
 
-        return Response(status=status.HTTP_200_OK)
+        return Response(status=status.HTTP_200_OK, data={'token': token.key})
 
 
 class UserListApi(APIView):
