@@ -148,8 +148,8 @@ class ChatTestHTTP(APITestCase):
             if i > 0:
                 self.assertEqual(response.data.get('count'), 3 + i * 2, response.data)
                 self.assertTrue(response.data['results'][i]['timestamp'])
-                self.assertEqual(response.data['results'][(2 * i) + 1]['participants'], 2,
-                                 [(i['created_at'], i['participants']) for i in response.data['results']])
+                self.assertEqual(response.data['results'][(2 * i) + 1]['total_participants'], 2,
+                                 [(i['created_at'], i['total_participants']) for i in response.data['results']])
                 self.assertGreater(response.data['results'][i - 1]['created_at'],
                                    response.data['results'][i]['created_at'])
 
@@ -160,8 +160,8 @@ class ChatTestHTTP(APITestCase):
             if i > 0:
                 self.assertEqual(response.data.get('count'), 2 + i * 2)
                 self.assertTrue(response.data['results'][i]['timestamp'])
-                self.assertEqual(response.data['results'][2 * (i - 1)]['participants'], 3,
-                                 [(i['created_at'], i['participants']) for i in response.data['results']])
+                self.assertEqual(response.data['results'][2 * (i - 1)]['total_participants'], 3,
+                                 [(i['created_at'], i['total_participants']) for i in response.data['results']])
                 self.assertGreater(response.data['results'][i - 1]['created_at'],
                                    response.data['results'][i]['created_at'])
 

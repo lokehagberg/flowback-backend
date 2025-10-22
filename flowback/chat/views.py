@@ -1,4 +1,5 @@
 from rest_framework import serializers, status
+from rest_framework.fields import SerializerMethodField
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -7,6 +8,7 @@ from .selectors import message_list, message_channel_preview_list, message_chann
 from .serializers import MessageSerializer, BasicMessageSerializer
 from .services import message_channel_userdata_update, message_channel_leave, message_files_upload
 from flowback.common.pagination import get_paginated_response, LimitOffsetPagination
+from ..user.models import User
 from ..user.serializers import BasicUserSerializer
 
 
@@ -64,7 +66,11 @@ class MessageChannelPreviewAPI(APIView):
 
     class OutputSerializer(BasicMessageSerializer):
         timestamp = serializers.DateTimeField(allow_null=True)
-        participants = BasicUserSerializer(many=True, source='channel.messagechannelparticipant.user')
+        total_participants = serializers.IntegerField()
+        participants = SerializerMethodField(help_text="List of Users who participated in the channel, max 20 displayed")
+
+        def get_participants(self, obj):
+            return User.objects.filter(messagechannelparticipant__channel=obj.channel)[:20]
 
     def get(self, request):
         serializer = self.FilterSerializer(data=request.query_params)
