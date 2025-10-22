@@ -2,10 +2,11 @@ import datetime
 import json
 
 from celery.schedules import crontab
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
 from django.contrib.postgres.fields import ArrayField
-from django.core.validators import MaxValueValidator
 from django.db import models
-from django.db.models.signals import post_save, post_delete, pre_delete
+from django.db.models.signals import post_save, post_delete
 from django.utils import timezone
 from django_celery_beat.models import PeriodicTask, CrontabSchedule
 from rest_framework.exceptions import ValidationError
@@ -16,15 +17,38 @@ from django.utils.translation import gettext_lazy as _
 from flowback.notification.models import NotifiableModel, NotificationObject
 
 
-# Create your models here.
+# TODO Migrate from origin_name and origin_id to content_type and object_id
+# TODO find all origin name, origin id references and update them to use content_type and object_id
 class Schedule(BaseModel):
-    name = models.TextField()
-    origin_name = models.CharField(max_length=255)
-    origin_id = models.IntegerField()
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveIntegerField()
+    created_by = GenericForeignKey('content_type', 'object_id')
+
+    default_tag = models.ForeignKey('schedule.ScheduleTag',
+                                    on_delete=models.CASCADE,
+                                    null=True,
+                                    blank=True,
+                                    related_name='default_tag')
 
     active = models.BooleanField(default=True)
 
+    @classmethod
+    def post_save(cls, instance, created, *args, **kwargs):
+        if not created:
+            return
 
+        default_tag = ScheduleTag.objects.create(name='default')
+        instance.default_tag = default_tag
+        instance.save()
+
+
+# TODO create a post_save method that automatically subscribes ScheduleSubscriptions who have subscribe_to_new_tags set to True
+class ScheduleTag(BaseModel, NotifiableModel):
+    schedule = models.ForeignKey(Schedule, on_delete=models.CASCADE)
+    name = models.CharField(max_length=100)
+
+
+# TODO find all origin name, origin id references and update them to use content_type and object_id
 class ScheduleEvent(BaseModel, NotifiableModel):
     class Frequency(models.IntegerChoices):
         DAILY = 1, _("Daily")
@@ -38,15 +62,16 @@ class ScheduleEvent(BaseModel, NotifiableModel):
     start_date = models.DateTimeField()
     end_date = models.DateTimeField(null=True, blank=True)
     active = models.BooleanField(default=True)
-    work_group = models.ForeignKey('group.WorkGroup', on_delete=models.CASCADE, null=True, blank=True)
+
+    # Making assignees to User serves no purpose but to complicate queries
     assignees = models.ManyToManyField('group.GroupUser')
     meeting_link = models.URLField(null=True, blank=True)
 
-    origin_name = models.CharField(max_length=255)
-    origin_id = models.IntegerField()
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True)
+    object_id = models.PositiveIntegerField(null=True)
+    created_by = GenericForeignKey('content_type', 'object_id')
 
     repeat_frequency = models.IntegerField(null=True, blank=True, choices=Frequency.choices)
-    reminders = ArrayField(models.PositiveIntegerField(), size=10, null=True, blank=True)  # Max 10 reminders
 
     NOTIFICATION_DATA_FIELDS = (('id', int),
                                 ('title', str),
@@ -63,18 +88,12 @@ class ScheduleEvent(BaseModel, NotifiableModel):
         return dict(id=self.id,
                     title=self.title,
                     description=self.description,
-                    origin_name=self.origin_name,
-                    origin_id=self.origin_id,
-                    schedule_origin_name=self.schedule.origin_name,
-                    schedule_origin_id=self.schedule.origin_id,
+                    origin_name=self.content_type.model,
+                    origin_id=self.object_id,
+                    schedule_origin_name=self.schedule.content_type.model,
+                    schedule_origin_id=self.schedule.object_id,
                     start_date=self.start_date.strftime('%Y-%m-%d %H:%M:%S'),
                     end_date=self.end_date.strftime('%Y-%m-%d %H:%M:%S'))
-
-    def notify_reminders(self, action: NotificationObject.Action, timestamp: datetime.datetime, message: str):
-        data = locals()
-        data.pop('self')
-
-        return self.notification_channel.notify(**data)
 
     def notify_start(self, action: NotificationObject.Action, timestamp: datetime.datetime, message: str):
         data = locals()
@@ -133,14 +152,14 @@ class ScheduleEvent(BaseModel, NotifiableModel):
 
         self.notification_channel.notificationobject_set.filter(timestamp__gte=timezone.now()).all().delete()
 
-        if self.reminders:
-            for reminder in self.reminders:
-                cron = self._get_cron_from_date(self.start_date - datetime.timedelta(seconds=reminder))
-                if cron:
-                    reminder = timezone.now() - cron.remaining_estimate(timezone.now())
-                    self.notify_reminders(NotificationObject.Action.UPDATED,
-                                          timestamp=reminder,
-                                          message=f"Reminder for upcoming event: {self.title}")
+        # if self.reminders:
+        #     for reminder in self.reminders:
+        #         cron = self._get_cron_from_date(self.start_date - datetime.timedelta(seconds=reminder))
+        #         if cron:
+        #             reminder = timezone.now() - cron.remaining_estimate(timezone.now())
+        #             self.notify_reminders(NotificationObject.Action.UPDATED,
+        #                                   timestamp=reminder,
+        #                                   message=f"Reminder for upcoming event: {self.title}")
 
         if self.next_start_date:
             self.notify_start(NotificationObject.Action.CREATED,
@@ -156,9 +175,9 @@ class ScheduleEvent(BaseModel, NotifiableModel):
         if self.end_date and self.start_date > self.end_date:
             raise ValidationError('Start date is greater than end date')
 
-        if self.reminders:
-            if len(set(self.reminders)) < len(self.reminders):
-                raise ValidationError("Reminders can't have duplicates")
+        # if self.reminders:
+        #     if len(set(self.reminders)) < len(self.reminders):
+        #         raise ValidationError("Reminders can't have duplicates")
 
     @classmethod
     def post_save(cls, instance, created, update_fields: list[str] = None, *args, **kwargs):
@@ -213,13 +232,24 @@ post_save.connect(ScheduleEvent.post_save, ScheduleEvent)
 post_delete.connect(ScheduleEvent.post_delete, ScheduleEvent)
 
 
+class ScheduleTagSubscription(models.Model):
+    schedule_subscription = models.ForeignKey('schedule.ScheduleSubscription', on_delete=models.CASCADE)
+    schedule_tag = models.ForeignKey(ScheduleTag, on_delete=models.CASCADE)
+    reminders = ArrayField(models.PositiveIntegerField(), size=10, null=True, blank=True)
+
+
 class ScheduleSubscription(BaseModel):
+    # TODO notification_tags allow users to auto-subscribe to any upcoming events with a specific tag
+    subscribe_to_new_notification_tags = models.BooleanField(default=False, blank=True)
+    notification_tags = models.ManyToManyField(ScheduleTag, blank=True, through=ScheduleTagSubscription)
+
+    # TODO make not null, migrate from "schedule to schedule subscription" to "user to schedule subscription"
+    user = models.ForeignKey('user.User', on_delete=models.CASCADE, related_name='schedule_subscription_user', null=True)
     schedule = models.ForeignKey(Schedule, on_delete=models.CASCADE, related_name='schedule_subscription_schedule')
-    target = models.ForeignKey(Schedule, on_delete=models.CASCADE, related_name='schedule_subscription_target')
 
     def clean(self):
         if self.schedule == self.target:
             raise ValidationError('Schedule cannot be the same as the target')
 
     class Meta:
-        unique_together = ('schedule', 'target')
+        unique_together = ('user', 'schedule')

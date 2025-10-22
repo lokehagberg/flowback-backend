@@ -341,6 +341,7 @@ class WorkGroup(BaseModel):
     direct_join = models.BooleanField(default=False)
     group = models.ForeignKey(Group, on_delete=models.CASCADE)
     chat = models.ForeignKey(MessageChannel, on_delete=models.PROTECT)
+    schedule = models.ForeignKey(Schedule, null=True, blank=True, on_delete=models.PROTECT)
 
     @property
     def group_users(self):
@@ -354,6 +355,11 @@ class WorkGroup(BaseModel):
             message_channel.save()
 
             instance.chat = message_channel
+
+    def post_save(cls, instance, created, *args, **kwargs):
+        if created:
+            schedule = Schedule(created_by=instance)
+            schedule.save()
 
 
 pre_save.connect(WorkGroup.pre_save, sender=WorkGroup)
