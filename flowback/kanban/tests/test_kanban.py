@@ -1,10 +1,13 @@
 from django.utils import timezone
 from rest_framework.test import APITestCase
+from django.core.files.uploadedfile import SimpleUploadedFile
 
+from flowback.common.tests import generate_request
 from flowback.kanban.models import KanbanEntry
 from flowback.kanban.services import kanban_entry_create
-from flowback.kanban.tests.factories import KanbanFactory
+from flowback.kanban.tests.factories import KanbanFactory, KanbanEntryFactory
 from flowback.user.tests.factories import UserFactory
+from flowback.user.views.kanban import UserKanbanEntryUpdateAPI
 
 
 class TestKanban(APITestCase):
@@ -24,3 +27,30 @@ class TestKanban(APITestCase):
                                     end_date=timezone.now())
 
         self.assertTrue(KanbanEntry.objects.filter(id=entry.id).exists())
+
+    def test_kanban_entry_update_with_attachments(self):
+        # Create a user-owned kanban entry
+        entry = KanbanEntryFactory(kanban=self.user.kanban,
+                                   created_by=self.user,
+                                   title="Entry with files")
+
+        # Prepare in-memory files to upload
+        file1 = SimpleUploadedFile("doc1.txt", b"Hello World 1", content_type="text/plain")
+        file2 = SimpleUploadedFile("doc2.txt", b"Hello World 2", content_type="text/plain")
+
+        # Send API request using the helper
+        response = generate_request(
+            api=UserKanbanEntryUpdateAPI,
+            user=self.user,
+            data={
+                "entry_id": entry.id,
+                "attachments": [file1, file2]
+            }
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        # Validate attachments have been saved and linked to the entry
+        entry.refresh_from_db()
+        self.assertIsNotNone(entry.attachments)
+        self.assertEqual(entry.attachments.filesegment_set.count(), 2)
