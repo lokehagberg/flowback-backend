@@ -71,6 +71,9 @@ def group_user_delegate_update(*, user_id: int, group_id: int, delegate_pool_id:
     if len(delegate_rel) < len(pools):
         raise ValidationError('User is not delegator in all pools')
 
+    if GroupUserDelegator.objects.filter(~Q(delegate_pool_id=delegate_pool_id) & Q(tags__id__in=tags)):
+        raise ValidationError('User already delegated to same tag in another pool')
+
     TagsModel = GroupUserDelegator.tags.through
     TagsModel.objects.filter(groupuserdelegator__in=delegate_rel).delete()
 

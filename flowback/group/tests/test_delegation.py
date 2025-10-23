@@ -166,19 +166,6 @@ class GroupDelegationTestCase(APITestCase):
         self.assertIsNotNone(delegator)
         self.assertEqual(delegator.tags.count(), 2)
 
-    def test_update_delegate(self):
-        self.skipTest("This feature is not working yet, refer to delete and recreating the delegator instead.")
-        # response = generate_request(api=GroupUserDelegateUpdateApi,
-        #                             data=dict(delegate_pool_id=self.delegate_pool.id,
-        #                                       tags=f'{self.tag2.id}'),
-        #                             url_params=dict(group=self.group.id),
-        #                             user=self.user1)
-        #
-        # self.assertEqual(response.status_code, status.HTTP_200_OK)
-        # print(GroupUserDelegator.objects.get(delegator=self.group_user1).tags.first().name)
-        # self.assertTrue(GroupUserDelegator.objects.filter(delegator=self.group_user1,
-        #                                                   tags__in=[self.tag2]).exists())
-
     def test_delete_delegate(self):
         """Test GroupUserDelegateDeleteApi"""
         # Create a delegator for user3
@@ -337,3 +324,38 @@ class GroupDelegationTestCase(APITestCase):
                 delegate_pool_id=new_pool.id
             ).exists()
         )
+
+    def test_cannot_delegate_same_tag_to_multiple_delegates(self):
+        """A user cannot delegate the same tag to multiple delegates (pools) within the same group."""
+        # Existing: user1 -> self.delegate_pool with tag1
+        # Create a second delegate pool with a different delegate
+        second_pool = GroupUserDelegatePoolFactory(group=self.group)
+        GroupUserDelegateFactory(
+            group=self.group,
+            group_user=self.group_user3,
+            pool=second_pool
+        )
+
+        # Try to delegate the same tag1 to the second delegate pool
+        response = generate_request(api=GroupUserDelegateApi,
+                                    data={'delegate_pool_id': second_pool.id, 'tags': [self.tag1.id]},
+                                    url_params={'group': self.group.id},
+                                    user=self.user1)
+
+        # Should not be permitted
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+        # Delegate to a different tag, then update to tag1 and see if it fails
+        generate_request(api=GroupUserDelegateApi,
+                         data={'delegate_pool_id': second_pool.id, 'tags': [self.tag2.id]},
+                         url_params={'group': self.group.id},
+                         user=self.user1)
+
+        response = generate_request(api=GroupUserDelegateUpdateApi,
+                                    data={'delegate_pool_id': second_pool.id, 'tags': [self.tag1.id]},
+                                    url_params={'group': self.group.id},
+                                    user=self.user1)
+
+        # Should not be permitted
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data['detail'][0], 'User already delegated to same tag in another pool')
