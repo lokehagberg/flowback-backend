@@ -70,7 +70,8 @@ class MessageChannelPreviewAPI(APIView):
         participants = SerializerMethodField(help_text="List of Users who participated in the channel, max 20 displayed")
 
         def get_participants(self, obj):
-            return BasicUserSerializer(User.objects.filter(messagechannelparticipant__channel=obj.channel)[:20], many=True).data
+            participants = User.objects.filter(messagechannelparticipant__channel=obj.channel)[:20]
+            return BasicUserSerializer(participants, many=True).data
 
     def get(self, request):
         serializer = self.FilterSerializer(data=request.query_params)
