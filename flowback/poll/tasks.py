@@ -426,7 +426,8 @@ def poll_proposal_vote_count(poll_id: int) -> None:
     user_participants = PollVoting.objects.filter(permission_q('created_by','allow_vote'),
                                                   poll=poll).count()
     delegate_participants = PollDelegateVoting.objects.filter(poll=poll).aggregate(mandate=Sum('mandate'))['mandate']
-    participants = user_participants or 0 + delegate_participants or 0
+    participants = ((user_participants if user_participants is not None else 0)
+                    + (delegate_participants if delegate_participants is not None else 0))
     poll.participants = participants
     poll.save()
 
