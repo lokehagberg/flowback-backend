@@ -54,6 +54,7 @@ class BaseMessageChannelPreviewFilter(django_filters.FilterSet):
 
     username__icontains = django_filters.CharFilter(field_name='target__username', lookup_expr='icontains')
     origin_names = StringInFilter(field_name='channel__origin_name')
+    title = django_filters.CharFilter(field_name='channel__title', lookup_expr='icontains')
     topic_name = django_filters.CharFilter(field_name='topic__name', lookup_expr='exact')
 
     class Meta:

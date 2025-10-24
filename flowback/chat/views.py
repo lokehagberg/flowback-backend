@@ -55,6 +55,7 @@ class MessageChannelPreviewAPI(APIView):
         order_by = serializers.ChoiceField(required=False, choices=['created_at_asc', 'created_at_desc'])
         origin_names = serializers.CharField(required=False, help_text="Comma-separated list of origins, "
                                                                        "e.g. 'user,user_group'")
+        title = serializers.CharField(required=False)
         username__icontains = serializers.CharField(required=False)
         id = serializers.IntegerField(required=False)
         user_id = serializers.IntegerField(required=False)
