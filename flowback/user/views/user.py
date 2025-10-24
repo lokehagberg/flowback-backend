@@ -67,9 +67,13 @@ class UserForgotPasswordApi(APIView):
         serializer = self.InputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        user_forgot_password(**serializer.validated_data)
+        password_reset = user_forgot_password(**serializer.validated_data)
 
-        return Response(status=status.HTTP_200_OK)
+        data = None
+        if DEBUG_REGISTER_BYPASS_EMAIL_VERIFICATION:
+            data = password_reset.verification_code
+
+        return Response(status=status.HTTP_200_OK, data=data)
 
 
 class UserForgotPasswordVerifyApi(APIView):
@@ -152,17 +156,17 @@ class UserGetApi(APIView):
 class UserUpdateApi(APIView):
     class InputSerializer(serializers.Serializer):
         username = serializers.CharField(required=False)
-        profile_image = serializers.ImageField(required=False)
-        banner_image = serializers.ImageField(required=False)
-        bio = serializers.CharField(required=False)
-        website = serializers.CharField(required=False)
+        profile_image = serializers.ImageField(required=False, allow_null=True)
+        banner_image = serializers.ImageField(required=False, allow_null=True)
+        bio = serializers.CharField(required=False, allow_null=True)
+        website = serializers.CharField(required=False, allow_null=True)
         dark_theme = serializers.BooleanField(required=False)
-        contact_email = serializers.CharField(required=False)
-        contact_phone = PhoneNumberField(required=False)
+        contact_email = serializers.CharField(required=False, allow_null=True)
+        contact_phone = PhoneNumberField(required=False, allow_null=True)
         public_status = serializers.ChoiceField(required=False, choices=User.PublicStatus.choices)
         chat_status = serializers.ChoiceField(required=False, choices=User.PublicStatus.choices)
         email = serializers.CharField(required=False)
-        user_config = serializers.CharField(required=False)
+        user_config = serializers.CharField(required=False, allow_null=True)
 
     def post(self, request):
         serializer = self.InputSerializer(data=request.data)

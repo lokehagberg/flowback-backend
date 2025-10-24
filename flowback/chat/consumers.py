@@ -167,6 +167,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
                                                  channel_id=self.user_channel)
 
         await self.send_message(channel_id=data.get('channel_id'), message=message)
+        await self.send_message(channel_id=self.user_channel, message=dict(channel_id=data.get('channel_id'),
+                                                                           status="notification"))
 
     @database_sync_to_async
     def _update_message(self, *,

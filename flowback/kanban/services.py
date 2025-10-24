@@ -64,7 +64,13 @@ def kanban_entry_create(*,
 def kanban_entry_update(*, kanban_entry_id: int, data) -> KanbanEntry:
     kanban = get_object(KanbanEntry, id=kanban_entry_id)
 
-    non_side_effect_fields = ['title', 'description', 'assignee_id', 'priority', 'lane', 'end_date', 'work_group_id',]
+    non_side_effect_fields = ['title', 'description', 'assignee_id', 'priority',
+                              'lane', 'end_date', 'work_group_id', 'attachments']
+
+    if 'attachments' in data.keys() and data['attachments']:
+        data['attachments'] = upload_collection(user_id=kanban.created_by_id,
+                                                file=data['attachments'],
+                                                upload_to=f'kanban/task/{kanban.kanban_id}')
 
     kanban, has_updated = model_update(instance=kanban,
                                        fields=non_side_effect_fields,
@@ -75,6 +81,7 @@ def kanban_entry_update(*, kanban_entry_id: int, data) -> KanbanEntry:
 
 def kanban_entry_delete(*, kanban_entry_id: int) -> None:
     get_object(KanbanEntry, id=kanban_entry_id).delete()
+
 
 class KanbanManager:
     def __init__(self, origin_type: str):
@@ -126,7 +133,7 @@ class KanbanManager:
                                    work_group_id=work_group_id,
                                    priority=priority,
                                    end_date=end_date,
-                                   lane=lane,)
+                                   lane=lane, )
 
     def kanban_entry_update(self,
                             *,
