@@ -17,8 +17,6 @@ from django.utils.translation import gettext_lazy as _
 from flowback.notification.models import NotifiableModel, NotificationObject
 
 
-# TODO Migrate from origin_name and origin_id to content_type and object_id
-# TODO find all origin name, origin id references and update them to use content_type and object_id
 class Schedule(BaseModel):
     content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
     object_id = models.PositiveIntegerField()
@@ -32,6 +30,10 @@ class Schedule(BaseModel):
 
     active = models.BooleanField(default=True)
 
+    # Create Event
+
+    # Subscribe (incl. unsubscribe, which deletes the subscription)
+
     @classmethod
     def post_save(cls, instance, created, *args, **kwargs):
         if not created:
@@ -42,13 +44,26 @@ class Schedule(BaseModel):
         instance.save()
 
 
-# TODO create a post_save method that automatically subscribes ScheduleSubscriptions who have subscribe_to_new_tags set to True
 class ScheduleTag(BaseModel, NotifiableModel):
     schedule = models.ForeignKey(Schedule, on_delete=models.CASCADE)
     name = models.CharField(max_length=100)
 
+    @classmethod
+    def post_save(cls, instance, created, *args, **kwargs):
+        if not created:
+            return
 
-# TODO find all origin name, origin id references and update them to use content_type and object_id
+        subscriptions = ScheduleSubscription.objects.filter(schedule=instance.schedule,
+                                                            subscribe_to_new_notification_tags=True)
+
+        for sub in subscriptions:
+            ScheduleTagSubscription.objects.get_or_create(schedule_subscription=sub,
+                                                          schedule_tag=instance)
+
+
+post_save.connect(ScheduleTag.post_save, ScheduleTag)
+
+
 class ScheduleEvent(BaseModel, NotifiableModel):
     class Frequency(models.IntegerChoices):
         DAILY = 1, _("Daily")
@@ -62,6 +77,7 @@ class ScheduleEvent(BaseModel, NotifiableModel):
     start_date = models.DateTimeField()
     end_date = models.DateTimeField(null=True, blank=True)
     active = models.BooleanField(default=True)
+    tag = models.ForeignKey(ScheduleTag, on_delete=models.CASCADE, null=True, blank=True)
 
     # Making assignees to User serves no purpose but to complicate queries
     assignees = models.ManyToManyField('group.GroupUser')
@@ -72,6 +88,9 @@ class ScheduleEvent(BaseModel, NotifiableModel):
     created_by = GenericForeignKey('content_type', 'object_id')
 
     repeat_frequency = models.IntegerField(null=True, blank=True, choices=Frequency.choices)
+
+    # TODO migrate PeriodicTask to task field, task deletes itself within tasks.py
+    task = models.ForeignKey(PeriodicTask, on_delete=models.SET_NULL, null=True, blank=True)
 
     NOTIFICATION_DATA_FIELDS = (('id', int),
                                 ('title', str),
@@ -152,15 +171,6 @@ class ScheduleEvent(BaseModel, NotifiableModel):
 
         self.notification_channel.notificationobject_set.filter(timestamp__gte=timezone.now()).all().delete()
 
-        # if self.reminders:
-        #     for reminder in self.reminders:
-        #         cron = self._get_cron_from_date(self.start_date - datetime.timedelta(seconds=reminder))
-        #         if cron:
-        #             reminder = timezone.now() - cron.remaining_estimate(timezone.now())
-        #             self.notify_reminders(NotificationObject.Action.UPDATED,
-        #                                   timestamp=reminder,
-        #                                   message=f"Reminder for upcoming event: {self.title}")
-
         if self.next_start_date:
             self.notify_start(NotificationObject.Action.CREATED,
                               timestamp=self.next_start_date,
@@ -175,12 +185,19 @@ class ScheduleEvent(BaseModel, NotifiableModel):
         if self.end_date and self.start_date > self.end_date:
             raise ValidationError('Start date is greater than end date')
 
-        # if self.reminders:
-        #     if len(set(self.reminders)) < len(self.reminders):
-        #         raise ValidationError("Reminders can't have duplicates")
-
     @classmethod
     def post_save(cls, instance, created, update_fields: list[str] = None, *args, **kwargs):
+        # Notification subscription management
+        if created or (update_fields and 'repeat_frequency' in update_fields):
+            subscribers = ScheduleTagSubscription.objects.filter(schedule_subscription__schedule=instance.schedule,
+                                                                 schedule_tag=instance.tag)
+
+            for subscriber in subscribers:
+                instance.subscribe(user=subscriber.schedule_subscription.user,
+                                   tags=["start", "end"],
+                                   reminders=subscriber.reminders)
+
+        # Repeat Frequency and notification management
         if instance.repeat_frequency:
             cron_data = dict()
             if instance.repeat_frequency == instance.Frequency.WEEKLY:
@@ -193,43 +210,36 @@ class ScheduleEvent(BaseModel, NotifiableModel):
                 cron_data['month_of_year'] = instance.end_date.month
                 cron_data['day_of_month'] = instance.end_date.day
 
-            schedule = CrontabSchedule.objects.get_or_create(minute=instance.end_date.minute,
-                                                             hour=instance.end_date.hour,
-                                                             **cron_data)
+            cron_schedule = CrontabSchedule.objects.get_or_create(minute=instance.end_date.minute,
+                                                                  hour=instance.end_date.hour,
+                                                                  **cron_data)[0]
 
-            if not created:
-                task = PeriodicTask.objects.get(name=f"schedule_event_{instance.id}")
-                if task.crontab != schedule[0]:
-                    task.crontab = schedule[0]
-                    task.save()
+            # If not created, update the instance task with a new crontab schedule
+            if not created and not instance.task:
+                if instance.task.crontab != cron_schedule:
+                    instance.task.crontab = cron_schedule
+                    instance.task.save()
 
                 return
 
             periodic_task = PeriodicTask.objects.create(name=f"schedule_event_{instance.id}",
                                                         task="schedule.tasks.event_notify",
                                                         kwargs=json.dumps(dict(event_id=instance.id)),
-                                                        crontab=schedule[0],
-                                                        one_off=bool(not instance.reminders))
+                                                        crontab=cron_schedule)
             periodic_task.full_clean()
             periodic_task.save()
 
-            instance.regenerate_notifications()
+            instance.task = periodic_task
+            instance.save()
 
-        else:
-            if not created:
-                PeriodicTask.objects.filter(name=f"schedule_event_{instance.id}").delete()
+            instance.regenerate_notifications()
 
         if not created:
             if update_fields and any([x in update_fields for x in ['end_date', 'start_date', 'repeat_frequency']]):
                 instance.regenerate_notifications()
 
-    @classmethod  # Delete reminders
-    def post_delete(cls, instance, *args, **kwargs):
-        PeriodicTask.objects.filter(name=f"schedule_event_{instance.id}").delete()
-
 
 post_save.connect(ScheduleEvent.post_save, ScheduleEvent)
-post_delete.connect(ScheduleEvent.post_delete, ScheduleEvent)
 
 
 class ScheduleTagSubscription(models.Model):
@@ -239,17 +249,12 @@ class ScheduleTagSubscription(models.Model):
 
 
 class ScheduleSubscription(BaseModel):
-    # TODO notification_tags allow users to auto-subscribe to any upcoming events with a specific tag
     subscribe_to_new_notification_tags = models.BooleanField(default=False, blank=True)
     notification_tags = models.ManyToManyField(ScheduleTag, blank=True, through=ScheduleTagSubscription)
 
-    # TODO make not null, migrate from "schedule to schedule subscription" to "user to schedule subscription"
-    user = models.ForeignKey('user.User', on_delete=models.CASCADE, related_name='schedule_subscription_user', null=True)
+    user = models.ForeignKey('user.User', on_delete=models.CASCADE, related_name='schedule_subscription_user',
+                             null=True)
     schedule = models.ForeignKey(Schedule, on_delete=models.CASCADE, related_name='schedule_subscription_schedule')
-
-    def clean(self):
-        if self.schedule == self.target:
-            raise ValidationError('Schedule cannot be the same as the target')
 
     class Meta:
         unique_together = ('user', 'schedule')
