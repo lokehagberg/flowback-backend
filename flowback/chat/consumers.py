@@ -130,8 +130,17 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
         await self.channel_layer.group_send(
             f"{channel_id}",
-            message
-        )
+            message)
+
+        participants = MessageChannelParticipant.objects.filter(channel_id=channel_id)
+        message["status"] = "message_received"
+
+        participant = await participants.select_related('channel').afirst()
+        if participant.channel.origin_name in ['user', 'user_group']:
+            async for participant in participants:
+                await self.channel_layer.group_send(
+                    f"user_{participant.user_id}",
+                    message)
 
     @database_sync_to_async
     def _create_message(self, *,
@@ -167,8 +176,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
                                                  channel_id=self.user_channel)
 
         await self.send_message(channel_id=data.get('channel_id'), message=message)
-        await self.send_message(channel_id=self.user_channel, message=dict(channel_id=data.get('channel_id'),
-                                                                           status="notification"))
 
     @database_sync_to_async
     def _update_message(self, *,
