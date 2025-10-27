@@ -122,7 +122,7 @@ class NotificationSubscription(BaseModel):
 class NotificationSubscriptionTag(BaseModel):
     subscription = models.ForeignKey('notification.NotificationSubscription', on_delete=models.CASCADE)
     name = models.CharField(max_length=255)
-    reminders = ArrayField(models.IntegerField(), help_text='Reminder times for the given tag', null=True, blank=True)
+    reminders = ArrayField(models.PositiveIntegerField(), help_text='Reminder times for the given tag', null=True, blank=True)
 
     class Meta:
         unique_together = ('subscription', 'name')

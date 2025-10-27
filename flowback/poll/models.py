@@ -98,6 +98,10 @@ class Poll(BaseModel, NotifiableModel):
     dynamic = models.BooleanField()
 
     @property
+    def group(self):
+        return self.created_by.group
+
+    @property
     def finished(self):
         return self.vote_end_date <= timezone.now()
 
