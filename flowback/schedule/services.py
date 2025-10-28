@@ -1,212 +1,73 @@
-import json
-from datetime import datetime
-from os import remove
+import datetime
 
-from charset_normalizer.constant import FREQUENCIES
-from django.utils import timezone
-from django_celery_beat.models import IntervalSchedule, CrontabSchedule, PeriodicTask
-from rest_framework.exceptions import ValidationError
-
-from flowback.common.services import model_update, get_object
-from flowback.group.models import GroupUser
-from flowback.schedule.models import Schedule, ScheduleEvent, ScheduleSubscription
+from flowback.common.services import model_update
+from flowback.schedule.models import Schedule, ScheduleTag, ScheduleEvent
 
 
-def create_schedule(*, name: str, origin_name: str, origin_id: int) -> Schedule:
-    schedule = Schedule(name=name, origin_name=origin_name, origin_id=origin_id)
-    schedule.full_clean()
-    schedule.save()
-
-    return schedule
-
-
-def update_schedule(*, schedule_id: int, data) -> Schedule:
-    schedule = get_object(Schedule, id=schedule_id)
-    non_side_effect_fields = ['name']
-    schedule, has_updated = model_update(instance=schedule,
-                                         fields=non_side_effect_fields,
-                                         data=data)
-    return schedule
-
-
-def delete_schedule(*, schedule_id: int):
-    schedule = get_object(Schedule, id=schedule_id)
-    schedule.delete()
-
-
+# Create event
 def create_event(*,
                  schedule_id: int,
                  title: str,
-                 start_date: datetime,
-                 end_date: datetime,
-                 origin_name: str,
-                 origin_id: int,
                  description: str = None,
-                 work_group_id: int = None,
-                 assignee_ids: list[int] = None,
+                 start_date: datetime.datetime,
+                 end_date: datetime.datetime = None,
+                 created_by=None,
+                 tag: str = None,
+                 assignees: list[int] = None,
                  meeting_link: str = None,
-                 repeat_frequency: int = None,
-                 reminders: list[int] = None) -> ScheduleEvent:
+                 repeat_frequency: int = None) -> ScheduleEvent:
+    fields = locals()
+
     schedule = Schedule.objects.get(id=schedule_id)
-
-    # Simple hack to allow assignees for schedules, needs refactor in future
-    if assignee_ids and schedule.origin_name == "group":
-        assignees = GroupUser.objects.filter(id__in=assignee_ids)
-        assignees = assignees.filter(group=assignees.first().group)
-        if assignees.count() != len(assignee_ids):
-            raise ValidationError("Not all assignees are assignable to this event.")
-
-    event = ScheduleEvent(schedule_id=schedule_id,
-                          title=title,
-                          description=description,
-                          start_date=start_date,
-                          end_date=end_date,
-                          origin_name=origin_name,
-                          work_group_id=work_group_id,
-                          origin_id=origin_id,
-                          meeting_link=meeting_link,
-                          repeat_frequency=repeat_frequency,
-                          reminders=reminders)
-
-    event.full_clean()
-    event.save()
-
-    # TODO notify user on one-shot events
-
-    if assignee_ids and schedule.origin_name == "group":
-        event.assignees.add(*assignee_ids)
-
-    elif assignee_ids and not event.schedule.origin_name == "group":
-        raise ValidationError("Assignees are only available for groups.")
-
-    return event
+    return schedule.create_event(**fields)
 
 
-def update_event(*, event_id: int, data) -> ScheduleEvent:
+# Update event
+def update_event(*,
+                 event_id: int,
+                 schedule_id: int = None,
+                 **data) -> ScheduleEvent:
+    """
+    Updates an event
+    :param event_id: The event id to update
+    :param schedule_id: Schedule id (for validation)
+    :param data: Update fields with data
+    :return: ScheduleEvent object
+    """
     event = ScheduleEvent.objects.get(id=event_id)
 
-    non_side_effect_fields = ['title', 'description', 'start_date', 'end_date', 'meeting_link']
-    event, has_updated = model_update(instance=event,
-                                      fields=non_side_effect_fields,
-                                      data=data)
+    if schedule_id and not event.schedule_id == schedule_id:
+        raise ValueError("Event does not belong to the schedule")
 
-    # Simple hack to allow assignees for schedules, needs refactor in future
-    if 'assignee_ids' in data.keys() and event.schedule.origin_name == "group":
-        assignee_ids = data.pop('assignee_ids')
+    non_side_effect_fields = ['title',
+                              'description',
+                              'start_date',
+                              'end_date',
+                              'tag',
+                              'meeting_link',
+                              'repeat_frequency',
+                              'assignees']
 
-        assignees = GroupUser.objects.filter(id__in=assignee_ids)
-        assignees = assignees.filter(group=assignees.first().group)
-        if assignees.count() != len(assignee_ids):
-            raise ValidationError("Not all assignees are assignable to this event.")
-
-        event.assignees.clear()
-        event.assignees.add(*assignees)
-
-    elif 'assignee_ids' in data.keys() and not event.schedule.origin_name == "group":
-        raise ValidationError("Assignees are only available for groups.")
+    event, updated = model_update(instance=event,
+                                  fields=non_side_effect_fields,
+                                  data=data)
 
     return event
 
 
-def delete_event(*, event_id: int):
-    event = get_object(ScheduleEvent, id=event_id)
+# Delete event
+def delete_event(*,
+                 event_id: int,
+                 schedule_id: int = None) -> None:
+    """
+    Deletes an event
+    :param event_id: Event to remove
+    :param schedule_id: Schedule id (for validation)
+    :return: None
+    """
+    event = ScheduleEvent.objects.get(id=event_id)
     event.delete()
 
-
-def subscribe_schedule(*, schedule_id: int, target_id: int) -> ScheduleSubscription:
-    subscription = ScheduleSubscription(schedule_id=schedule_id, target_id=target_id)
-    subscription.full_clean()
-    subscription.save()
-
-    return subscription
-
-
-def unsubscribe_schedule(*, schedule_id: int, target_id: int):
-    subscription = get_object(ScheduleSubscription, schedule_id=schedule_id, target_id=target_id)
-    subscription.delete()
-
-
-class ScheduleManager:
-    def __init__(self, schedule_origin_name: str, possible_origins: list[str] = None):
-        self.origin_name = schedule_origin_name
-        self.possible_origins = possible_origins or []
-
-        if self.origin_name not in self.possible_origins:
-            self.possible_origins.append(self.origin_name)
-
-    def validate_origin_name(self, origin_name: str):
-        if origin_name not in self.possible_origins:
-            raise Exception('origin_name not in possible_origins')
-
-    # Schedule
-    def get_schedule(self, *, origin_name: str = None, origin_id: int) -> Schedule:
-        return get_object(Schedule, origin_name=origin_name or self.origin_name,
-                          origin_id=origin_id)
-
-    def create_schedule(self, *, name: str, origin_id: int) -> Schedule:
-        get_object(Schedule, origin_name=self.origin_name, origin_id=origin_id, reverse=True)
-        return create_schedule(name=name, origin_name=self.origin_name, origin_id=origin_id)
-
-    def update_schedule(self, *, origin_id: int, data):
-        schedule = self.get_schedule(origin_id=origin_id)
-        update_schedule(schedule_id=schedule.id, data=data)
-
-    def delete_schedule(self, origin_id: int):
-        schedule = self.get_schedule(origin_id=origin_id)
-        delete_schedule(schedule_id=schedule.id)
-
-    # Event
-    def get_schedule_event(self,
-                           event_id: int,
-                           schedule_origin_id: int = None,
-                           raise_exception: bool = True) -> ScheduleEvent:
-        data = dict(id=event_id,
-                    schedule__origin_name=self.origin_name,
-                    raise_exception=raise_exception)
-
-        if schedule_origin_id is not None:
-            data['schedule__origin_id'] = schedule_origin_id
-
-        return get_object(ScheduleEvent, **data)
-
-    def create_event(self,
-                     *,
-                     schedule_id: int,
-                     title: str,
-                     start_date: timezone.datetime,
-                     end_date: timezone.datetime = None,
-                     origin_name: str,
-                     origin_id: int,
-                     description: str = None,
-                     work_group_id: int = None,
-                     assignee_ids: list[int] = None,
-                     reminders: list[int] = None,
-                     repeat_frequency: str = None,
-                     meeting_link: str = None) -> ScheduleEvent:
-
-        self.validate_origin_name(origin_name=origin_name)
-
-        return create_event(schedule_id=schedule_id,
-                            title=title,
-                            start_date=start_date,
-                            end_date=end_date,
-                            origin_name=origin_name,
-                            origin_id=origin_id,
-                            work_group_id=work_group_id,
-                            description=description,
-                            assignee_ids=assignee_ids,
-                            meeting_link=meeting_link,
-                            reminders=reminders,
-                            repeat_frequency=repeat_frequency)
-
-    def update_event(self, *, schedule_origin_id: int, event_id: int, data) -> ScheduleEvent:
-        get_object(ScheduleEvent, id=event_id,
-                   schedule__origin_id=schedule_origin_id,
-                   schedule__origin_name=self.origin_name)
-        return update_event(event_id=event_id, data=data)
-
-    def delete_event(self, *, schedule_origin_id: int, event_id: int):
-        get_object(ScheduleEvent, id=event_id,
-                   schedule__origin_id=schedule_origin_id,
-                   schedule__origin_name=self.origin_name)
-        delete_event(event_id=event_id)
+# Subscribe (incl. tags, user tags)
+# Unsubscribe
+# Update user event (user_tags, locked, reminders)

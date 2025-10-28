@@ -37,7 +37,7 @@ class Schedule(BaseModel):
                      description: str = None,
                      start_date: datetime,
                      end_date: datetime = None,
-                     created_by=None,
+                     created_by = None,
                      tag: str = None,
                      assignees: list[int] = None,
                      meeting_link: str = None,
@@ -56,6 +56,8 @@ class Schedule(BaseModel):
 
         event.full_clean()
         event.save()
+
+        return event
 
     # Subscribe (incl. unsubscribe, which deletes the subscription)
     def subscribe(self, user, tags: dict[str, list[int]] = None):
@@ -247,6 +249,7 @@ class ScheduleEvent(BaseModel, NotifiableModel):
         if self.end_date and self.start_date > self.end_date:
             raise ValidationError('Start date is greater than end date')
 
+    # TODO add method for updating tags
     @classmethod
     def post_save(cls, instance, created, update_fields: list[str] = None, *args, **kwargs):
         # Notification subscription management
