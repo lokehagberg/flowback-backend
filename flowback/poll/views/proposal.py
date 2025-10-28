@@ -94,7 +94,7 @@ class PollProposalCreateAPI(APIView):
 
         class Meta:
             model = PollProposal
-            fields = ('title', 'description', 'attachments', 'start_date', 'end_date')
+            fields = ('title', 'description', 'blockchain_id', 'attachments', 'start_date', 'end_date')
 
     def post(self, request, poll: int):
         poll = get_object(Poll, id=poll)
