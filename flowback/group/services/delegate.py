@@ -38,10 +38,13 @@ def group_user_delegate(*, user: int, group: int, delegate_pool_id: int, tags: l
     if len(db_tags) < len(tags):
         raise ValidationError('Not all tags are available in the group')
 
-    delegate_rel = GroupUserDelegator(group_id=group, delegator_id=delegator.id,
-                                      delegate_pool_id=delegate_pool.id)
-    delegate_rel.full_clean()
-    delegate_rel.save()
+    delegate_rel, created = GroupUserDelegator.objects.get_or_create(group_id=group,
+                                                                     delegator_id=delegator.id,
+                                                                     delegate_pool_id=delegate_pool.id)
+
+    if not created:
+        raise ValidationError('User already delegated to this pool')
+
     delegate_rel.tags.add(*db_tags)
 
     return delegate_rel
@@ -59,7 +62,6 @@ def group_user_delegate_update(*, user_id: int, group_id: int, delegate_pool_id:
     delegate_rel = GroupUserDelegator.objects.filter(delegator_id=group_user.id,
                                                      group_id=group_id,
                                                      delegate_pool__in=pools).all()
-
 
     if len(tags) == 0:
         GroupUserDelegator.objects.filter(delegator=group_user, group_id=group_id, delegate_pool__in=pools).delete()
