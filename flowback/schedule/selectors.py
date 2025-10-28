@@ -24,9 +24,7 @@ class ScheduleEventBaseFilter(django_filters.FilterSet):
     class Meta:
         model = ScheduleEvent
         fields = dict(start_date=['lt', 'gt', 'exact'],
-                      end_date=['lt', 'gt', 'exact'],
-                      origin_name=['exact'],
-                      origin_id=['exact'])
+                      end_date=['lt', 'gt', 'exact'])
 
 
 def schedule_event_list(*, schedule_id: int, group_user=None, filters=None):

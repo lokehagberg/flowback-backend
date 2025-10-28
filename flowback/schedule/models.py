@@ -15,7 +15,6 @@ from rest_framework.exceptions import ValidationError
 from flowback.common.models import BaseModel
 from django.utils.translation import gettext_lazy as _
 
-from flowback.group.models import GroupUser
 from flowback.notification.models import NotifiableModel, NotificationObject, NotificationSubscription
 
 
@@ -162,9 +161,7 @@ class ScheduleEvent(BaseModel, NotifiableModel):
                 case _:
                     group = self.created_by.group
 
-            assignee_ids = list(self.assignees.values_list('id', flat=True))
-            assignees = GroupUser.objects.filter(group=group, id__in=assignee_ids)
-            if self.assignees.count() != len(assignees):
+            if not all([assignee.group == group for assignee in self.assignees.all()]):
                 raise ValidationError("Not all group users are assignable to this event.")
 
     @property
@@ -344,7 +341,6 @@ class ScheduleTagSubscription(BaseModel):
 post_delete.connect(ScheduleTagSubscription.post_delete, ScheduleTagSubscription)
 
 
-# TODO post_delete should remove all schedule event notification subscriptions
 class ScheduleSubscription(BaseModel):
     subscribe_to_new_notification_tags = models.BooleanField(default=False, blank=True)
     notification_tags = models.ManyToManyField(ScheduleTag, blank=True, through=ScheduleTagSubscription)
@@ -357,10 +353,10 @@ class ScheduleSubscription(BaseModel):
         unique_together = ('user', 'schedule')
 
     # TODO update code with new fields
-    def delete_all_notification_subscriptions(self,
-                                              tags: str | None,
-                                              user_tags: list[str] | None = None,
-                                              include_locked: bool = False):
+    def delete_tag_subscriptions(self,
+                                 tag: str | None,
+                                 user_tag: str | None = None,
+                                 include_locked: bool = False):
         """
         Deletes all notifications and tag subscriptions for the user and schedule.
         :param tags: Relevant tags to target, leave empty to delete all notification subscriptions.
@@ -369,20 +365,24 @@ class ScheduleSubscription(BaseModel):
         """
         filters = dict()
         with transaction.atomic():
-            # Delete tag subscriptions, and if tags exist, add filters for the next step
-            if tags:
-                tags = ScheduleTag.objects.filter(schedule=self.schedule,
-                                                  name__in=tags).values_list('id',
-                                                                             flat=True)
-                filters['scheduletag__id__in'] = list(tags)
-
-                ScheduleTagSubscription.objects.filter(schedule_tag__id__in=tags).delete()
-
-            else:
+            if not tag or user_tag:
                 ScheduleTagSubscription.objects.filter(schedule_subscription=self).delete()
 
-            if reminders:
-                filters['scheduletagsubscription__reminders'] = reminders
+            if tag:
+                tag = ScheduleTag.objects.get(schedule=self.schedule, name=tag)
+                filters['scheduletag__id'] = tag.id
+
+                ScheduleTagSubscription.objects.filter(schedule_subscription=self,
+                                                       schedule_tag_id=tag).delete()
+
+            if user_tag or not include_locked:
+                filters['scheduleeventsubscription__subscription__user'] = self.user
+
+            if user_tag:
+                filters['scheduleeventsubscription__tag'] = user_tag
+
+            if not include_locked:
+                filters['scheduleeventsubscription__locked'] = False
 
             content_type = ContentType.objects.get_for_model(ScheduleEvent)
             object_ids = ScheduleEvent.objects.filter(schedule=self.schedule,
