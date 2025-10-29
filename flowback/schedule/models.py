@@ -231,7 +231,7 @@ class ScheduleEvent(BaseModel, NotifiableModel):
 
     def regenerate_notifications(self):
         """Regenerate notifications for the event"""
-        if not self.repeat_frequency and timezone.now() > self.start_date:
+        if not self.repeat_frequency and self.end_date and timezone.now() > self.end_date:
             return
 
         self.notification_channel.notificationobject_set.filter(timestamp__gte=timezone.now()).all().delete()
@@ -290,6 +290,7 @@ class ScheduleEvent(BaseModel, NotifiableModel):
             task = PeriodicTask.objects.filter(name=f"schedule_event_{instance.id}").first()
             if not created and not task:
                 if task.crontab != cron_schedule:
+                    task.start_date = instance.start_date
                     task.crontab = cron_schedule
                     task.save()
 
@@ -298,7 +299,8 @@ class ScheduleEvent(BaseModel, NotifiableModel):
             periodic_task = PeriodicTask.objects.create(name=f"schedule_event_{instance.id}",
                                                         task="schedule.tasks.event_notify",
                                                         kwargs=json.dumps(dict(event_id=instance.id)),
-                                                        crontab=cron_schedule)
+                                                        crontab=cron_schedule,
+                                                        start_time=instance.start_date)
             periodic_task.full_clean()
             periodic_task.save()
 
