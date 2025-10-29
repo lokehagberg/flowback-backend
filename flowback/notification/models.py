@@ -111,10 +111,6 @@ class NotificationSubscription(BaseModel):
     user = models.ForeignKey('user.User', on_delete=models.CASCADE)
     channel = models.ForeignKey('notification.NotificationChannel', on_delete=models.CASCADE)
 
-    @property
-    def tags(self) -> list[str]:
-        return list(NotificationSubscriptionTag.objects.filter(subscription=self).values_list('name', flat=True))
-
     class Meta:
         unique_together = ('user', 'channel')
 
