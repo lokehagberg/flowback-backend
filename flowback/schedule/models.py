@@ -150,19 +150,24 @@ class ScheduleEvent(BaseModel, NotifiableModel):
                                 ('end_date', datetime))
 
     def clean(self, *args, **kwargs):
-        # Manual management of getting group from created_by
+        if self.end_date and self.start_date > self.end_date:
+            raise ValidationError('Start date is greater than end date')
+
+        # Manual management of getting the group from created_by
         if self.assignees:
             model = self.content_type.model
+
             group = None
-
-            if not model in ['group', 'poll', 'workgroup']:
-                raise ValidationError("Assignees can only be assigned to events created by a group.")
-
             match model:
                 case 'group':
                     group = self.created_by
-                case _:
+                case 'poll':
+                    group = self.created_by.created_by.group
+                case 'workgroup':
                     group = self.created_by.group
+
+            if group is None:
+                raise ValidationError("Assignees can only be assigned to events created by a group.")
 
             if not all([assignee.group == group for assignee in self.assignees.all()]):
                 raise ValidationError("Not all group users are assignable to this event.")
@@ -216,6 +221,13 @@ class ScheduleEvent(BaseModel, NotifiableModel):
         return schedule
 
     @property
+    def is_live(self) -> bool:
+        """Returns whether the event has yet to begin or already begun"""
+        return (self.active
+                and self.start_date <= timezone.now() <= self.end_date
+                if self.end_date else self.start_date <= timezone.now())
+
+    @property
     def next_start_date(self) -> datetime.datetime:
         if timezone.now() < self.start_date:
             return self.start_date
@@ -246,9 +258,19 @@ class ScheduleEvent(BaseModel, NotifiableModel):
                             timestamp=self.next_end_date,
                             message=f"Event ended: {self.title}")
 
-    def clean(self):
-        if self.end_date and self.start_date > self.end_date:
-            raise ValidationError('Start date is greater than end date')
+    def event_subscribe(self, user, user_tags: list[str] = None, locked: bool = True):
+        if not (self.active and self.is_live):
+            return
+
+        user_schedule = ScheduleSubscription.objects.get(schedule=self.schedule, user=user)
+        event, created = ScheduleEventUserData.objects.update_or_create(event=self,
+                                                                        subscription=user_schedule,
+                                                                        defaults=dict(tags=user_tags),
+                                                                                      reminders=None,
+                                                                        locked=locked)
+
+        if created:
+            self.notification_channel.subscribe(user=user, tags=['start', 'end'], reminders=None)
 
     @classmethod
     def post_save(cls, instance, created, update_fields: list[str] = None, *args, **kwargs):

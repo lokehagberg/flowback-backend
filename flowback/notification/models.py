@@ -329,7 +329,7 @@ class NotificationChannel(BaseModel, TreeNode):
         ]
 
     def subscribe(self, *, user,
-                  tags: tuple[str] = None,
+                  tags: tuple[str] | list[str] = None,
                   reminders: tuple[None | tuple[int]] = None) -> NotificationSubscription | None:
         """
         Subscribes user to the channel.

@@ -1,5 +1,7 @@
 import datetime
 
+from django.core.exceptions import ValidationError
+
 from flowback.common.services import model_update
 from flowback.schedule.models import Schedule, ScheduleTag, ScheduleEvent
 
@@ -37,7 +39,7 @@ def update_event(*,
     event = ScheduleEvent.objects.get(id=event_id)
 
     if schedule_id and not event.schedule_id == schedule_id:
-        raise ValueError("Event does not belong to the schedule")
+        raise ValidationError("Event does not belong to the schedule")
 
     non_side_effect_fields = ['title',
                               'description',
@@ -66,6 +68,10 @@ def delete_event(*,
     :return: None
     """
     event = ScheduleEvent.objects.get(id=event_id)
+
+    if not event.schedule_id == schedule_id:
+        raise ValidationError("Event does not belong to the schedule")
+
     event.delete()
 
 # Subscribe (incl. tags, user tags)
