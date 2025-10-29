@@ -381,6 +381,9 @@ class NotificationChannel(BaseModel, TreeNode):
 
         return subscription
 
+    def unsubscribe(self, *, user):
+        self.subscribe(user=user)
+
     def unsubscribe_all(self, *, user):
         """
         Deletes all subscriptions for the given user, including related channels.

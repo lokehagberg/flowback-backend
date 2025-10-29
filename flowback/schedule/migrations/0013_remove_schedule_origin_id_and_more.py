@@ -56,7 +56,7 @@ class Migration(migrations.Migration):
             field=models.PositiveIntegerField(),
         ),
         migrations.CreateModel(
-            name='ScheduleEventSubscription',
+            name='ScheduleEventUserData',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now)),
