@@ -38,6 +38,7 @@ class PollSerializer(serializers.Serializer):
     participants = serializers.IntegerField()
     pinned = serializers.BooleanField()
     dynamic = serializers.BooleanField()
+    interval_mean_absolute_correctness = serializers.DecimalField(max_digits=12, decimal_places=9, allow_null=True)
 
     group_joined = serializers.BooleanField(required=False)
     total_comments = serializers.IntegerField(required=False)
