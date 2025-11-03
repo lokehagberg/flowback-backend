@@ -93,10 +93,10 @@ class MessageChannelTopicListAPI(APIView):
         max_limit = 100
 
     class FilterSerializer(serializers.Serializer):
-        id = serializers.IntegerField()
-        topic_id = serializers.IntegerField()
-        name = serializers.CharField()
-        name__icontains = serializers.CharField()
+        id = serializers.IntegerField(required=False)
+        topic_id = serializers.IntegerField(required=False)
+        name = serializers.CharField(required=False)
+        name__icontains = serializers.CharField(required=False)
 
     class OutputSerializer(serializers.Serializer):
         id = serializers.IntegerField()
