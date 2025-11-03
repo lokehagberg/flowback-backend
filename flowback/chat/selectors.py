@@ -53,7 +53,7 @@ class BaseMessageChannelPreviewFilter(django_filters.FilterSet):
     title = django_filters.CharFilter(field_name='channel__title', lookup_expr='icontains')
 
     class Meta:
-        model = Message
+        model = MessageChannelParticipant
         fields = dict(id=['exact'],
                       user_id=['exact'],
                       closed_at=['gte', 'lte'],
