@@ -39,6 +39,41 @@ class ChatTestHTTP(APITestCase):
         self.message_channel_topic = MessageChannelTopicFactory(channel=self.message_channel)
         self.message_channel_file_collection = MessageFileCollectionFactory(channel=self.message_channel)
 
+    def test_message_channel_preview_latest_includes_join(self):
+        # Create a fresh channel and add user_two first
+        channel = MessageChannelFactory(origin_name='user')
+        participant_two = MessageChannelParticipantFactory(channel=channel, user=self.user_two)
+
+        # user_two sends a normal message
+        message_create(user_id=self.user_two.id, channel_id=channel.id, message="hello before join")
+
+        # Now user_one joins the channel, which should create an 'info' join message via signals
+        message_channel_join(user_id=self.user_one.id, channel_id=channel.id)
+
+        # Preview for user_one should show the latest message which is the join info
+        response = generate_request(
+            MessageChannelPreviewAPI,
+            data=dict(order_by='created_at_desc', channel_id=channel.id),
+            user=self.user_one,
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data.get('count'), 1, response.data)
+        latest = response.data['results'][0]
+        self.assertIn('joined the channel', latest['recent_message']['message'])
+        self.assertEqual('info', latest['recent_message']['type'])
+
+        # If another normal message is sent afterwards, preview should update to that message
+        message = message_create(user_id=self.user_two.id, channel_id=channel.id, message="after join message")
+        print(message.__dict__)
+        response = generate_request(MessageChannelPreviewAPI,
+                                    data=dict(order_by='created_at_desc', channel_id=channel.id),
+                                    user=self.user_one)
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data.get('count'), 1, response.data)
+        latest = response.data['results'][0]
+        self.assertEqual('after join message', latest['recent_message']['message'])
+        self.assertEqual(latest['recent_message']['type'], 'message')
+
     def test_message_channel_create(self):
         channel = message_channel_create(origin_name="user", title="test")
 
@@ -137,8 +172,8 @@ class ChatTestHTTP(APITestCase):
 
             factory = APIRequestFactory()
             request = factory.get('', data=dict(order_by='created_at_desc'))
-            request_two = factory.get('', data=dict(order_by='created_at_desc', origin_name='user'))
-            request_three = factory.get('', data=dict(order_by='created_at_desc', origin_name='group'))
+            request_two = factory.get('', data=dict(order_by='created_at_desc', origin_names='user'))
+            request_three = factory.get('', data=dict(order_by='created_at_desc', origin_names='group'))
             view = MessageChannelPreviewAPI.as_view()
 
             # Check if all channels are shown
