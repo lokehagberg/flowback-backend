@@ -29,7 +29,7 @@ class GroupFolder(BaseModel):
 
 # Permission class for each Group
 class GroupPermissions(BaseModel):
-    role_name = models.TextField(default='default', blank=False)
+    role_name = models.TextField(default='default')
     author = models.ForeignKey('Group', on_delete=models.CASCADE, null=True, blank=True)
     invite_user = models.BooleanField(default=False)
     create_poll = models.BooleanField(default=True)
