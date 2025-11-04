@@ -155,7 +155,7 @@ def group_user_update(*, fetched_by: User, group: int, target_user_id: int, data
 
     if fetched_by.id != target_user_id:
         group_user.group.notify_group_user(_user_id=target_user_id,
-                                           message=f"Your group user has been updated by a group admin",
+                                           message=f"An Admin has changed your permissions",
                                            action=group_user.group.notification_channel.Action.CREATED)
 
     return group_user
