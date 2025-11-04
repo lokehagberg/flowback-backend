@@ -376,14 +376,14 @@ class PollDelegateVoteTest(APITestCase):
         # Create proposals for the poll
         proposal_one = PollProposalFactory(created_by=self.group_user_creator, poll=poll)
         proposal_two = PollProposalFactory(created_by=self.group_user_creator, poll=poll)
-        
-        # Create a delegate
-        delegate = GroupUserDelegateFactory(group=self.group)
-        
+
         # Create permissions - one allowing vote, one denying vote
         permission_allow_vote = GroupPermissionsFactory(author=self.group, allow_vote=True)
         permission_deny_vote = GroupPermissionsFactory(author=self.group, allow_vote=False)
-        
+
+        # Create a delegate
+        delegate = GroupUserDelegateFactory(group=self.group, group_user__permission=permission_allow_vote)
+
         # Create delegators with different permissions
         # 2 delegators with voting permission
         delegator_with_permission_1 = GroupUserFactory(group=self.group, permission=permission_allow_vote)
@@ -394,18 +394,22 @@ class PollDelegateVoteTest(APITestCase):
         delegator_without_permission_2 = GroupUserFactory(group=self.group, permission=permission_deny_vote)
 
         # Create delegator relationships
-        delegator_pool_1 = GroupUserDelegatorFactory(group=self.group, delegator=delegator_with_permission_1,
+        delegator_1 = GroupUserDelegatorFactory(group=self.group, delegator=delegator_with_permission_1,
                                                      delegate_pool=delegate.pool)
-        delegator_pool_2 = GroupUserDelegatorFactory(group=self.group, delegator=delegator_with_permission_2,
+        delegator_2 = GroupUserDelegatorFactory(group=self.group, delegator=delegator_with_permission_2,
                                                      delegate_pool=delegate.pool)
-        delegator_pool_3 = GroupUserDelegatorFactory(group=self.group, delegator=delegator_without_permission_1,
+        delegator_3 = GroupUserDelegatorFactory(group=self.group, delegator=delegator_without_permission_1,
                                                      delegate_pool=delegate.pool)
-        delegator_pool_4 = GroupUserDelegatorFactory(group=self.group, delegator=delegator_without_permission_2,
+        delegator_4 = GroupUserDelegatorFactory(group=self.group, delegator=delegator_without_permission_2,
                                                      delegate_pool=delegate.pool)
 
-        # Add tag to all delegators
-        for delegator_pool in [delegator_pool_1, delegator_pool_2, delegator_pool_3, delegator_pool_4]:
-            delegator_pool.tags.add(tag)
+        # Also make the delegate delegate to themselves
+        delegator_delegate = GroupUserDelegatorFactory(group=self.group, delegator=delegate.group_user,
+                                                       delegate_pool=delegate.pool)
+
+        # Add tag to all delegators (excluding the self-delegation to avoid counting the delegate themselves)
+        for delegator in [delegator_1, delegator_2, delegator_3, delegator_4, delegator_delegate]:
+            delegator.tags.add(tag)
 
         # Have the delegate vote
         user = delegate.group_user.user
@@ -431,8 +435,8 @@ class PollDelegateVoteTest(APITestCase):
         delegate_vote.refresh_from_db()
 
         # Verify that only delegators with voting permission are counted
-        # Should be 2 (delegators with permission) - only delegators count toward mandate, not the delegate
-        expected_mandate = 2  # Only the 2 delegators with voting permission should be counted
+        # Should be 3 (delegators with permission) - only delegators count toward mandate, not the delegate
+        expected_mandate = 3  # Only the 3 delegators with voting permission should be counted
         self.assertEqual(delegate_vote.mandate, expected_mandate, 
                         f"Expected mandate of {expected_mandate} but got {delegate_vote.mandate}")
         
@@ -442,9 +446,9 @@ class PollDelegateVoteTest(APITestCase):
         
         # Each delegator with permission contributes their weight to the delegate's vote
         # Delegate vote: proposal_one=100, proposal_two=50
-        # With mandate of 2, final scores should be: proposal_one=200, proposal_two=100
-        self.assertEqual(proposal_one.score, 200, f"Expected proposal_one score of 200 but got {proposal_one.score}")
-        self.assertEqual(proposal_two.score, 100, f"Expected proposal_two score of 100 but got {proposal_two.score}")
+        # With mandate of 3, final scores should be: proposal_one=300, proposal_two=150
+        self.assertEqual(proposal_one.score, 300, f"Expected proposal_one score of 300 but got {proposal_one.score}")
+        self.assertEqual(proposal_two.score, 150, f"Expected proposal_two score of 150 but got {proposal_two.score}")
         
         # Verify poll status is not failed (participants met requirements)
         poll.refresh_from_db()
