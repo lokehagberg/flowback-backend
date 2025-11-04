@@ -69,6 +69,7 @@ class MessageChannelPreviewAPI(APIView):
         timestamp = serializers.DateTimeField(allow_null=True)
         total_participants = serializers.IntegerField()
         channel_id = serializers.IntegerField()
+        channel_title = serializers.CharField(source="channel.title")
         participants = SerializerMethodField(help_text="List of Users who participated in the channel, max 20 displayed")
 
         def get_participants(self, obj):
