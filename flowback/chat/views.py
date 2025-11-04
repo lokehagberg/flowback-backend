@@ -56,6 +56,7 @@ class MessageChannelPreviewAPI(APIView):
         title = serializers.CharField(required=False)
         id = serializers.IntegerField(required=False)
         user_id = serializers.IntegerField(required=False)
+        exclude_closed = serializers.BooleanField(required=False, default=True)
         closed_at__gte = serializers.DateTimeField(required=False)
         closed_at__lte = serializers.DateTimeField(required=False)
         channel_id = serializers.IntegerField(required=False)

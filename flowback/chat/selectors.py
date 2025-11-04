@@ -51,6 +51,13 @@ def message_channel_topic_list(*, user: User, channel_id: int, filters=None):
 class BaseMessageChannelPreviewFilter(django_filters.FilterSet):
     origin_names = StringInFilter(field_name='channel__origin_name')
     title = django_filters.CharFilter(field_name='channel__title', lookup_expr='icontains')
+    exclude_closed = django_filters.BooleanFilter(method='filter_exclude_closed')
+
+    def filter_exclude_closed(self, queryset, name, value):
+        if value:
+            return queryset.filter(Q(closed_at__isnull=True)
+                                   | Q(message_created_at__gt=F('closed_at')))
+        return queryset
 
     class Meta:
         model = MessageChannelParticipant
@@ -69,9 +76,7 @@ def message_channel_preview_list(*, user: User, filters=None):
         active=True
     ).annotate(
         message_created_at=Subquery(message_qs)
-    ).filter(Q(closed_at__isnull=True)
-             | Q(message_created_at__gt=F('closed_at'))
-             ).order_by('-channel__message__created_at')
+    ).order_by('-message_created_at')
 
     participants = BaseMessageChannelPreviewFilter(filters, qs).qs
 
