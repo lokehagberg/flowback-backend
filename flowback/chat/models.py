@@ -28,6 +28,10 @@ class MessageChannelParticipant(BaseModel):
     timestamp = models.DateTimeField(auto_now=True)
     active = models.BooleanField(default=True)
 
+    @property
+    def recent_message(self):
+        return self.channel.message_set.filter(active=True).order_by('-created_at').first()
+
 
     class Meta:
         unique_together = ('user', 'channel')

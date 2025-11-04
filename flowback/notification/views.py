@@ -66,7 +66,7 @@ class NotificationSubscriptionListAPI(APIView):
 
     class OutputSerializer(serializers.Serializer):
         class NotificationSubscriptionTagSerializer(serializers.Serializer):
-            tag = serializers.CharField()
+            name = serializers.CharField()
             reminders = serializers.ListField(child=serializers.IntegerField(), allow_null=True)
 
         channel_id = serializers.IntegerField()

@@ -45,30 +45,26 @@ class MessageListAPI(APIView):
                                       view=self)
 
 
-# TODO better to order by updated_at, and change updated_at each time user sends a message
 class MessageChannelPreviewAPI(APIView):
     class Pagination(LimitOffsetPagination):
         default_limit = 50
         max_limit = 50
 
     class FilterSerializer(serializers.Serializer):
-        order_by = serializers.ChoiceField(required=False, choices=['created_at_asc', 'created_at_desc'])
         origin_names = serializers.CharField(required=False, help_text="Comma-separated list of origins, "
                                                                        "e.g. 'user,user_group'")
         title = serializers.CharField(required=False)
-        username__icontains = serializers.CharField(required=False)
         id = serializers.IntegerField(required=False)
         user_id = serializers.IntegerField(required=False)
-        created_at__gte = serializers.DateTimeField(required=False)
-        created_at__lte = serializers.DateTimeField(required=False)
+        closed_at__gte = serializers.DateTimeField(required=False)
+        closed_at__lte = serializers.DateTimeField(required=False)
         channel_id = serializers.IntegerField(required=False)
-        topic_id = serializers.IntegerField(required=False)
-        topic_name = serializers.CharField(required=False)
 
-    class OutputSerializer(BasicMessageSerializer):
+    class OutputSerializer(serializers.Serializer):
+        id = serializers.IntegerField()
         timestamp = serializers.DateTimeField(allow_null=True)
-        total_participants = serializers.IntegerField()
         participants = SerializerMethodField(help_text="List of Users who participated in the channel, max 20 displayed")
+        recent_message = BasicMessageSerializer(allow_null=True)
 
         def get_participants(self, obj):
             participants = User.objects.filter(messagechannelparticipant__channel=obj.channel)[:20]
@@ -93,10 +89,10 @@ class MessageChannelTopicListAPI(APIView):
         max_limit = 100
 
     class FilterSerializer(serializers.Serializer):
-        id = serializers.IntegerField()
-        topic_id = serializers.IntegerField()
-        name = serializers.CharField()
-        name__icontains = serializers.CharField()
+        id = serializers.IntegerField(required=False)
+        topic_id = serializers.IntegerField(required=False)
+        name = serializers.CharField(required=False)
+        name__icontains = serializers.CharField(required=False)
 
     class OutputSerializer(serializers.Serializer):
         id = serializers.IntegerField()

@@ -10,7 +10,7 @@ from flowback.notification.tests.factories import (
     NotificationSubscriptionFactory, 
     NotificationSubscriptionTagFactory
 )
-from flowback.notification.views import NotificationUpdateAPI, NotificationListAPI
+from flowback.notification.views import NotificationUpdateAPI, NotificationListAPI, NotificationSubscriptionListAPI
 from flowback.group.views.group import GroupNotificationSubscribeAPI
 from flowback.group.services.group import group_notification_subscribe
 
@@ -778,3 +778,34 @@ class RemindersTest(APITransactionTestCase):
         ).count()
         expected_total = len(users) * 2  # Each user gets immediate + 1 reminder
         self.assertEqual(total_notifications, expected_total)
+
+
+
+class NotificationSubscriptionListAPITest(APITransactionTestCase):
+    def setUp(self):
+        # Create a group and a user in that group
+        self.group = GroupFactory()
+        self.user = GroupUserFactory.create(group=self.group).user
+        # Subscribe the user to the group's notification channel
+        self.group.notification_channel.subscribe(user=self.user, tags=("group",))
+
+    def test_subscription_list_basic(self):
+        # Use generate_request to call the API and verify the response
+        response = generate_request(
+            api=NotificationSubscriptionListAPI,
+            user=self.user
+        )
+
+        self.assertEqual(response.status_code, 200, response.data)
+        # Should have exactly one subscription
+        self.assertEqual(response.data.get("count"), 1)
+        self.assertEqual(len(response.data.get("results", [])), 1)
+
+        item = response.data["results"][0]
+        # Basic structure checks
+        self.assertEqual(item["channel_name"], "group")
+        self.assertEqual(item["channel_id"], self.group.notification_channel.id)
+        # Tags should include the subscribed tag
+        self.assertIn("tags", item)
+        self.assertEqual(len(item["tags"]), 1)
+        self.assertEqual(item["tags"][0]["name"], "group")
