@@ -10,6 +10,7 @@ class _MessageSerializerTemplate(serializers.Serializer):
     created_at = serializers.DateTimeField()
     updated_at = serializers.DateTimeField()
     channel_origin_name = serializers.CharField(source="channel.origin_name")
+    channel_id = serializers.CharField(source="channel.id")
     topic_id = serializers.IntegerField(required=False)
     topic_name = serializers.CharField(required=False, source='topic.name')
     type = serializers.CharField(read_only=True)
