@@ -3,10 +3,10 @@ import datetime
 from django.core.exceptions import ValidationError
 
 from flowback.common.services import model_update
-from flowback.schedule.models import Schedule, ScheduleTag, ScheduleEvent
+from flowback.schedule.models import Schedule, ScheduleTag, ScheduleEvent, ScheduleEventSubscription, \
+    ScheduleTagSubscription, ScheduleUser
 
 
-# Create event
 def create_event(*,
                  schedule_id: int,
                  title: str,
@@ -24,7 +24,6 @@ def create_event(*,
     return schedule.create_event(**fields)
 
 
-# Update event
 def update_event(*,
                  event_id: int,
                  schedule_id: int = None,
@@ -57,7 +56,6 @@ def update_event(*,
     return event
 
 
-# Delete event
 def delete_event(*,
                  event_id: int,
                  schedule_id: int = None) -> None:
@@ -75,51 +73,55 @@ def delete_event(*,
     event.delete()
 
 
-# Subscribe (incl. tags, user tags)
-def schedule_notification_subscribe(*,
-                                    user,
-                                    schedule_id: int = None,
-                                    event_id: int = None,
-                                    user_tags: list[str] = None,
-                                    locked: bool = True,
-                                    tags: list[str] = None):
-    """
-    Subscribes user to either a schedule, a tag or an event.
-    :param user: The user that'll subscribe
-    :param schedule_id: The ID of the schedule to subscribe to,
-     used for validation if at least one other field is filled.
-     If schedule_id is the only field set, subscribes to all tags.
-    :param event_id: The ID of the event to subscribe to. Takes priority over schedule and tag subscriptions.
-     Will cause the event subscription to be locked.
-    :param user_tags: List of user-defined tags to subscribe to.
-    :param locked: Whether the event subscription should be locked. Only used for event_id subscriptions.
-    :param tags: List of tags to subscribe to.
-    :return:
-    """
-    if event_id:
-        event = ScheduleEvent.objects.get(id=event_id)
-
-        if schedule_id and event.schedule_id != schedule_id:
-            raise ValidationError('Event does not belong to the schedule')
-
-        event.event_subscribe(user=user,
+# Subscription services
+def schedule_event_subscribe(*, user,
+                             schedule_id: int,
+                             event_ids: list[int],
+                             user_tags: list[str] = None,
+                             locked: bool = True,
+                             reminders: list[int] = None) -> None:
+    schedule = Schedule.objects.get(id=schedule_id)
+    schedule.subscribe_events(user=user,
+                              event_ids=event_ids,
                               user_tags=user_tags,
+                              reminders=reminders,
                               locked=locked)
-    pass
 
-# Unsubscribe
-def schedule_notification_unsubscribe(*,
-                                      user,
-                                      schedule_id: int = None,
-                                      event_id: int = None,
-                                      tags: list[str] = None):
-    """
-    Unsubscribes the user from a schedule, tag or event.
-    :param user: The user that'll unsubscribe
-    :param schedule_id: The ID of the schedule to unsubscribe from. Used for validation.
-     If schedule_id is the only field set, unsubscribes from all tags.
-    :param event_id: The ID of the event to unsubscribe from.
-    :param tags: The tags to unsubscribe from.
-    """
-    pass
-# Update user event (user_tags, locked, reminders)
+
+def schedule_event_unsubscribe(*, user,
+                               schedule_id: int,
+                               event_ids: list[int]) -> None:
+    schedule = Schedule.objects.get(id=schedule_id)
+    schedule.unsubscribe_events(user=user, event_ids=event_ids)
+
+
+def schedule_tag_subscribe(*, user,
+                           schedule_id: int,
+                           tag_ids: list[int],
+                           reminders: list[int] = None) -> None:
+    schedule = Schedule.objects.get(id=schedule_id)
+    schedule.subscribe_tags(user=user, tag_ids=tag_ids, reminders=reminders)
+
+
+def schedule_tag_unsubscribe(*, user,
+                             schedule_id: int,
+                             tag_ids: list[int]) -> None:
+    schedule = Schedule.objects.get(id=schedule_id)
+    schedule.unsubscribe_tags(user=user, tag_ids=tag_ids)
+
+
+def schedule_subscribe_to_new_tags(*, user,
+                                   schedule_id: int,
+                                   reminders: list[int] = None) -> None:
+    schedule_user = ScheduleUser.objects.get(schedule_id=schedule_id, user=user)
+    schedule_user.subscribe_to_new_notification_tags = True
+    schedule_user.reminders = reminders
+    schedule_user.save()
+
+
+def schedule_unsubscribe_to_new_tags(*, user,
+                                     schedule_id: int) -> None:
+    schedule_user = ScheduleUser.objects.get(schedule_id=schedule_id, user=user)
+    schedule_user.subscribe_to_new_notification_tags = False
+    schedule_user.reminders = None
+    schedule_user.save()

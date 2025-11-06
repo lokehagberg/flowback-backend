@@ -135,14 +135,14 @@ class NotificationSubscriptionTag(BaseModel):
         if (created and instance.reminders is not None) or 'reminders' in update_fields:
             Notification.objects.filter(
                 ~Q(reminder=0),
-                user=instance.subscription.user,
+                user=instance.schedule_user.user,
                 notification_object__tag=instance.name
             ).annotate(ts=ExpressionWrapper(F('notification_object__timestamp') - F('reminder') * timedelta(seconds=1),
                               output_field=models.DateTimeField())
                        ).filter(ts__lte=timezone.now()).delete()
 
             notification_objects = NotificationObject.objects.filter(tag=instance.name,
-                                                                     notification__user=instance.subscription.user)
+                                                                     notification__user=instance.schedule_user.user)
 
             # Add new reminders if any
             if instance.reminders and len(instance.reminders) > 0:
@@ -150,7 +150,7 @@ class NotificationSubscriptionTag(BaseModel):
                 for notification_object in notification_objects:
                     for i in instance.reminders:
                         if notification_object.timestamp - timedelta(seconds=i) > timezone.now():
-                            notifications.append(Notification(user=instance.subscription.user,
+                            notifications.append(Notification(user=instance.schedule_user.user,
                                                               notification_object=notification_object,
                                                               reminder=i))
 
@@ -202,6 +202,13 @@ class NotificationChannel(BaseModel, TreeNode):
             return tag_fields
 
         return None
+
+    def get_subscriber(self, user) -> NotificationSubscription | None:
+        try:
+            return NotificationSubscription.objects.get(channel=self, user=user)
+
+        except NotificationSubscription.DoesNotExist:
+            return None
 
     # Grabs the notification_data property from content_object (if any)
     @property

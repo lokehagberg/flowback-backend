@@ -2,6 +2,7 @@ import datetime
 import json
 
 import pgtrigger
+from celery.events import event_exchange
 from celery.schedules import crontab
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.contrib.contenttypes.models import ContentType
@@ -60,29 +61,123 @@ class Schedule(BaseModel):
 
         return event
 
-    # Subscribe (incl. unsubscribe, which deletes the subscription)
-    def subscribe(self, user, tags: dict[str, list[int]] = None):
+    def add_user(self, user):
         """
-        Subscribe/Unsubscribe to a schedule.
+        Add user to schedule
+        :param user: User to be added
+        :return: ScheduleUser object
+        """
+        with transaction.atomic():
+            schedule_user = ScheduleUser(user=user, schedule=self)
+            schedule_user.full_clean()
+            schedule_user.save()
+
+            return schedule_user
+
+    def remove_user(self, user) -> None:
+        """
+        Remove user from schedule
+        :param user: User to be removed
+        :return: None
+        """
+        with transaction.atomic():
+            schedule_user = ScheduleUser.objects.filter(user=user, schedule=self).first()
+            if schedule_user:
+                schedule_user.delete()
+            else:
+                raise ValidationError("User is not added to this schedule.")
+
+    def subscribe_new_tags(self, user, reminders: list[int] = None):
+        """
+        Subscribes to new tags
+        :param user: User to subscribe
+        :param reminders: A list of reminders (in seconds before the event begins)
+        :return: ScheduleUser object
+        """
+        with transaction.atomic():
+            schedule_user = ScheduleUser.objects.get(user=user, schedule=self)
+            schedule_user.subscribe_to_new_notification_tags = True
+            schedule_user.reminders = reminders
+            schedule_user.save()
+            return schedule_user
+
+    def unsubscribe_new_tags(self, user):
+        """
+        Unsubscribes from new tags
+        :param user: User to subscribe
+        :return: ScheduleUser object
+        """
+        with transaction.atomic():
+            schedule_user = ScheduleUser.objects.get(user=user, schedule=self)
+            schedule_user.subscribe_to_new_notification_tags = False
+            schedule_user.reminders = None
+            schedule_user.save()
+            return schedule_user
+
+    def subscribe_tags(self, user, tag_ids: list, reminders: list[int] = None):
+        """
+        Subscribe to a schedule.
         :param user: A user object
-        :param tags: A dictionary in the format of {tag_name<str>: [reminders<int>, ...]}.
-            If set to None, it unsubscribes the user from the schedule.
-        :return: ScheduleSubscription object (or None if unsubscribed)
+        :param tag_ids: A list of tag id's
+        :param reminders: A list of reminders (in seconds before the event begins)
+        :return: ScheduleUser object
         """
-        if not tags:
-            ScheduleSubscription.objects.filter(schedule=self, user=user).delete()
-            return None
+        with transaction.atomic():
+            schedule_user = ScheduleUser.objects.get(user=user, schedule=self)
+            tags = ScheduleTag.objects.filter(schedule=self, id__in=tag_ids)
+            for tag in tags:
+                ScheduleTagSubscription.objects.update_or_create(schedule_user=schedule_user,
+                                                                 schedule_tag=tag,
+                                                                 defaults=dict(reminders=reminders))
+
+    def unsubscribe_tags(self, user, tag_ids: list):
+        """
+        Unsubscribes from schedule tags.
+        :param user: A user object
+        :param tag_ids: A list of tag id's, leave empty to unsubscribe from all tags
+        :return: ScheduleUser object
+        """
+        filters = {} if not tag_ids else dict(schedule_tag__id__in=tag_ids)
 
         with transaction.atomic():
-            subscription = ScheduleSubscription(user=user, schedule=self)
-            subscription.full_clean()
-            subscription.save()
+            schedule_user = ScheduleUser.objects.get(user=user, schedule=self)
+            tags = ScheduleTagSubscription.objects.filter(schedule_user=schedule_user,
+                                                          **filters)
 
-            for tag, reminders in tags.items():
-                schedule_tag = ScheduleTag.objects.get(schedule=self, name=tag)
-                subscription.notification_tags.add(schedule_tag, through_defaults=dict(reminders=reminders))
+            if not tags.exists():
+                raise ValidationError("User is not subscribed to any of the tags.")
 
-        return subscription
+            tags.delete()
+
+    def subscribe_events(self, user, event_ids: list[int], user_tags: list[str], reminders: list[int], locked: bool):
+        """
+        Subscribe a user to a specified event with optional user tags and locked status.
+
+        :param user: The user object who is subscribing to the event.
+        :param event_id: ID of the event to subscribe to.
+        :param user_tags: A list of user-defined tags.
+        :param reminders: A list of reminders (in seconds before the event begins)
+        :param locked: A boolean indicating whether the event subscription is locked
+         (that is, not affected by tag subscribe/unsubscribe).
+        :return: ScheduleEventUserData object
+        """
+        with transaction.atomic():
+            events = ScheduleEvent.objects.filter(id__in=event_ids, schedule=self)
+            for event in events:
+                event.event_subscribe(user, user_tags, locked, reminders)
+
+    def unsubscribe_events(self, user, event_ids: list[int]) -> None:
+        """
+        Unsubscribes a user from a specified event.
+
+        :param user: The user object who is unsubscribing from the event.
+        :param event_id: ID of the event to unsubscribe from.
+        :return: None
+        """
+        with transaction.atomic():
+            events = ScheduleEvent.objects.filter(id__in=event_ids, schedule=self)
+            for event in events:
+                event.event_unsubscribe(user)
 
     @classmethod
     def post_save(cls, instance, created, *args, **kwargs):
@@ -103,8 +198,8 @@ class ScheduleTag(BaseModel, NotifiableModel):
         if not created:
             return
 
-        subscriptions = ScheduleSubscription.objects.filter(schedule=instance.schedule,
-                                                            subscribe_to_new_notification_tags=True)
+        subscriptions = ScheduleUser.objects.filter(schedule=instance.schedule,
+                                                    subscribe_to_new_notification_tags=True)
 
         for sub in subscriptions:
             ScheduleTagSubscription.objects.get_or_create(schedule_subscription=sub,
@@ -258,38 +353,44 @@ class ScheduleEvent(BaseModel, NotifiableModel):
                             timestamp=self.next_end_date,
                             message=f"Event ended: {self.title}")
 
-    def event_subscribe(self, user, user_tags: list[str] = None, locked: bool = True):
+    def event_subscribe(self, user,
+                        user_tags: list[str] = None,
+                        locked: bool = True,
+                        reminders: list[int] = None):
         if not (self.active and self.is_live):
             return
 
-        user_schedule = ScheduleSubscription.objects.get(schedule=self.schedule, user=user)
-        event, created = ScheduleEventUserData.objects.update_or_create(event=self,
-                                                                        subscription=user_schedule,
-                                                                        defaults=dict(tags=user_tags),
-                                                                                      reminders=None,
-                                                                        locked=locked)
+        user_schedule = ScheduleUser.objects.get(schedule=self.schedule, user=user)
+        ScheduleEventSubscription.objects.update_or_create(event=self,
+                                                           subscription=user_schedule,
+                                                           defaults=dict(tags=user_tags),
+                                                           reminders=reminders,
+                                                           locked=locked)
 
-        if created:
-            self.notification_channel.subscribe(user=user, tags=['start', 'end'], reminders=None)
+    def event_unsubscribe(self, user):
+        with transaction.atomic():
+            user_schedule = ScheduleUser.objects.get(schedule=self.schedule, user=user)
+            ScheduleEventSubscription.objects.get(event=self, subscription=user_schedule).delete()
 
     @classmethod
     def post_save(cls, instance, created, update_fields: list[str] = None, *args, **kwargs):
+        # Remove unrelated subscriptions and migrate new and existing subscribers to a new tag
         if not created and (update_fields and 'tag' in update_fields):
-            ScheduleEventUserData.objects.filter(event=instance, locked=False).delete()
+            schedule_event_user_datas = ScheduleEventSubscription.objects.filter(event=instance, locked=False)
+            new_active_subscribers = ScheduleTagSubscription.objects.filter(schedule_tag=instance.tag)
+            locked_users = ScheduleEventSubscription.objects.filter(event=instance,
+                                                                    locked=True).values_list('subscription__user',
+                                                                                             flat=True)
 
-        # Notification subscription management
-        if created or (update_fields and 'repeat_frequency' in update_fields):
-            subscribers = ScheduleTagSubscription.objects.filter(schedule_subscription__schedule=instance.schedule,
-                                                                 schedule_tag=instance.tag)
+            # Delete subscriptions that are not in the new tag
+            for i in schedule_event_user_datas:
+                subscription_exists = new_active_subscribers.filter(schedule_user=i.schedule_user).exists()
+                if not subscription_exists:
+                    instance.event_unsubscribe(user=i.schedule_user.user)
 
-            for subscriber in subscribers:
-                instance.subscribe(user=subscriber.schedule_subscription.user,
-                                   tags=["start", "end"],
-                                   reminders=((*instance.reminders), None))
-
-                ScheduleEventUserData.objects.create(event=instance,
-                                                     subscription=subscriber.schedule_subscription,
-                                                     locked=False)
+            # Migrate subscriptions that are in the new tag (excluding users with locked event subscriptions)
+            for i in new_active_subscribers.exclude(schedule_user__user__in=locked_users):
+                instance.event_subscribe(user=i.schedule_user.user, reminders=i.reminders, locked=False)
 
         # Repeat Frequency and notification management
         if instance.repeat_frequency:
@@ -336,17 +437,31 @@ class ScheduleEvent(BaseModel, NotifiableModel):
 post_save.connect(ScheduleEvent.post_save, ScheduleEvent)
 
 
-class ScheduleEventUserData(BaseModel):
+class ScheduleEventSubscription(BaseModel):
     event = models.ForeignKey(ScheduleEvent, on_delete=models.CASCADE)
-    subscription = models.ForeignKey('schedule.ScheduleSubscription', on_delete=models.CASCADE)
+    schedule_user = models.ForeignKey('schedule.ScheduleUser', on_delete=models.CASCADE)
+    reminders = ArrayField(models.PositiveIntegerField(), size=10, null=True, blank=True)
     tags = ArrayField(base_field=models.CharField(max_length=100), size=10, null=True, blank=True,
                       help_text="A list of user-defined tags")
     locked = models.BooleanField(default=True, help_text="If set to true and user unsubscribes from the tag related "
                                                          "to the event, the event will remain subscribed.")
 
+    @classmethod
+    def post_save(cls, instance, *args, **kwargs):
+        instance.event.notification_channel.subscribe(user=instance.schedule_user.user,
+                                                      tags=['start', 'end'], reminders=instance.reminders)
+
+    @classmethod
+    def pre_delete(cls, instance, *args, **kwargs):
+        instance.event.notification_channel.unsubscribe(user=instance.schedule_user.user)
+
+
+post_save.connect(ScheduleEventSubscription.post_save, ScheduleEventSubscription)
+pre_delete.connect(ScheduleEventSubscription.pre_delete, ScheduleEventSubscription)
+
 
 class ScheduleTagSubscription(BaseModel):
-    schedule_subscription = models.ForeignKey('schedule.ScheduleSubscription', on_delete=models.CASCADE)
+    schedule_user = models.ForeignKey('schedule.ScheduleUser', on_delete=models.CASCADE)
     schedule_tag = models.ForeignKey(ScheduleTag, on_delete=models.CASCADE)
     reminders = ArrayField(models.PositiveIntegerField(), size=10, null=True, blank=True)
 
@@ -360,45 +475,32 @@ class ScheduleTagSubscription(BaseModel):
 
     @classmethod
     def post_save(cls, instance, created, *args, **kwargs):
-        if not created:
-            return
-
         events = instance.schedule_tag.scheduleevent_set.filter(Q(start_date__gte=timezone.now())
                                                                 | Q(end_date__isnull=True)
                                                                 | Q(end_date__gt=timezone.now()), active=True)
 
         with transaction.atomic():
             for event in events:
-                ScheduleEventUserData.objects.get_or_create(event=event,
-                                                            subscription=instance.schedule_subscription,
-                                                            locked=False)
+                event.event_subscribe(user=instance.schedule_user.user, locked=False, reminders=instance.reminders)
 
-                event.notification_channel.subscribe(user=instance.schedule_subscription.user,
-                                                     tags=["start", "end"],
-                                                     reminders=None if not instance.reminders
-                                                     else ((*instance.reminders), None))
-
-    def delete_user_events(self, include_locked: bool = False, user_tag: str | None = None):
+    def delete_user_events(self, include_locked: bool = False, user_tags: list[str] | None = None):
         filters = dict()
         if not include_locked:
             filters['scheduleeventsubscription__locked'] = False
 
-        if user_tag:
-            filters['scheduleeventsubscription__user'] = self.schedule_subscription.user
-            filters['scheduleeventsubscription__tag'] = user_tag
+        if user_tags:
+            filters['scheduleeventsubscription__user'] = self.schedule_user.user
+            filters['scheduleeventsubscription__tag__in'] = user_tags
 
         events = ScheduleEvent.objects.filter(
-            schedule=self.schedule_subscription.schedule,
+            schedule=self.schedule_user.schedule,
             tag=self.schedule_tag,
-            scheduleeventsubscription__subscription__user=self.schedule_subscription.user,
+            scheduleeventsubscription__subscription__user=self.schedule_user.user,
             **filters)
 
         with transaction.atomic():
-            ScheduleEventUserData.objects.filter(event__in=events, subscription=self.schedule_subscription).delete()
-
-            # Unsubscribes user
             for event in events:
-                event.notification_channel.unsubscribe(user=self.schedule_subscription.user)
+                event.event_unsubscribe(user=self.schedule_user.user)
 
     @classmethod
     def pre_delete(cls, instance, *args, **kwargs):
@@ -409,8 +511,9 @@ post_save.connect(ScheduleTagSubscription.post_save, ScheduleTagSubscription)
 pre_delete.connect(ScheduleTagSubscription.pre_delete, ScheduleTagSubscription)
 
 
-class ScheduleSubscription(BaseModel):
+class ScheduleUser(BaseModel):
     subscribe_to_new_notification_tags = models.BooleanField(default=False, blank=True)
+    reminders = ArrayField(models.PositiveIntegerField(), size=10, null=True, blank=True)
     notification_tags = models.ManyToManyField(ScheduleTag, blank=True, through=ScheduleTagSubscription)
 
     user = models.ForeignKey('user.User', on_delete=models.CASCADE, related_name='schedule_subscription_user',
@@ -420,10 +523,10 @@ class ScheduleSubscription(BaseModel):
     class Meta:
         unique_together = ('user', 'schedule')
 
-    def delete_tag_subscriptions(self,
-                                 tag: str | None,
-                                 user_tag: str | None = None,
-                                 include_locked: bool = False) -> None:
+    # TODO check if this needs a refresh (given new changes ofc)
+    def tag_unsubscribe(self,
+                        tag_ids: list[int] | None,
+                        include_locked: bool = False) -> None:
         """
         Deletes all notifications and tag subscriptions for the user and schedule.
         :param tag: Relevant tags to target, leave empty to delete all notification subscriptions.
@@ -432,23 +535,20 @@ class ScheduleSubscription(BaseModel):
         :return: None
         """
         with transaction.atomic():
-            if not tag and not user_tag:  # Delete all subscriptions
-                ScheduleTagSubscription.objects.filter(schedule_subscription=self).delete()
+            ScheduleTagSubscription.objects.filter(schedule_user=self, schedule_tag__in=tag_ids).delete()
 
-            if tag:  # Delete tag & (tag, user_tag) subscriptions
-                tag = ScheduleTag.objects.get(schedule=self.schedule, name=tag)
-                ScheduleTagSubscription.objects.get(
-                    schedule_subscription=self,
-                    schedule_tag_id=tag
-                ).delete_user_events(include_locked=include_locked,
-                                     user_tag=user_tag)
-
-            if user_tag:  # Delete user_tag subscriptions
-                subscriptions = ScheduleTagSubscription.objects.filter(schedule_subscription=self)
-
-                for sub in subscriptions:
-                    sub.delete_user_events(include_locked=include_locked,
-                                           user_tag=user_tag)
+    def user_tag_unsubscribe(self,
+                             user_tag_ids: list[int] | None,
+                             include_locked: bool = False) -> None:
+        """
+        Deletes all notifications and tag subscriptions for the user and schedule.
+        :param tag: Relevant tags to target, leave empty to delete all notification subscriptions.
+        :param user_tag: Relevant user tags to target, leave empty to delete all notification subscriptions.
+        :param include_locked: Whether to include user-locked events or not.
+        :return: None
+        """
+        with transaction.atomic():
+            tags = ScheduleEventSubscription.objects.filter(schedule_user=self)
 
 
 def generate_schedule(sender, instance, created, *args, **kwargs):

@@ -4,7 +4,7 @@ from django.db.models import Q, F
 
 from flowback.common.filters import NumberInFilter
 from flowback.group.models import WorkGroupUser
-from flowback.schedule.models import ScheduleEvent, ScheduleSubscription
+from flowback.schedule.models import ScheduleEvent, ScheduleUser
 
 
 class ScheduleEventBaseFilter(django_filters.FilterSet):
@@ -29,7 +29,7 @@ class ScheduleEventBaseFilter(django_filters.FilterSet):
 
 def schedule_event_list(*, schedule_id: int, group_user=None, filters=None):
     filters = filters or {}
-    subquery = ScheduleSubscription.objects.filter(schedule_id=schedule_id).values_list('target_id')
+    subquery = ScheduleUser.objects.filter(schedule_id=schedule_id).values_list('target_id')
     qs = ScheduleEvent.objects.filter(Q(schedule_id=schedule_id) | Q(schedule__in=subquery))
 
     if group_user is not None and not group_user.is_admin:

@@ -7,7 +7,7 @@ from django.utils import timezone
 from django_celery_beat.models import PeriodicTask
 
 from flowback.group.tests.factories import GroupFactory, GroupUserFactory
-from flowback.schedule.models import ScheduleEvent, ScheduleSubscription
+from flowback.schedule.models import ScheduleEvent, ScheduleUser
 from flowback.schedule.services import create_event, update_event, delete_event, create_schedule, ScheduleManager, \
     subscribe_schedule, unsubscribe_schedule
 from flowback.schedule.selectors import schedule_event_list, ScheduleEventBaseFilter
@@ -190,20 +190,20 @@ class TestScheduleSubscriptionModel(TestCase):
     def test_subscription_validation(self):
         schedule = ScheduleFactory()
         with self.assertRaises(ValidationError):
-            subscription = ScheduleSubscription(schedule=schedule, target=schedule)
+            subscription = ScheduleUser(schedule=schedule, target=schedule)
             subscription.clean()
 
         schedule2 = ScheduleFactory()
-        subscription = ScheduleSubscription(schedule=schedule, target=schedule2)
+        subscription = ScheduleUser(schedule=schedule, target=schedule2)
         subscription.clean()
 
     def test_unique_together(self):
         schedule1 = ScheduleFactory()
         schedule2 = ScheduleFactory()
 
-        ScheduleSubscription.objects.create(schedule=schedule1, target=schedule2)
+        ScheduleUser.objects.create(schedule=schedule1, target=schedule2)
         with self.assertRaises(Exception):
-            ScheduleSubscription.objects.create(schedule=schedule1, target=schedule2)
+            ScheduleUser.objects.create(schedule=schedule1, target=schedule2)
 
 
 class TestScheduleServices(TestCase):
@@ -276,7 +276,7 @@ class TestScheduleServices(TestCase):
             subscribe_schedule(schedule_id=schedule1.id, target_id=schedule2.id)
 
         unsubscribe_schedule(schedule_id=schedule1.id, target_id=schedule2.id)
-        self.assertFalse(ScheduleSubscription.objects.filter(
+        self.assertFalse(ScheduleUser.objects.filter(
             schedule=schedule1, target=schedule2
         ).exists())
 
@@ -367,7 +367,7 @@ class TestScheduleSelectors(TestCase):
         events = schedule_event_list(schedule_id=self.schedule1.id)
         self.assertEqual(events.count(), 2)
 
-        ScheduleSubscription.objects.create(schedule=self.schedule1, target=self.schedule2)
+        ScheduleUser.objects.create(schedule=self.schedule1, target=self.schedule2)
         events = schedule_event_list(schedule_id=self.schedule1.id)
         self.assertEqual(events.count(), 3)
 
