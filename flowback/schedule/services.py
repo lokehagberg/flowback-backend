@@ -3,8 +3,7 @@ import datetime
 from django.core.exceptions import ValidationError
 
 from flowback.common.services import model_update
-from flowback.schedule.models import Schedule, ScheduleTag, ScheduleEvent, ScheduleEventSubscription, \
-    ScheduleTagSubscription, ScheduleUser
+from flowback.schedule.models import Schedule, ScheduleEvent, ScheduleUser
 
 
 def create_event(*,
