@@ -140,7 +140,7 @@ def group_leave(*, user: int, group: int) -> None:
         raise ValidationError("Group owner isn't allowed to leave, deleting the group is an option")
 
     user.active = False
-    user.save()
+    user.save(update_fields=['active'])
 
 def group_user_update(*, fetched_by: User, group: int, target_user_id: int, data) -> GroupUser:
     # If user updates someone else (requires Admin)
