@@ -318,11 +318,24 @@ class GroupUser(BaseModel):
         if created:
             KanbanSubscription(kanban_id=instance.user.kanban_id, target_id=instance.group.kanban_id)
 
+        if not instance.active:
+            KanbanSubscription.objects.filter(kanban_id=instance.user.kanban_id,
+                                              target_id=instance.group.kanban_id).delete()
+
+            if instance.chat_participant:
+                instance.chat_participant.delete()
+
+            if instance.group.notification_channel:
+                instance.group.notification_channel.unsubscribe_all(user=instance.user)
+
     @classmethod
     def post_delete(cls, instance, *args, **kwargs):
         KanbanSubscription.objects.filter(kanban_id=instance.user.kanban_id,
                                           target_id=instance.group.kanban_id).delete()
-        instance.chat_participant.delete()
+
+        if instance.chat_participant:
+            instance.chat_participant.delete()
+
         if instance.group.notification_channel:
             instance.group.notification_channel.unsubscribe_all(user=instance.user)
 
