@@ -22,7 +22,7 @@ class PollCommentListAPI(CommentListAPI):
 
 @extend_schema(tags=['poll/comment'])
 class PollCommentAncestorListAPI(CommentAncestorListAPI):
-    lazy_action = poll_comment_delete
+    lazy_action = poll_comment_ancestor_list
 
 
 @extend_schema(tags=['poll/comment'])
