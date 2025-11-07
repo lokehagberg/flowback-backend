@@ -511,6 +511,7 @@ post_save.connect(ScheduleTagSubscription.post_save, ScheduleTagSubscription)
 pre_delete.connect(ScheduleTagSubscription.pre_delete, ScheduleTagSubscription)
 
 
+# TODO add active status, should be possible to restore ScheduleUser when re-joining
 class ScheduleUser(BaseModel):
     subscribe_to_new_notification_tags = models.BooleanField(default=False, blank=True)
     reminders = ArrayField(models.PositiveIntegerField(), size=10, null=True, blank=True)

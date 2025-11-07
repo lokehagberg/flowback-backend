@@ -55,3 +55,7 @@ def schedule_event_list(*, user: User, filters=None):
                subscribed=Exists(subscribed_qs)).all()
 
     return ScheduleEventBaseFilter(filters, qs).qs
+
+
+# Schedule list (incl. info about subscriptions, reminders, user tags and tags)
+
