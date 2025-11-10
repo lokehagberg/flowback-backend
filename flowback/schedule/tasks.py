@@ -17,7 +17,10 @@ def event_notify(event_id: int):
         return
 
     # Stop notifying if scheduled after end_date
-    if not event or not event.repeat_frequency or (event.end_date and event.end_date < timezone.now()):
+    if (not event
+        or (not event.repeat_frequency
+            and event.end_date
+            and event.end_date < timezone.now())):
         PeriodicTask.objects.filter(name=f"schedule_event_{event_id}").delete()
 
     if event.repeat_frequency:
