@@ -3,7 +3,7 @@ import django_filters
 from django.db.models import OuterRef, Subquery, Exists
 
 from flowback.common.filters import NumberInFilter
-from flowback.schedule.models import ScheduleEvent, ScheduleEventSubscription, ScheduleTagSubscription
+from flowback.schedule.models import ScheduleEvent, ScheduleEventSubscription, ScheduleTagSubscription, Schedule
 from flowback.user.models import User
 
 
@@ -57,5 +57,23 @@ def schedule_event_list(*, user: User, filters=None):
     return ScheduleEventBaseFilter(filters, qs).qs
 
 
-# Schedule list (incl. info about subscriptions, reminders, user tags and tags)
+class ScheduleBaseFilter(django_filters.FilterSet):
+    id__in = NumberInFilter(field_name='id')
+    origin_name = django_filters.CharFilter(field_name='content_type.model', lookup_expr='iexact')
+    origin_id = NumberInFilter(field_name='object_id')
+    order_by = django_filters.OrderingFilter(fields=(('created_at', 'created_at_asc'),
+                                                     ('-created_at', 'created_at_desc'),
+                                                     ('content_type.model', 'origin_name_asc'),
+                                                     ('-content_type.model', 'origin_name_desc')))
 
+    class Meta:
+        model = Schedule
+        fields = dict(id=['exact'])
+
+
+# Schedule list (incl. info about subscriptions, reminders, user tags and tags)
+def schedule_list(*, user: User, filters=None):
+    filters = filters or {}
+    qs = Schedule.objects.filter(scheduleuser__user=user).all()
+
+    return ScheduleBaseFilter(filters, qs).qs
