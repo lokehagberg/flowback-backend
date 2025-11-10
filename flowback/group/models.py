@@ -6,6 +6,7 @@ from django.db.models import Q
 from django.db.models.signals import post_save, post_delete, pre_save
 from django.forms import model_to_dict
 from rest_framework.exceptions import ValidationError
+from sphinx.ext.autodoc.preserve_defaults import update_defvalue
 
 from backend.settings import FLOWBACK_DEFAULT_GROUP_JOIN
 from flowback.chat.models import MessageChannel, MessageChannelParticipant
@@ -78,7 +79,9 @@ class Group(BaseModel, NotifiableModel):
     # Determines the default permission for every user get when they join
     # TODO return basic permissions by default if field is NULL
     default_permission = models.OneToOneField('GroupPermissions',
-                                              on_delete=models.CASCADE)
+                                              on_delete=models.CASCADE,
+                                              null=True,
+                                              blank=True)
 
     name = models.TextField(unique=True)
     description = models.TextField(null=True, blank=True)
@@ -193,11 +196,7 @@ class Group(BaseModel, NotifiableModel):
         if instance.pk is None:
             channel = MessageChannel(origin_name='group', title=instance.name)
             channel.save()
-            default_permission = GroupPermissions()
-            default_permission.save()
-
             instance.chat = channel
-            instance.default_permission = default_permission
 
     @classmethod
     def post_save(cls, instance, created, update_fields, *args, **kwargs):
@@ -208,19 +207,19 @@ class Group(BaseModel, NotifiableModel):
             kanban = Kanban(name=instance.name, origin_type='group', origin_id=instance.id)
             kanban.save()
 
-            instance.default_permission.name = instance.name
-            instance.default_permission.author = instance
-            instance.default_permission.save()
+            default_permission = GroupPermissions(author=instance, role_name=instance.name)
+            default_permission.save()
+            instance.default_permission = default_permission
+
+            instance.schedule = schedule
+            instance.kanban = kanban
+            instance.save()
 
             group_user = GroupUser(user=instance.created_by,
                                    group=instance,
                                    permission=instance.default_permission,
                                    is_admin=True)
             group_user.save()
-
-            instance.schedule = schedule
-            instance.kanban = kanban
-            instance.save()
 
         if update_fields:
             if not all(isinstance(field, str) for field in update_fields):
@@ -315,14 +314,38 @@ class GroupUser(BaseModel):
 
     @classmethod
     def post_save(cls, instance, created, update_fields, *args, **kwargs):
+        print(update_fields, args, kwargs)
         if created:
-            KanbanSubscription(kanban_id=instance.user.kanban_id, target_id=instance.group.kanban_id)
+            subscription = KanbanSubscription(kanban_id=instance.user.kanban_id, target_id=instance.group.kanban_id)
+            subscription.save()
+
+
+        elif update_fields and 'active' in update_fields:
+            if instance.active:
+                subscription = KanbanSubscription(kanban_id=instance.user.kanban_id, target_id=instance.group.kanban_id)
+                subscription.save()
+
+                instance.chat_participant.active = True
+                instance.chat_participant.save()
+
+            else:
+                KanbanSubscription.objects.filter(kanban_id=instance.user.kanban_id,
+                                                  target_id=instance.group.kanban_id).delete()
+
+                instance.chat_participant.active = False
+                instance.chat_participant.save()
+
+                if instance.group.notification_channel:
+                    instance.group.notification_channel.unsubscribe_all(user=instance.user)
 
     @classmethod
     def post_delete(cls, instance, *args, **kwargs):
         KanbanSubscription.objects.filter(kanban_id=instance.user.kanban_id,
                                           target_id=instance.group.kanban_id).delete()
-        instance.chat_participant.delete()
+
+        if instance.chat_participant:
+            instance.chat_participant.delete()
+
         if instance.group.notification_channel:
             instance.group.notification_channel.unsubscribe_all(user=instance.user)
 
