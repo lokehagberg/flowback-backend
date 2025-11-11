@@ -1,5 +1,3 @@
-from django.contrib.admin import action
-from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import ValidationError
 
 from flowback.chat.models import MessageChannel, Message, MessageChannelParticipant, MessageFileCollection, \
@@ -8,7 +6,6 @@ from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from backend.settings import TESTING
 from flowback.common.services import get_object, model_update
-from flowback.files.models import FileCollection
 from flowback.files.services import upload_collection
 from flowback.user.models import User
 from flowback.user.serializers import BasicUserSerializer
@@ -142,7 +139,7 @@ def message_channel_join(*, user_id: int, channel_id: int):
             method="message_channel_join",
             channel_id=channel.id,
             channel_title=channel.title,
-            users=BasicUserSerializer(channel.users, many=True),
+            users=BasicUserSerializer(channel.users.all(), many=True),
             origin_name=channel.origin_name,
             user_id=user.id,
             username=user.username,
