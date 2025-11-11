@@ -136,6 +136,7 @@ def message_channel_join(*, user_id: int, channel_id: int):
 
         payload = dict(
             type="message",
+            message=f"User {user.username} joined the channel",
             method="message_channel_join",
             channel_id=channel.id,
             channel_title=channel.title,
