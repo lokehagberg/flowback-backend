@@ -6,6 +6,7 @@ from flowback.group.serializers import GroupUserSerializer
 from flowback.schedule.selectors import schedule_list, schedule_event_list
 
 
+# TODO remove LazyAction, this is made for schedule only
 class ScheduleListAPI(APIView):
     lazy_action = schedule_list
 
@@ -41,6 +42,7 @@ class ScheduleListAPI(APIView):
         return Response(serializer.data)
 
 
+# TODO remove LazyAction, this is made for schedule only
 class ScheduleEventListAPI(APIView):
     lazy_action = schedule_event_list
 
@@ -110,3 +112,15 @@ class ScheduleEventListAPI(APIView):
         serializer = self.OutputSerializer(data=data, many=True)
         serializer.is_valid(raise_exception=True)
         return Response(serializer.data)
+
+
+# TODO add Views
+#   schedule subscribe (update) - for continuous tag subscriptions
+#   schedule unsubscribe (delete)
+#   schedule event subscribe (update) - for individual event subscriptions
+#   schedule event unsubscribe (delete)
+#   schedule tag subscribe (update) - for individual tag subscriptions
+#   schedule tag unsubscribe (delete)
+
+# TODO Add LazyActionViews:
+#   schedule event (create, update, delete)
