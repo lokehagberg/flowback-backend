@@ -59,7 +59,8 @@ def notify_group_poll(message: str,
                                              poll_title=poll.title,
                                              work_group_id=poll.work_group_id if poll.work_group else None,
                                              work_group_name=poll.work_group.name if poll.work_group else None,
-                                             subscription_filters=subscription_filters)
+                                             subscription_filters=subscription_filters,
+                                             exclude_subscription_filters=dict(user_id=poll.created_by.user_id))
 
 
 def notify_group_schedule_event(message: str,
