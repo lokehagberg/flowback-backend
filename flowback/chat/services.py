@@ -139,7 +139,7 @@ def message_channel_join(*, user_id: int, channel_id: int):
             method="message_channel_join",
             channel_id=channel.id,
             channel_title=channel.title,
-            users=BasicUserSerializer(channel.users.all(), many=True),
+            users=BasicUserSerializer(channel.users.all(), many=True).data,
             origin_name=channel.origin_name,
             user_id=user.id,
             username=user.username,
