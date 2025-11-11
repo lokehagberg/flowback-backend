@@ -148,8 +148,8 @@ def message_channel_join(*, user_id: int, channel_id: int):
             username=user.username,
         )
 
-        for uid in channel.users.all():
-            async_to_sync(channel_layer.group_send)(f"user_{uid}", payload)
+        for user in channel.users.all():
+            async_to_sync(channel_layer.group_send)(f"user_{user.id}", payload)
 
     return participant
 
