@@ -169,7 +169,8 @@ class Group(BaseModel, NotifiableModel):
                     poll_title: str,
                     work_group_id: int = None,
                     work_group_name: str = None,
-                    subscription_filters: dict = None):
+                    subscription_filters: dict = None,
+                    exclude_subscription_filters: dict = None):
         """Notifies about new polls"""
         params = locals()
         params.pop('self')
