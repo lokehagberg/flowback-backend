@@ -1,102 +1,112 @@
 from rest_framework import serializers
+from rest_framework.response import Response
 from rest_framework.views import APIView
-from flowback.common.pagination import LimitOffsetPagination
-from flowback.group.serializers import WorkGroupSerializer, GroupUserSerializer
-from flowback.schedule.models import ScheduleEvent
+
+from flowback.group.serializers import GroupUserSerializer
+from flowback.schedule.selectors import schedule_list, schedule_event_list
 
 
-class ScheduleEventListTemplateAPI(APIView):
-    class Pagination(LimitOffsetPagination):
-        max_limit = 500
+class ScheduleListAPI(APIView):
+    lazy_action = schedule_list
 
     class FilterSerializer(serializers.Serializer):
-        start_date = serializers.DateTimeField(required=False)
-        start_date__lt = serializers.DateTimeField(required=False)
-        start_date__gt = serializers.DateTimeField(required=False)
-
-        end_date = serializers.DateTimeField(required=False)
-        end_date__lt = serializers.DateTimeField(required=False)
-        end_date__gt = serializers.DateTimeField(required=False)
-
-        repeat_frequency__isnull = serializers.BooleanField(required=False, allow_null=True)
-
-        order_by = serializers.CharField(required=False, help_text="Allowed options: "
-                                                                   "`created_at_asc`, `created_at_desc`, "
-                                                                   "`start_date_asc`, `start_date_desc`, "
-                                                                   "`end_date_asc`, `end_date_desc`")
-
+        id = serializers.IntegerField(required=False)
+        id__in = serializers.ListField(child=serializers.IntegerField(), required=False)
         origin_name = serializers.CharField(required=False)
         origin_id = serializers.IntegerField(required=False)
-
-        assignee_ids = serializers.ListField(child=serializers.IntegerField(),
-                                             required=False,
-                                             help_text="A list of group user IDs")
-        work_group_ids = serializers.CharField(required=False)
-
-    class OutputSerializer(serializers.Serializer):
-        schedule_id = serializers.IntegerField()
-        event_id = serializers.IntegerField(source='id')
-        title = serializers.CharField()
-        description = serializers.CharField(required=False)
-        start_date = serializers.DateTimeField()
-        end_date = serializers.DateTimeField(required=False)
-        origin_name = serializers.CharField()
-        origin_id = serializers.IntegerField()
-        schedule_origin_name = serializers.CharField(source='schedule.origin_name')
-        schedule_origin_id = serializers.CharField(source='schedule.origin_id')
-        repeat_frequency = serializers.CharField(source='get_repeat_frequency_display', read_only=True)
-        work_group = WorkGroupSerializer(allow_null=True)
-        assignees = GroupUserSerializer(many=True,
-                                        allow_null=True,
-                                        help_text="A list of Group Users")
-        meeting_link = serializers.URLField(allow_null=True,
-                                            help_text="URL link to meeting, can be any URL.")
-
-
-class ScheduleEventCreateTemplateAPI(APIView):
-    class InputSerializer(serializers.Serializer):
-        title = serializers.CharField()
-        description = serializers.CharField(required=False)
-
-        start_date = serializers.DateTimeField()
-        end_date = serializers.DateTimeField(required=False)
-        work_group_id = serializers.IntegerField(required=False)
-        assignee_ids = serializers.ListField(child=serializers.IntegerField(),
-                                             required=False,
-                                             help_text="List of group user IDs (Only available for group schedules)")
-        meeting_link = serializers.URLField(required=False,
-                                            help_text="URL link to meeting, can be any URL.")
-        repeat_frequency = serializers.ChoiceField(required=False, choices=ScheduleEvent.Frequency.choices)
-        reminders = serializers.ListField(child=serializers.IntegerField(),
-                                          required=False,
-                                          max_length=10,
-                                          help_text="List of reminders in seconds, before the event begins"
-                                                    "(add 0 to get a reminder when the event begin)")
+        order_by = serializers.ChoiceField(choices=('created_at_asc',
+                                                    'created_at_desc',
+                                                    'origin_name_asc',
+                                                    'origin_name_desc'),
+                                           required=False)
 
     class OutputSerializer(serializers.Serializer):
         id = serializers.IntegerField()
+        origin_name = serializers.CharField(source='content_type.model')
+        origin_id = serializers.IntegerField(source='object_id')
+
+        default_tag_name = serializers.CharField(source='default_tag.name')
+        default_tag_id = serializers.IntegerField(source='default_tag.id')
+        available_tags = serializers.ListField(child=serializers.CharField(), allow_null=True)
+
+    def get(self, request, *args, **kwargs):
+        serializer = self.FilterSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        data = self.lazy_action.__func__(user=request.user, *args, **kwargs, filters=serializer.validated_data)
+
+        serializer = self.OutputSerializer(data=data, many=True)
+        serializer.is_valid(raise_exception=True)
+
+        return Response(serializer.data)
 
 
-class ScheduleEventUpdateTemplateAPI(APIView):
-    class InputSerializer(serializers.Serializer):
-        event_id = serializers.IntegerField()
+class ScheduleEventListAPI(APIView):
+    lazy_action = schedule_event_list
+
+    class FilterSerializer(serializers.Serializer):
+        ids = serializers.CharField(required=False)
+        schedule_origin_name = serializers.CharField(required=False)
+        schedule_origin_id = serializers.IntegerField(required=False, help_text='Comma-separated list')
+        origin_name = serializers.CharField(required=False)
+        origin_ids = serializers.CharField(required=False, help_text='Comma-separated list')
+        schedule_ids = serializers.CharField(required=False, help_text='Comma-separated list')
         title = serializers.CharField(required=False)
         description = serializers.CharField(required=False)
+        active = serializers.BooleanField(required=False)
+        tag_ids = serializers.CharField(required=False, help_text='Comma-separated list')
+        assignee_user_ids = serializers.CharField(required=False, help_text='Comma-separated list')
+        repeat_frequency__isnull = serializers.BooleanField(required=False)
+        user_tags = serializers.CharField(required=False)
+        subscribed = serializers.BooleanField(required=False)
+        locked = serializers.BooleanField(required=False)
+
+        # Field lookups from Meta.fields
         start_date = serializers.DateTimeField(required=False)
+        start_date__lt = serializers.DateTimeField(required=False)
+        start_date__gt = serializers.DateTimeField(required=False)
         end_date = serializers.DateTimeField(required=False)
-        assignee_ids = serializers.ListField(child=serializers.IntegerField(),
-                                             required=False,
-                                             help_text="List of group user IDs (Only available for group schedules)")
-        meeting_link = serializers.URLField(required=False,
-                                            help_text="URL link to meeting, can be any URL.")
+        end_date__lt = serializers.DateTimeField(required=False)
+        end_date__gt = serializers.DateTimeField(required=False)
+        tag = serializers.CharField(required=False)
+        tag__icontains = serializers.CharField(required=False)
 
+        order_by = serializers.ChoiceField(choices=(
+            'created_at_asc', 'created_at_desc',
+            'start_date_asc', 'start_date_desc',
+            'end_date_asc', 'end_date_desc'
+        ), required=False)
 
-class ScheduleEventDeleteAPI(APIView):
-    class InputSerializer(serializers.Serializer):
-        event_id = serializers.IntegerField()
+    class OutputSerializer(serializers.Serializer):
+        id = serializers.IntegerField()
+        schedule_id = serializers.IntegerField()
+        title = serializers.CharField()
+        description = serializers.CharField(allow_null=True)
+        start_date = serializers.DateTimeField()
+        end_date = serializers.DateTimeField(allow_null=True)
+        active = serializers.BooleanField()
+        meeting_link = serializers.CharField(allow_null=True)
+        repeat_frequency = serializers.IntegerField(allow_null=True)
 
+        tag_id = serializers.IntegerField(source='tag.id', allow_null=True)
+        tag_name = serializers.CharField(source='tag.name', allow_null=True)
+        origin_name = serializers.CharField(source='content_type.model')
+        origin_id = serializers.IntegerField(source='object_id')
+        schedule_origin_name = serializers.CharField(source='schedule.content_type.model')
+        schedule_origin_id = serializers.IntegerField(source='schedule.object_id')
+        assignees = GroupUserSerializer(many=True)
 
-class ScheduleUnsubscribeAPI(APIView):
-    class InputSerializer(serializers.Serializer):
-        target_type = serializers.CharField()
-        target_id = serializers.IntegerField()
+        reminders = serializers.ListField(child=serializers.IntegerField(), allow_null=True)
+        user_tags = serializers.ListField(child=serializers.CharField(), allow_null=True)
+        locked = serializers.BooleanField(allow_null=True)
+        subscribed = serializers.BooleanField()
+
+    def get(self, request, *args, **kwargs):
+        serializer = self.FilterSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        data = self.lazy_action.__func__(user=request.user, *args, **kwargs, filters=serializer.validated_data)
+
+        serializer = self.OutputSerializer(data=data, many=True)
+        serializer.is_valid(raise_exception=True)
+        return Response(serializer.data)

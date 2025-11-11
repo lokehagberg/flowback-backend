@@ -1,5 +1,6 @@
 # Schedule Event List (with multiple schedule id support)
 import django_filters
+from django.contrib.postgres.aggregates import ArrayAgg
 from django.db.models import OuterRef, Subquery, Exists
 
 from flowback.common.filters import NumberInFilter
@@ -13,7 +14,7 @@ class ScheduleEventBaseFilter(django_filters.FilterSet):
                                                      lookup_expr='iexact')
     schedule_origin_id = NumberInFilter(field_name='schedule__object_id')
     origin_name = django_filters.CharFilter(field_name='content_type.model', lookup_expr='iexact')
-    origin_id = NumberInFilter(field_name='object_id')
+    origin_ids = NumberInFilter(field_name='object_id')
     schedule_ids = NumberInFilter(field_name='schedule_id')
     title = django_filters.CharFilter(lookup_expr='iexact')
     description = django_filters.CharFilter(lookup_expr='icontains')
@@ -74,6 +75,8 @@ class ScheduleBaseFilter(django_filters.FilterSet):
 # Schedule list (incl. info about subscriptions, reminders, user tags and tags)
 def schedule_list(*, user: User, filters=None):
     filters = filters or {}
-    qs = Schedule.objects.filter(scheduleuser__user=user).all()
+    qs = Schedule.objects.filter(
+        scheduleuser__user=user
+    ).annotate(available_tags=ArrayAgg('scheduletag__name', distinct=True)).all()
 
     return ScheduleBaseFilter(filters, qs).qs
