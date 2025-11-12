@@ -467,8 +467,10 @@ class ScheduleTagSubscription(BaseModel):
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=['schedule_subscription', 'schedule_tag'],
-                                    name='unique_schedule_tag_subscription'),
+            models.UniqueConstraint(fields=['schedule_user', 'schedule_tag'],
+                                    name='unique_schedule_tag_subscription')
+        ]
+        triggers = [
             pgtrigger.Protect(name='prevent_update_schedule_tag_subscription',
                               operation=pgtrigger.Update)
         ]
