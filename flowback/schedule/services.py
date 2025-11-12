@@ -6,13 +6,13 @@ from flowback.common.services import model_update
 from flowback.schedule.models import Schedule, ScheduleEvent, ScheduleUser
 
 
-def create_event(*,
+def schedule_event_create(*,
                  schedule_id: int,
                  title: str,
                  description: str = None,
                  start_date: datetime.datetime,
                  end_date: datetime.datetime = None,
-                 created_by=None,
+                 created_by = None,
                  tag: str = None,
                  assignees: list[int] = None,
                  meeting_link: str = None,
@@ -23,7 +23,7 @@ def create_event(*,
     return schedule.create_event(**fields)
 
 
-def update_event(*,
+def schedule_event_update(*,
                  event_id: int,
                  schedule_id: int = None,
                  **data) -> ScheduleEvent:
@@ -55,7 +55,7 @@ def update_event(*,
     return event
 
 
-def delete_event(*,
+def schedule_event_delete(*,
                  event_id: int,
                  schedule_id: int = None) -> None:
     """
