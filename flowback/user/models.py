@@ -14,7 +14,7 @@ from flowback.chat.models import MessageChannelParticipant
 from flowback.common.models import BaseModel
 from flowback.kanban.models import Kanban
 from flowback.notification.models import NotifiableModel, NotificationChannel
-from flowback.schedule.models import Schedule
+from flowback.schedule.models import ScheduleModel
 
 
 class CustomUserManager(BaseUserManager):
@@ -52,7 +52,7 @@ class CustomUserManager(BaseUserManager):
         return user
 
 
-class User(AbstractBaseUser, PermissionsMixin, NotifiableModel):
+class User(AbstractBaseUser, PermissionsMixin, NotifiableModel, ScheduleModel):
     class PublicStatus(models.TextChoices):
         PUBLIC = 'public', _('Public')  # Everyone can see/access
         GROUP_ONLY = 'group_only', _('Group Only')  # Only users in the same group can see/access
@@ -77,7 +77,6 @@ class User(AbstractBaseUser, PermissionsMixin, NotifiableModel):
     public_status = models.CharField(choices=PublicStatus.choices, default=PublicStatus.PRIVATE)
     chat_status = models.CharField(choices=PublicStatus.choices, default=PublicStatus.PRIVATE)
 
-    schedule = models.ForeignKey('schedule.Schedule', on_delete=models.SET_NULL, null=True, blank=True)
     kanban = models.ForeignKey('kanban.Kanban', on_delete=models.SET_NULL, null=True, blank=True)
 
     USERNAME_FIELD = 'email'
@@ -117,16 +116,12 @@ class User(AbstractBaseUser, PermissionsMixin, NotifiableModel):
         return self.notification_channel.notify(**params)
 
     @classmethod
-    # Updates Schedule name
     def post_save(cls, instance, created, update_fields, **kwargs):
         if created:
             kanban = Kanban(name=instance.username, origin_type='user', origin_id=instance.id)
             kanban.save()
-            schedule = Schedule(name=instance.username, origin_name='user', origin_id=instance.id)
-            schedule.save()
 
             instance.kanban = kanban
-            instance.schedule = schedule
             instance.save()
             return
 
@@ -135,15 +130,12 @@ class User(AbstractBaseUser, PermissionsMixin, NotifiableModel):
 
         fields = [str(field) for field in update_fields]
         if 'name' in fields:
-            instance.schedule.name = instance.name
             instance.kanban.name = instance.name
             instance.kanban.save()
-            instance.schedule.save()
 
     @classmethod
     def post_delete(cls, instance, **kwargs):
         instance.kanban.delete()
-        instance.schedule.delete()
 
 
 post_save.connect(User.post_save, sender=User)

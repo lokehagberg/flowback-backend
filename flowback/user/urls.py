@@ -13,10 +13,6 @@ from flowback.user.views.user import (UserCreateApi,
                                       UserForgotPasswordVerifyApi, UserGetChatChannelAPI, UserChatInviteListAPI,
                                       UserChatInviteAPI, UserLogoutAPI, UserLeaveChatChannelAPI,
                                       UserChatChannelUpdateAPI, UserNotificationSubscribeAPI)
-from flowback.user.views.schedule import (UserScheduleEventListAPI,
-                                          UserScheduleEventCreateAPI,
-                                          UserScheduleEventUpdateAPI,
-                                          UserScheduleEventDeleteAPI, UserScheduleUnsubscribeAPI)
 from flowback.user.views.kanban import (UserKanbanEntryListAPI,
                                         UserKanbanEntryCreateAPI,
                                         UserKanbanEntryUpdateAPI,
@@ -36,12 +32,6 @@ user_patterns = [
     path('user/notification/subscribe',
          UserNotificationSubscribeAPI.as_view(),
          name='user_notification_subscribe'),
-
-    path('user/schedule', UserScheduleEventListAPI.as_view(), name='user_schedule'),
-    path('user/schedule/create', UserScheduleEventCreateAPI.as_view(), name='user_schedule_create'),
-    path('user/schedule/update', UserScheduleEventUpdateAPI.as_view(), name='user_schedule_update'),
-    path('user/schedule/delete', UserScheduleEventDeleteAPI.as_view(), name='user_schedule_delete'),
-    path('user/schedule/unsubscribe', UserScheduleUnsubscribeAPI.as_view(), name='user_schedule_unsubscribe'),
 
     path('user/kanban/entry/list', UserKanbanEntryListAPI.as_view(), name='user_kanban_entry'),
     path('user/kanban/entry/create', UserKanbanEntryCreateAPI.as_view(), name='user_kanban_entry_create'),
