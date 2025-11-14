@@ -3,7 +3,6 @@ from flowback.poll.models import Poll
 from flowback.kanban.models import KanbanEntry
 from flowback.notification.models import NotificationChannel
 from flowback.user.models import User
-from flowback.schedule.models import ScheduleEvent
 
 
 def notify_group_kanban(message: str,
@@ -60,27 +59,6 @@ def notify_group_poll(message: str,
                                              work_group_id=poll.work_group_id if poll.work_group else None,
                                              work_group_name=poll.work_group.name if poll.work_group else None,
                                              subscription_filters=subscription_filters)
-
-
-def notify_group_schedule_event(message: str,
-                                action: NotificationChannel.Action,
-                                schedule_event: ScheduleEvent,
-                                user_id_list: list[int] = None):
-    group = schedule_event.schedule.group_set.first()
-    users = user_id_list
-
-    if schedule_event.work_group and not user_id_list:
-        users = list(schedule_event.work_group.group_users.values_list('user_id', flat=True))
-
-    return group.notify_schedule_event(message=message,
-                                       action=action,
-                                       schedule_event_id=schedule_event.id,
-                                       schedule_event_title=schedule_event.title,
-                                       work_group_id=schedule_event.work_group_id
-                                       if schedule_event.work_group else None,
-                                       work_group_name=schedule_event.work_group.name
-                                       if schedule_event.work_group else None,
-                                       subscription_filters=dict(user_id__in=users) if users else None)
 
 
 def notify_group_user_delegate_pool_poll_vote_update(message: str,
