@@ -560,7 +560,7 @@ def generate_schedule(sender, instance, created, *args, **kwargs):
 
 
 class ScheduleModel(models.Model):
-    schedule_relations = GenericRelation(Schedule)
+    schedule_relations = GenericRelation(Schedule, on_delete=models.CASCADE)
 
     class Meta:
         abstract = True
