@@ -144,3 +144,10 @@ def group_thread_comment_vote(*, fetched_by: int, thread_id: int, comment_id: in
                         comment_section_id=group_thread.comment_section.id,
                         comment_id=comment_id,
                         vote=vote)
+
+
+def group_thread_notification_subscribe(*, fetched_by: int, thread_id: int, **kwargs):
+    group_thread = GroupThread.objects.get(id=thread_id)
+    group_user = group_user_permissions(user=fetched_by, group=group_thread.created_by.group)
+
+    group_thread.notification_channel.subscribe(user=group_user.user, **kwargs)
