@@ -7,7 +7,7 @@ from flowback.group.models import GroupThread, GroupThreadVote
 from flowback.group.notify import notify_group_thread
 from flowback.group.selectors.permission import group_user_permissions
 from flowback.notification.models import NotificationChannel
-
+from flowback.user.models import User
 
 def group_thread_create(user_id: int,
                         group_id: int,
@@ -146,8 +146,8 @@ def group_thread_comment_vote(*, fetched_by: int, thread_id: int, comment_id: in
                         vote=vote)
 
 
-def group_thread_notification_subscribe(*, fetched_by: int, thread_id: int, **kwargs):
+def group_thread_notification_subscribe(*, user: int, thread_id: int, **kwargs):
     group_thread = GroupThread.objects.get(id=thread_id)
-    group_user = group_user_permissions(user=fetched_by, group=group_thread.created_by.group)
+    group_user = group_user_permissions(user=user, group=group_thread.created_by.group)
 
     group_thread.notification_channel.subscribe(user=group_user.user, **kwargs)
