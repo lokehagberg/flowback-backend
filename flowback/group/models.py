@@ -441,7 +441,14 @@ class GroupThread(BaseModel, NotifiableModel):
     public = models.BooleanField(default=False)
 
 
-    def notify_poll_comment(self):
+    def notify_thread_comment(self,
+                            action: NotificationChannel.Action,
+                            message: str,
+                            work_group_id: int,
+                            work_group_name: str,
+                            subscription_filters: dict,
+                            exclude_subscription_filters: dict,
+                            comment_message: str):
         """
         Notifies about new comments
         """
@@ -449,7 +456,6 @@ class GroupThread(BaseModel, NotifiableModel):
         params.pop('self')
 
         return self.notification_channel.notify(**params)
-
 
 
 # Likes and Dislikes for Group Thread

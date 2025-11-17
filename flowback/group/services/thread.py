@@ -8,6 +8,7 @@ from flowback.group.notify import notify_group_thread
 from flowback.group.selectors.permission import group_user_permissions
 from flowback.notification.models import NotificationChannel
 from flowback.user.models import User
+from flowback.group.notify import notify_thread_comment
 
 def group_thread_create(user_id: int,
                         group_id: int,
@@ -112,6 +113,10 @@ def group_thread_comment_create(author_id: int,
                              attachments=attachments,
                              attachment_upload_to="group/thread/attachments")
 
+    notify_thread_comment(message="A new comment has been posted",
+                        action=NotificationChannel.Action.CREATED,
+                        thread=thread,
+                        comment=comment)
     return comment
 
 
