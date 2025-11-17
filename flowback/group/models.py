@@ -443,12 +443,12 @@ class GroupThread(BaseModel, NotifiableModel):
 
     @property
     def notification_data(self) -> dict | None:
-        return dict(poll_id=self.id,
-                    poll_title=self.title,
+        return dict(thread_id=self.id,
+                    thread_title=self.title,
                     group_id=self.created_by.group.id,
                     group_name=self.created_by.group.name,
                     group_image=self.created_by.group.image)
-                    
+
     def notify_thread_comment(self,
                             action: NotificationChannel.Action,
                             message: str,
