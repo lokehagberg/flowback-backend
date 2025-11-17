@@ -10,6 +10,7 @@ from flowback.files.serializers import FileSerializer
 from flowback.group.selectors.thread import group_thread_list, group_thread_comment_list, \
     group_thread_comment_ancestor_list
 from flowback.group.serializers import WorkGroupSerializer, GroupUserSerializer
+from flowback.notification.views import NotificationSubscribeTemplateAPI
 from flowback.group.services.thread import (group_thread_create,
                                             group_thread_update,
                                             group_thread_delete,
@@ -17,7 +18,8 @@ from flowback.group.services.thread import (group_thread_create,
                                             group_thread_comment_update,
                                             group_thread_comment_delete,
                                             group_thread_comment_vote,
-                                            group_thread_vote_update)
+                                            group_thread_vote_update,
+                                            group_thread_notification_subscribe)
 
 
 @extend_schema(tags=['group/thread'])
@@ -154,3 +156,8 @@ class GroupThreadCommentDeleteAPI(CommentDeleteAPI):
 @extend_schema(tags=['group/thread'])
 class GroupThreadCommentVoteAPI(CommentVoteAPI):
     lazy_action = group_thread_comment_vote
+
+
+@extend_schema(tags=['group/thread'])
+class GroupThreadNotificationSubscribeAPI(NotificationSubscribeTemplateAPI):
+    lazy_action = group_thread_notification_subscribe
