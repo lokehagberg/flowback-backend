@@ -362,7 +362,7 @@ class ScheduleEvent(BaseModel, NotifiableModel):
 
         user_schedule = ScheduleUser.objects.get(schedule=self.schedule, user=user)
         ScheduleEventSubscription.objects.update_or_create(event=self,
-                                                           subscription=user_schedule,
+                                                           schedule_user=user_schedule,
                                                            defaults=dict(tags=user_tags),
                                                            reminders=reminders,
                                                            locked=locked)
@@ -370,7 +370,7 @@ class ScheduleEvent(BaseModel, NotifiableModel):
     def event_unsubscribe(self, user):
         with transaction.atomic():
             user_schedule = ScheduleUser.objects.get(schedule=self.schedule, user=user)
-            ScheduleEventSubscription.objects.get(event=self, subscription=user_schedule).delete()
+            ScheduleEventSubscription.objects.get(event=self, schedule_user=user_schedule).delete()
 
     @classmethod
     def post_save(cls, instance, created, update_fields: list[str] = None, *args, **kwargs):
@@ -379,7 +379,7 @@ class ScheduleEvent(BaseModel, NotifiableModel):
             schedule_event_user_datas = ScheduleEventSubscription.objects.filter(event=instance, locked=False)
             new_active_subscribers = ScheduleTagSubscription.objects.filter(schedule_tag=instance.tag)
             locked_users = ScheduleEventSubscription.objects.filter(event=instance,
-                                                                    locked=True).values_list('subscription__user',
+                                                                    locked=True).values_list('schedule_user__user',
                                                                                              flat=True)
 
             # Delete subscriptions that are not in the new tag
@@ -449,7 +449,9 @@ class ScheduleEventSubscription(BaseModel):
     @classmethod
     def post_save(cls, instance, *args, **kwargs):
         instance.event.notification_channel.subscribe(user=instance.schedule_user.user,
-                                                      tags=['start', 'end'], reminders=instance.reminders)
+                                                      tags=['start', 'end'],
+                                                      reminders=(None if not instance.reminders
+                                                                 else [instance.reminders, None]))
 
     @classmethod
     def pre_delete(cls, instance, *args, **kwargs):
@@ -497,7 +499,7 @@ class ScheduleTagSubscription(BaseModel):
         events = ScheduleEvent.objects.filter(
             schedule=self.schedule_user.schedule,
             tag=self.schedule_tag,
-            scheduleeventsubscription__subscription__user=self.schedule_user.user,
+            scheduleeventsubscription__schedule_user__user=self.schedule_user.user,
             **filters)
 
         with transaction.atomic():
@@ -519,9 +521,8 @@ class ScheduleUser(BaseModel):
     reminders = ArrayField(models.PositiveIntegerField(), size=10, null=True, blank=True)
     notification_tags = models.ManyToManyField(ScheduleTag, blank=True, through=ScheduleTagSubscription)
 
-    user = models.ForeignKey('user.User', on_delete=models.CASCADE, related_name='schedule_subscription_user',
-                             null=True)
-    schedule = models.ForeignKey(Schedule, on_delete=models.CASCADE, related_name='schedule_subscription_schedule')
+    user = models.ForeignKey('user.User', on_delete=models.CASCADE)
+    schedule = models.ForeignKey(Schedule, on_delete=models.CASCADE)
 
     class Meta:
         unique_together = ('user', 'schedule')

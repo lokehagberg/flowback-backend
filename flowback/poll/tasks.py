@@ -18,7 +18,6 @@ from flowback.poll.models import Poll, PollAreaStatement, PollPredictionBet, Pol
 import numpy as np
 
 from flowback.poll.notify import notify_poll
-from flowback.schedule.services import create_event
 
 
 @shared_task
@@ -447,13 +446,10 @@ def poll_proposal_vote_count(poll_id: int) -> None:
 
         if poll.poll_type == Poll.PollType.SCHEDULE and poll.status == 1:
             winning_proposal = PollProposal.objects.filter(
-                poll_id=poll_id).order_by('-score', '-pollproposaltypeschedule__event__start_date').first()
+                poll_id=poll_id).order_by('-score', '-pollproposaltypeschedule__event_start_date').first()
             if winning_proposal:
-                event = winning_proposal.pollproposaltypeschedule.event
-                create_event(schedule_id=group.schedule_id,
-                             title=poll.title,
-                             start_date=event.start_date,
-                             end_date=event.end_date,
-                             origin_name=poll.schedule_origin,
-                             origin_id=poll.id,
-                             description=poll.description)
+                group.schedule.create_event(title=poll.title,
+                                            description=poll.description,
+                                            start_date=winning_proposal.pollproposaltypeschedule.event_start_date,
+                                            end_date=winning_proposal.pollproposaltypeschedule.event_end_date,
+                                            created_by=poll)

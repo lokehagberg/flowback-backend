@@ -19,7 +19,6 @@ from flowback.poll.models import (Poll,
                                   PollAreaStatementSegment,
                                   PollAreaStatementVote)
 from flowback.poll.tests.utils import generate_poll_phase_kwargs
-from flowback.schedule.tests.factories import ScheduleEventFactory
 
 
 class PollFactory(factory.django.DjangoModelFactory):
@@ -65,10 +64,6 @@ class PollProposalTypeScheduleFactory(factory.django.DjangoModelFactory):
         model = PollProposalTypeSchedule
 
     proposal = factory.SubFactory(PollProposalFactory, poll__poll_type=3)
-    event = factory.SubFactory(ScheduleEventFactory,
-                               schedule=factory.SelfAttribute('..proposal.poll.polltypeschedule.schedule'),
-                               origin_id=factory.SelfAttribute('..proposal.id'),
-                               origin_name=factory.SelfAttribute('..proposal.schedule_origin'))
 
 
 class PollVotingFactory(factory.django.DjangoModelFactory):

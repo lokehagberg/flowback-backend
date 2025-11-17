@@ -25,6 +25,7 @@ class ScheduleEventBaseFilter(django_filters.FilterSet):
     user_tags = django_filters.CharFilter(lookup_expr='iexact')
     subscribed = django_filters.BooleanFilter()
     locked = django_filters.BooleanFilter()
+    tag_name = django_filters.CharFilter(lookup_expr=['exact', 'icontains'], field_name='tag__name')
 
     order_by = django_filters.OrderingFilter(fields=(('created_at', 'created_at_asc'),
                                                      ('-created_at', 'created_at_desc'),
@@ -36,20 +37,19 @@ class ScheduleEventBaseFilter(django_filters.FilterSet):
     class Meta:
         model = ScheduleEvent
         fields = dict(start_date=['lt', 'gt', 'exact'],
-                      end_date=['lt', 'gt', 'exact'],
-                      tag=['exact', 'icontains'])
+                      end_date=['lt', 'gt', 'exact'])
 
 
 def schedule_event_list(*, user: User, filters=None):
     filters = filters or {}
     subscription_qs = ScheduleEventSubscription.objects.filter(event_id=OuterRef('id'),
-                                                               subscription__user=user)
+                                                               schedule_user__user=user)
 
     subscribed_qs = ScheduleTagSubscription.objects.filter(schedule_user__user=user,
                                                            schedule_tag=OuterRef('tag'))
 
     qs = ScheduleEvent.objects.filter(
-        scheduleeventsubscription__subscription__user=user
+        scheduleeventsubscription__schedule_user__user=user
     ).annotate(reminders=Subquery(subscription_qs.values('reminders')),
                user_tags=Subquery(subscription_qs.values('tags')),
                locked=Subquery(subscription_qs.values('locked')),
@@ -59,13 +59,13 @@ def schedule_event_list(*, user: User, filters=None):
 
 
 class ScheduleBaseFilter(django_filters.FilterSet):
-    id__in = NumberInFilter(field_name='id')
-    origin_name = django_filters.CharFilter(field_name='content_type.model', lookup_expr='iexact')
-    origin_id = NumberInFilter(field_name='object_id')
+    ids = NumberInFilter(field_name='id')
+    origin_name = django_filters.CharFilter(field_name='content_type__model', lookup_expr='iexact')
+    origin_ids = NumberInFilter(field_name='object_id')
     order_by = django_filters.OrderingFilter(fields=(('created_at', 'created_at_asc'),
                                                      ('-created_at', 'created_at_desc'),
-                                                     ('content_type.model', 'origin_name_asc'),
-                                                     ('-content_type.model', 'origin_name_desc')))
+                                                     ('content_type__model', 'origin_name_asc'),
+                                                     ('-content_type__model', 'origin_name_desc')))
 
     class Meta:
         model = Schedule

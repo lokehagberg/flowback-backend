@@ -7,7 +7,7 @@ from flowback.common.tests import fake
 from flowback.schedule.models import (Schedule, ScheduleTag, ScheduleEvent,
                                       ScheduleUser, ScheduleEventSubscription,
                                       ScheduleTagSubscription)
-from flowback.group.tests.factories import GroupFactory, GroupUserFactory
+from flowback.group.tests.factories import GroupFactory
 from flowback.user.tests.factories import UserFactory
 
 
@@ -15,20 +15,7 @@ class ScheduleFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = Schedule
 
-    @factory.lazy_attribute
-    def content_type(self):
-        group = GroupFactory.create()
-        self.object_id = group.id
-        return ContentType.objects.get_for_model(group)
-
-    @factory.lazy_attribute
-    def object_id(self):
-        # This will be set by content_type lazy attribute
-        return getattr(self, '_object_id', 1)
-
-    @object_id.setter
-    def object_id(self, value):
-        self._object_id = value
+    created_by = factory.SubFactory(GroupFactory)
 
     active = True
 
@@ -53,19 +40,7 @@ class ScheduleEventFactory(factory.django.DjangoModelFactory):
     active = True
     tag = factory.SubFactory(ScheduleTagFactory, schedule=factory.SelfAttribute('..schedule'))
 
-    @factory.lazy_attribute
-    def content_type(self):
-        group = GroupFactory.create()
-        self.object_id = group.id
-        return ContentType.objects.get_for_model(group)
-
-    @factory.lazy_attribute
-    def object_id(self):
-        return getattr(self, '_object_id', 1)
-
-    @object_id.setter
-    def object_id(self, value):
-        self._object_id = value
+    created_by = factory.SubFactory(GroupFactory)
 
     meeting_link = factory.LazyAttribute(lambda _: fake.url())
     repeat_frequency = None

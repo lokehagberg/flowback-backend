@@ -19,12 +19,12 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from flowback.common.tests import generate_request
-from flowback.schedule.models import Schedule, ScheduleEvent, ScheduleUser, ScheduleTag, ScheduleEventSubscription, ScheduleTagSubscription
+from flowback.schedule.models import ScheduleUser, ScheduleEventSubscription, ScheduleTagSubscription
 from flowback.schedule.selectors import schedule_list, schedule_event_list
 from flowback.schedule.services import (schedule_event_subscribe, schedule_event_unsubscribe,
                                         schedule_tag_subscribe, schedule_tag_unsubscribe,
                                         schedule_subscribe_to_new_tags, schedule_unsubscribe_to_new_tags)
-from flowback.schedule.tests.factories import (ScheduleFactory, ScheduleEventFactory, ScheduleUserFactory,
+from flowback.schedule.tests.factories import (ScheduleEventFactory, ScheduleUserFactory,
                                                ScheduleTagFactory, ScheduleEventSubscriptionFactory,
                                                ScheduleTagSubscriptionFactory)
 from flowback.schedule.views import (ScheduleListAPI, ScheduleEventListAPI,
@@ -32,7 +32,7 @@ from flowback.schedule.views import (ScheduleListAPI, ScheduleEventListAPI,
                                      ScheduleEventSubscribeAPI, ScheduleEventUnsubscribeAPI,
                                      ScheduleTagSubscribeAPI, ScheduleTagUnsubscribeAPI)
 from flowback.user.tests.factories import UserFactory
-from flowback.group.tests.factories import GroupFactory, GroupUserFactory
+from flowback.group.tests.factories import GroupFactory
 
 
 # TODO delete relevant outside references of Schedule, clean up all comments
@@ -70,8 +70,7 @@ class ScheduleAPITest(APITestCase):
         self.assertIn('id', result)
         self.assertIn('origin_name', result)
         self.assertIn('origin_id', result)
-        self.assertIn('default_tag_name', result)
-        self.assertIn('default_tag_id', result)
+        self.assertIn('default_tag', result)
         self.assertIn('available_tags', result)
 
     def test_schedule_list_api_filters(self):
@@ -90,11 +89,11 @@ class ScheduleAPITest(APITestCase):
         """Test ScheduleListAPI filter by origin_name and origin_id"""
         response = generate_request(
             api=ScheduleListAPI,
-            data={'origin_name': 'group', 'origin_id': self.group1.id},
+            data={'origin_name': 'group', 'origin_ids': str(self.group1.id)},
             user=self.user1
         )
 
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         self.assertEqual(response.data['count'], 1)
 
     def test_schedule_subscribe_api(self):
@@ -395,7 +394,7 @@ class ScheduleSelectorTest(APITestCase):
         """Test schedule_list selector filter by origin_name and origin_id"""
         filters = {
             'origin_name': 'group',
-            'origin_id': self.group1.id
+            'origin_ids': str(self.group1.id)
         }
         schedules = schedule_list(user=self.user1, filters=filters)
 
@@ -439,7 +438,7 @@ class ScheduleSelectorTest(APITestCase):
         )
 
         # Filter by schedule_ids
-        filters = {'schedule_ids': [self.group1.schedule.id]}
+        filters = {'schedule_ids': str(self.group1.schedule.id)}
         events = schedule_event_list(user=self.user1, filters=filters)
         self.assertEqual(events.count(), 1)
 
@@ -449,7 +448,7 @@ class ScheduleSelectorTest(APITestCase):
         self.assertEqual(events.count(), 1)
 
         # Filter by tag_ids
-        filters = {'tag_ids': [self.tag1.id]}
+        filters = {'tag_ids': str(self.tag1.id)}
         events = schedule_event_list(user=self.user1, filters=filters)
         self.assertEqual(events.count(), 1)
 
@@ -621,8 +620,7 @@ class ScheduleSerializerTest(APITestCase):
         result = response.data['results'][0]
 
         # Verify all output fields
-        expected_fields = ['id', 'origin_name', 'origin_id', 'default_tag_name',
-                          'default_tag_id', 'available_tags']
+        expected_fields = ['id', 'origin_name', 'origin_id', 'default_tag']
         for field in expected_fields:
             self.assertIn(field, result)
 

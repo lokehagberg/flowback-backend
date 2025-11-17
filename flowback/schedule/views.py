@@ -20,9 +20,9 @@ from flowback.schedule.services import (schedule_event_subscribe,
 class ScheduleListAPI(APIView):
     class FilterSerializer(serializers.Serializer):
         id = serializers.IntegerField(required=False)
-        id__in = CharacterSeparatedField(child=serializers.IntegerField(), required=False)
+        ids = serializers.CharField(required=False)
         origin_name = serializers.CharField(required=False)
-        origin_id = serializers.IntegerField(required=False)
+        origin_ids = serializers.CharField(required=False)
         order_by = serializers.ChoiceField(choices=('created_at_asc',
                                                     'created_at_desc',
                                                     'origin_name_asc',
@@ -30,16 +30,19 @@ class ScheduleListAPI(APIView):
                                            required=False)
 
     class OutputSerializer(serializers.Serializer):
+        class ScheduleTagSerializer(serializers.Serializer):
+            id = serializers.IntegerField()
+            name = serializers.CharField()
+
         id = serializers.IntegerField()
         origin_name = serializers.CharField(source='content_type.model')
         origin_id = serializers.IntegerField(source='object_id')
+        default_tag = ScheduleTagSerializer()
 
-        default_tag_name = serializers.CharField(source='default_tag.name')
-        default_tag_id = serializers.IntegerField(source='default_tag.id')
         available_tags = serializers.ListField(child=serializers.CharField(), allow_null=True)
 
     def get(self, request):
-        serializer = self.FilterSerializer(data=request.data)
+        serializer = self.FilterSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
         schedules = schedule_list(user=request.user, filters=serializer.validated_data)
 
@@ -52,26 +55,21 @@ class ScheduleListAPI(APIView):
 
 class ScheduleEventListAPI(APIView):
     class FilterSerializer(serializers.Serializer):
-        ids = CharacterSeparatedField(child=serializers.IntegerField(), required=False)
+        ids = serializers.CharField(required=False, help_text='comma-separated list of integers')
         schedule_origin_name = serializers.CharField(required=False)
-        schedule_origin_id = CharacterSeparatedField(child=serializers.IntegerField(), required=False,
-                                                     help_text='Comma-separated list')
+        schedule_origin_id = serializers.CharField(required=False, help_text='comma-separated list of integers')
         origin_name = serializers.CharField(required=False)
-        origin_ids = CharacterSeparatedField(child=serializers.IntegerField(), required=False,
-                                             help_text='Comma-separated list')
-        schedule_ids = CharacterSeparatedField(child=serializers.IntegerField(), required=False,
-                                               help_text='Comma-separated list')
+        origin_ids = serializers.CharField(required=False, help_text='comma-separated list of integers')
+        schedule_ids = serializers.CharField(required=False, help_text='comma-separated list of integers')
         title = serializers.CharField(required=False)
         description = serializers.CharField(required=False)
-        active = serializers.BooleanField(required=False)
-        tag_ids = CharacterSeparatedField(child=serializers.IntegerField(), required=False,
-                                          help_text='Comma-separated list')
-        assignee_user_ids = CharacterSeparatedField(child=serializers.IntegerField(), required=False,
-                                                    help_text='Comma-separated list')
-        repeat_frequency__isnull = serializers.BooleanField(required=False)
+        active = serializers.BooleanField(required=False, allow_null=True, default=None)
+        tag_ids = serializers.CharField(required=False, help_text='comma-separated list of integers')
+        assignee_user_ids = serializers.CharField(required=False, help_text='comma-separated list of integers')
+        repeat_frequency__isnull = serializers.BooleanField(required=False, allow_null=True, default=None)
         user_tags = serializers.CharField(required=False)
-        subscribed = serializers.BooleanField(required=False)
-        locked = serializers.BooleanField(required=False)
+        subscribed = serializers.BooleanField(required=False, allow_null=True, default=None)
+        locked = serializers.BooleanField(required=False, allow_null=True, default=None)
 
         # Field lookups from Meta.fields
         start_date = serializers.DateTimeField(required=False)
@@ -114,7 +112,7 @@ class ScheduleEventListAPI(APIView):
         subscribed = serializers.BooleanField()
 
     def get(self, request, *args, **kwargs):
-        serializer = self.FilterSerializer(data=request.data)
+        serializer = self.FilterSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
 
         events = schedule_event_list(user=request.user, filters=serializer.validated_data)
@@ -144,7 +142,7 @@ class ScheduleSubscribeAPI(APIView):
 
 
 class ScheduleUnsubscribeAPI(APIView):
-    def delete(self, request, schedule_id: int):
+    def post(self, request, schedule_id: int):
         schedule_unsubscribe_to_new_tags(user=request.user,
                                          schedule_id=schedule_id)
         return Response(status=status.HTTP_200_OK)
@@ -176,7 +174,7 @@ class ScheduleEventUnsubscribeAPI(APIView):
     class InputSerializer(serializers.Serializer):
         event_ids = CharacterSeparatedField(child=serializers.IntegerField())
 
-    def delete(self, request, schedule_id: int):
+    def post(self, request, schedule_id: int):
         serializer = self.InputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -208,7 +206,7 @@ class ScheduleTagUnsubscribeAPI(APIView):
     class InputSerializer(serializers.Serializer):
         tag_ids = CharacterSeparatedField(child=serializers.IntegerField())
 
-    def delete(self, request, schedule_id: int):
+    def post(self, request, schedule_id: int):
         serializer = self.InputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 

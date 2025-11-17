@@ -36,13 +36,13 @@ class BasePollProposalScheduleFilter(django_filters.FilterSet):
 
     group = django_filters.NumberFilter(field_name='created_by.group_id', lookup_expr='exact')
 
-    start_date__lt = django_filters.DateTimeFilter(field_name='pollproposaltypeschedule.event.start_date',
+    start_date__lt = django_filters.DateTimeFilter(field_name='pollproposaltypeschedule.event_start_date',
                                                    lookup_expr='lt')
-    start_date__gte = django_filters.DateTimeFilter(field_name='pollproposaltypeschedule.event.start_date',
+    start_date__gte = django_filters.DateTimeFilter(field_name='pollproposaltypeschedule.event_start_date',
                                                    lookup_expr='gte')
-    end_date__lt = django_filters.DateTimeFilter(field_name='pollproposaltypeschedule.event.end_date',
+    end_date__lt = django_filters.DateTimeFilter(field_name='pollproposaltypeschedule.event_end_date',
                                                  lookup_expr='lt')
-    end_date__gte = django_filters.DateTimeFilter(field_name='pollproposaltypeschedule.event.end_date',
+    end_date__gte = django_filters.DateTimeFilter(field_name='pollproposaltypeschedule.event_end_date',
                                                  lookup_expr='gte')
 
     poll_title = django_filters.CharFilter(field_name='poll.title', lookup_expr='exact')

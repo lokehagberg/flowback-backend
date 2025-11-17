@@ -249,8 +249,8 @@ class PollUserScheduleListAPI(APIView):
         hide_poll_users = serializers.BooleanField(source='created_by.group.hide_poll_users')
         title = serializers.CharField(source='poll.title')
         description = serializers.CharField(source='poll.description')
-        start_date = serializers.DateTimeField(source='pollproposaltypeschedule.event.start_date')
-        end_date = serializers.DateTimeField(source='pollproposaltypeschedule.event.end_date')
+        start_date = serializers.DateTimeField(source='pollproposaltypeschedule.event_start_date')
+        end_date = serializers.DateTimeField(source='pollproposaltypeschedule.event_end_date')
 
         class Meta:
             model = PollProposal
