@@ -10,6 +10,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('schedule', '0014_scheduleeventsubscription_scheduleuser_and_more'),
+        ('group', '0054_workgroup_schedule'),
     ]
 
     operations = [

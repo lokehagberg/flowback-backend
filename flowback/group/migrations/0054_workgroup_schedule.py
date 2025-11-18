@@ -7,8 +7,15 @@ import django.db.models.deletion
 def create_schedule_for_each_workgroup(apps, schema_editor):
     WorkGroup = apps.get_model('group', 'WorkGroup')
     Schedule = apps.get_model('schedule', 'Schedule')
+    ContentType = apps.get_model('contenttypes', 'ContentType')
+    workgroup_content_type = ContentType.objects.get_for_model(WorkGroup)
     for workgroup in WorkGroup.objects.all():
-        schedule = Schedule.objects.create(created_by=workgroup)
+        schedule = Schedule.objects.create(
+            content_type=workgroup_content_type,
+            object_id=workgroup.id,
+            origin_name=workgroup_content_type.model,
+            origin_id=workgroup.id,
+        )
         workgroup.schedule = schedule
         workgroup.save()
 
@@ -17,6 +24,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('group', '0053_fix_grouppermissions_author'),
+        ('schedule', '0011_scheduletag_schedule_content_type_schedule_object_id_and_more'),
     ]
 
     operations = [

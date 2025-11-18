@@ -2,6 +2,8 @@
 
 from django.conf import settings
 from django.db import migrations
+from numpy.core.defchararray import startswith
+
 
 # Populates the content_type fields for Schedule and ScheduleEvent
 def migrate_schedule_origins(apps, schema_editor):
@@ -19,15 +21,22 @@ def migrate_schedule_origins(apps, schema_editor):
 
     # Populate schedule content_type with origin fields
     for schedule in Schedule.objects.all():
-        schedule.content_type = origins[schedule.origin_name]
-        schedule.object_id = schedule.origin_id
-        schedule.save()
+        if not schedule.content_type:
+            schedule.content_type = origins[schedule.origin_name]
+            schedule.object_id = schedule.origin_id
+            schedule.save()
 
     # Populate schedule event content_type with origin fields
     for event in ScheduleEvent.objects.all():
-        event.content_type = origins[event.origin_name]
-        event.object_id = event.origin_id
-        event.save()
+        if not startswith(event.title, 'group_poll_'):
+            event.content_type = origins[event.origin_name]
+            event.object_id = event.origin_id
+            event.save()
+
+        else:
+            event.content_type = ContentType.objects.get(app_label='poll', model='poll')
+            event.object_id = event.origin_id
+            event.save()
 
 
 def populate_schedule_tags(apps, schema_editor):
@@ -46,9 +55,8 @@ def migrate_from_schedule_subscription_to_user_subscription(apps, schema_editor)
     Schedule = apps.get_model('schedule', 'Schedule')
     User = apps.get_model('user', 'User')
     Group = apps.get_model('group', 'Group')
+    ContentType = apps.get_model('contenttypes', 'ContentType')
     WorkGroup = apps.get_model('group', 'WorkGroup')
-
-    print("HERE")
 
     # TODO keep previous schedule events intact
     ScheduleSubscription.objects.all().delete()
@@ -56,24 +64,32 @@ def migrate_from_schedule_subscription_to_user_subscription(apps, schema_editor)
     # Create new user subscriptions
     for user in User.objects.all():
         schedule = user.schedule
-        ScheduleSubscription.objects.create(user=user, schedule=schedule)
+        if not schedule:
+            schedule = Schedule.objects.create(content_type=ContentType.objects.get(app_label='user', model='user'),
+                                               object_id=user.id,
+                                               origin_id=user.id,
+                                               origin_name='user')
+
+        ScheduleSubscription.objects.create(user=user, schedule_id=schedule.id)
 
     # Create new group subscriptions
     for group in Group.objects.all():
-        schedule = group.schedule
-        group.schedule = schedule
-        group.save()
+        schedule = Schedule.objects.get(origin_name='group', origin_id=group.id)
+        schedule.content_type = ContentType.objects.get(app_label='group', model='group')
+        schedule.object_id = group.id
+        schedule.save()
 
         for group_user in group.groupuser_set.filter(active=True).all():
-            ScheduleSubscription.objects.create(user=group_user.user, schedule=schedule)
+            ScheduleSubscription.objects.create(user=group_user.user, schedule_id=schedule.id)
 
         # Work groups as well
         for work_group in group.workgroup_set.all():
-            for schedule_event in work_group.group.schedule.scheduleevent_set.filter(work_group__isnull=False).all():
+            wg_schedule = Schedule.objects.get(origin_name='workgroup', origin_id=work_group.id)
+            for schedule_event in schedule.scheduleevent_set.filter(work_group__isnull=False).all():
                 schedule_event.update(created_by=work_group)
 
             for workgroup_user in work_group.workgroupuser_set.filter(active=True).all():
-                ScheduleSubscription.objects.create(user=workgroup_user.group_user.user, schedule=work_group.schedule)
+                ScheduleSubscription.objects.create(user=workgroup_user.group_user.user, schedule_id=wg_schedule.id)
 
 
 
@@ -91,13 +107,5 @@ class Migration(migrations.Migration):
         ),
         migrations.RunPython(migrate_schedule_origins),
         migrations.RunPython(populate_schedule_tags),
-        migrations.RunPython(migrate_from_schedule_subscription_to_user_subscription),
-        migrations.RemoveField(
-            model_name='scheduleevent',
-            name='reminders'
-        ),
-        migrations.RemoveField(
-            model_name='scheduleevent',
-            name='work_group'
-        )
+        migrations.RunPython(migrate_from_schedule_subscription_to_user_subscription)
     ]

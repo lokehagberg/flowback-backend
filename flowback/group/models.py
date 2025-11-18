@@ -14,7 +14,7 @@ from flowback.common.models import BaseModel
 from flowback.files.models import FileCollection
 from flowback.kanban.models import Kanban, KanbanSubscription
 from flowback.notification.models import NotifiableModel, NotificationChannel
-from flowback.schedule.models import Schedule, ScheduleModel
+from flowback.schedule.models import ScheduleModel
 from flowback.user.models import User
 from django.db import models
 

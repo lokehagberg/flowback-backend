@@ -2,12 +2,8 @@
 
 from django.conf import settings
 import django.contrib.postgres.fields
-from django.contrib.contenttypes.models import ContentType
 from django.db import migrations, models
-import django.db.models.deletion
 import django.utils.timezone
-
-from flowback.schedule.models import ScheduleTag
 
 
 class Migration(migrations.Migration):
@@ -15,8 +11,7 @@ class Migration(migrations.Migration):
     dependencies = [
         ('contenttypes', '0002_remove_content_type_name'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
-        ('schedule', '0010_remove_scheduleevent_reminder_tasks_and_more'),
-        ('group', '0054_workgroup_schedule'),
+        ('schedule', '0010_remove_scheduleevent_reminder_tasks_and_more')
     ]
 
     operations = [

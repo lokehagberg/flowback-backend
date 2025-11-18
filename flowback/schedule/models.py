@@ -51,7 +51,7 @@ class Schedule(BaseModel):
                               end_date=end_date,
                               schedule=self,
                               created_by=created_by,
-                              tag=tag,
+                              tag=tag or self.default_tag,
                               assignees=assignees,
                               meeting_link=meeting_link,
                               repeat_frequency=repeat_frequency)
@@ -222,7 +222,7 @@ class ScheduleEvent(BaseModel, NotifiableModel):
     start_date = models.DateTimeField()
     end_date = models.DateTimeField(null=True, blank=True)
     active = models.BooleanField(default=True)
-    tag = models.ForeignKey(ScheduleTag, on_delete=models.CASCADE, null=True, blank=True)
+    tag = models.ForeignKey(ScheduleTag, on_delete=models.CASCADE)
 
     # Making assignees to User serves no purpose but to complicate queries
     assignees = models.ManyToManyField('group.GroupUser')

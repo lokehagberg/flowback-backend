@@ -55,6 +55,14 @@ class Migration(migrations.Migration):
             name='object_id',
             field=models.PositiveIntegerField(),
         ),
+        migrations.RemoveField(
+            model_name='scheduleevent',
+            name='reminders'
+        ),
+        migrations.RemoveField(
+            model_name='scheduleevent',
+            name='work_group'
+        ),
         migrations.CreateModel(
             name='ScheduleEventUserData',
             fields=[
