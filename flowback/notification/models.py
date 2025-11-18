@@ -371,7 +371,6 @@ class NotificationChannel(BaseModel, TreeNode):
                 raise ValidationError('Reminders cannot be set to 0')
 
             rem = {} if not rem else dict(reminders=rem)
-            print(f"Reminders = {rem}, original = {reminders}")
             subscription_tags.append(NotificationSubscriptionTag(name=tag, **rem))
 
         subscription, created = NotificationSubscription.objects.update_or_create(user=user,
