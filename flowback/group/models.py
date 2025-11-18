@@ -78,7 +78,9 @@ class Group(BaseModel, NotifiableModel, ScheduleModel):
     # Determines the default permission for every user get when they join
     # TODO return basic permissions by default if field is NULL
     default_permission = models.OneToOneField('GroupPermissions',
-                                              on_delete=models.CASCADE)
+                                              on_delete=models.CASCADE,
+                                              null=True,
+                                              blank=True)
 
     name = models.TextField(unique=True)
     description = models.TextField(null=True, blank=True)
@@ -165,7 +167,8 @@ class Group(BaseModel, NotifiableModel, ScheduleModel):
                     poll_title: str,
                     work_group_id: int = None,
                     work_group_name: str = None,
-                    subscription_filters: dict = None):
+                    subscription_filters: dict = None,
+                    exclude_subscription_filters: dict = None):
         """Notifies about new polls"""
         params = locals()
         params.pop('self')
@@ -178,11 +181,7 @@ class Group(BaseModel, NotifiableModel, ScheduleModel):
         if instance.pk is None:
             channel = MessageChannel(origin_name='group', title=instance.name)
             channel.save()
-            default_permission = GroupPermissions()
-            default_permission.save()
-
             instance.chat = channel
-            instance.default_permission = default_permission
 
     @classmethod
     def post_save(cls, instance, created, update_fields, *args, **kwargs):
@@ -190,9 +189,12 @@ class Group(BaseModel, NotifiableModel, ScheduleModel):
             kanban = Kanban(name=instance.name, origin_type='group', origin_id=instance.id)
             kanban.save()
 
-            instance.default_permission.name = instance.name
-            instance.default_permission.author = instance
-            instance.default_permission.save()
+            default_permission = GroupPermissions(author=instance, role_name=instance.name)
+            default_permission.save()
+            instance.default_permission = default_permission
+
+            instance.kanban = kanban
+            instance.save()
 
             group_user = GroupUser(user=instance.created_by,
                                    group=instance,
@@ -294,13 +296,36 @@ class GroupUser(BaseModel):
     @classmethod
     def post_save(cls, instance, created, update_fields, *args, **kwargs):
         if created:
-            KanbanSubscription(kanban_id=instance.user.kanban_id, target_id=instance.group.kanban_id)
+            subscription = KanbanSubscription(kanban_id=instance.user.kanban_id, target_id=instance.group.kanban_id)
+            subscription.save()
+
+
+        elif update_fields and 'active' in update_fields:
+            if instance.active:
+                subscription = KanbanSubscription(kanban_id=instance.user.kanban_id, target_id=instance.group.kanban_id)
+                subscription.save()
+
+                instance.chat_participant.active = True
+                instance.chat_participant.save()
+
+            else:
+                KanbanSubscription.objects.filter(kanban_id=instance.user.kanban_id,
+                                                  target_id=instance.group.kanban_id).delete()
+
+                instance.chat_participant.active = False
+                instance.chat_participant.save()
+
+                if instance.group.notification_channel:
+                    instance.group.notification_channel.unsubscribe_all(user=instance.user)
 
     @classmethod
     def post_delete(cls, instance, *args, **kwargs):
         KanbanSubscription.objects.filter(kanban_id=instance.user.kanban_id,
                                           target_id=instance.group.kanban_id).delete()
-        instance.chat_participant.delete()
+
+        if instance.chat_participant:
+            instance.chat_participant.delete()
+
         if instance.group.notification_channel:
             instance.group.notification_channel.unsubscribe_all(user=instance.user)
 
@@ -383,7 +408,7 @@ class WorkGroupUserJoinRequest(BaseModel):
 
 
 # GroupThreads are mainly used for creating comment sections for various topics
-class GroupThread(BaseModel):
+class GroupThread(BaseModel, NotifiableModel):
     created_by = models.ForeignKey(GroupUser, on_delete=models.CASCADE)
     title = models.CharField(max_length=200)
     description = models.TextField(null=True, blank=True)
@@ -393,6 +418,31 @@ class GroupThread(BaseModel):
     attachments = models.ForeignKey(FileCollection, on_delete=models.CASCADE, null=True, blank=True)
     work_group = models.ForeignKey(WorkGroup, on_delete=models.SET_NULL, null=True, blank=True)
     public = models.BooleanField(default=False)
+
+
+    @property
+    def notification_data(self) -> dict | None:
+        return dict(thread_id=self.id,
+                    thread_title=self.title,
+                    group_id=self.created_by.group.id,
+                    group_name=self.created_by.group.name,
+                    group_image=self.created_by.group.image)
+
+    def notify_thread_comment(self,
+                            action: NotificationChannel.Action,
+                            message: str,
+                            work_group_id: int,
+                            work_group_name: str,
+                            subscription_filters: dict,
+                            exclude_subscription_filters: dict,
+                            comment_message: str):
+        """
+        Notifies about new comments
+        """
+        params = locals()
+        params.pop('self')
+
+        return self.notification_channel.notify(**params)
 
 
 # Likes and Dislikes for Group Thread

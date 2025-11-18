@@ -1,6 +1,6 @@
 import math
 
-from django.core.validators import MaxValueValidator, MinValueValidator
+from django.core.validators import MinValueValidator
 from django.utils.translation import gettext_lazy as _
 
 from django.db import models
@@ -25,7 +25,6 @@ class KanbanEntry(BaseModel):
     assignee = models.ForeignKey('user.User', null=True, blank=True, on_delete=models.SET_NULL, related_name='kanban_entry_assignee')
     end_date = models.DateTimeField(null=True, blank=True)
     priority = models.IntegerField(default=1)
-
     title = models.CharField(max_length=255)
     description = models.TextField(null=True, blank=True)
     attachments = models.ForeignKey('files.FileCollection', on_delete=models.SET_NULL, null=True, blank=True)
@@ -41,9 +40,8 @@ class KanbanEntry(BaseModel):
 
     @classmethod
     def pre_save(cls, instance, *args, **kwargs):
-        if instance.pk is None:
-            if instance.priority is None:
-                instance.priority = math.floor(FLOWBACK_KANBAN_PRIORITY_LIMIT / 2)
+        if instance.pk is None and instance.priority is None:
+            instance.priority = math.floor(FLOWBACK_KANBAN_PRIORITY_LIMIT / 2)
 
 
 class KanbanEntryTag(BaseModel):

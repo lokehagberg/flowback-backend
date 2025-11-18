@@ -71,6 +71,8 @@ class NotificationSubscriptionListAPI(APIView):
 
         channel_id = serializers.IntegerField()
         channel_name = serializers.CharField(source='channel.name')
+        origin_name = serializers.CharField(source='channel.content_type.model')
+        origin_id = serializers.IntegerField(source='channel.object_id')
         tags = NotificationSubscriptionTagSerializer(many=True, source='notificationsubscriptiontag_set')
 
     def get(self, request):

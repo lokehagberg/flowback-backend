@@ -128,9 +128,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
             if not message.get("type"):
                 message["type"] = "message"
 
-        await self.channel_layer.group_send(
-            f"{channel_id}",
-            message)
+        # TODO Faster, but lacks purpose (for now)
+        # await self.channel_layer.group_send(
+        #     f"{channel_id}",
+        #     message)
 
         participants = MessageChannelParticipant.objects.filter(channel_id=channel_id)
         message["status"] = "message_received"
