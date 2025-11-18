@@ -1,5 +1,7 @@
 import factory
 from django.utils import timezone
+from future.backports.datetime import timedelta
+
 from flowback.common.tests import fake
 from flowback.group.tests.factories import GroupUserFactory, GroupUserDelegatePoolFactory, GroupTagsFactory
 
@@ -63,6 +65,8 @@ class PollProposalTypeScheduleFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = PollProposalTypeSchedule
 
+    event_start_date = factory.LazyAttribute(lambda _: timezone.now() + timedelta(days=1))
+    event_end_date = factory.LazyAttribute(lambda _: timezone.now() + timedelta(days=2))
     proposal = factory.SubFactory(PollProposalFactory, poll__poll_type=3)
 
 

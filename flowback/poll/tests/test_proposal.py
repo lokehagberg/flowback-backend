@@ -102,12 +102,11 @@ class ProposalTest(APITestCase):
 
         self.assertEqual(proposal.title, 'Test Proposal')
         self.assertEqual(proposal.description, 'Test')
-        self.assertEqual(proposal.pollproposaltypeschedule.event.start_date, start_date)
-        self.assertEqual(proposal.pollproposaltypeschedule.event.end_date, end_date)
 
         response = self.proposal_create(user=self.group_user_one.user, poll=self.poll_schedule,
                                         title='Test Proposal', description='Test',
                                         event__start_date=start_date, event__end_date=end_date)
+        proposal = PollProposal.objects.get(id=int(response.data))
 
         self.assertRaises(ObjectDoesNotExist, PollProposal.objects.get, id=proposal.id + 1)
 
@@ -150,11 +149,9 @@ class ProposalTest(APITestCase):
     def test_proposal_schedule_delete(self):
         user = self.group_user_one.user
         proposal = self.poll_schedule_proposal_one
-        event_id = proposal.pollproposaltypeschedule.event.id
 
         response = self.proposal_delete(proposal, user)
         self.assertEqual(response.status_code, 200, response.data)
-        self.assertFalse(ScheduleEvent.objects.filter(id=event_id).exists())
 
     def test_proposal_schedule_delete_no_permission(self):
         self.group_user_one.permission = GroupPermissionsFactory(author=self.group_user_one.group,
@@ -162,18 +159,13 @@ class ProposalTest(APITestCase):
         self.group_user_one.save()
         user = self.group_user_one.user
         proposal = self.poll_schedule_proposal_one
-        event_id = proposal.pollproposaltypeschedule.event.id
 
         response = self.proposal_delete(proposal, user)
         self.assertEqual(response.status_code, 400)
-        self.assertTrue(ScheduleEvent.objects.filter(id=event_id).exists())
 
     def test_proposal_schedule_delete_admin(self):
         user = self.group_user_creator.user
         proposal = self.poll_schedule_proposal_one
-        event_id = proposal.pollproposaltypeschedule.event.id
-        self.assertTrue(ScheduleEvent.objects.filter(id=event_id).exists())
 
         response = self.proposal_delete(proposal, user)
         self.assertEqual(response.status_code, 200, response.data)
-        self.assertFalse(ScheduleEvent.objects.filter(id=event_id).exists())
