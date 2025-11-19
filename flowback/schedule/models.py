@@ -44,7 +44,7 @@ class Schedule(BaseModel):
                      assignees: list[int] = None,
                      meeting_link: str = None,
                      repeat_frequency: int = None):
-        tag = ScheduleTag.objects.get(schedule=self, name=tag)
+        tag = ScheduleTag.objects.filter(schedule=self, name=tag).first()
         event = ScheduleEvent(title=title,
                               description=description,
                               start_date=start_date,
@@ -52,9 +52,11 @@ class Schedule(BaseModel):
                               schedule=self,
                               created_by=created_by,
                               tag=tag or self.default_tag,
-                              assignees=assignees,
                               meeting_link=meeting_link,
                               repeat_frequency=repeat_frequency)
+
+        if assignees:
+            event.assignees.add(*assignees)
 
         event.full_clean()
         event.save()
@@ -184,9 +186,12 @@ class Schedule(BaseModel):
         if not created:
             return
 
-        default_tag = ScheduleTag.objects.create(name='default')
+        default_tag = ScheduleTag.objects.create(schedule=instance, name='default')
         instance.default_tag = default_tag
         instance.save()
+
+
+post_save.connect(Schedule.post_save, Schedule)
 
 
 class ScheduleTag(BaseModel, NotifiableModel):
@@ -228,8 +233,8 @@ class ScheduleEvent(BaseModel, NotifiableModel):
     assignees = models.ManyToManyField('group.GroupUser')
     meeting_link = models.URLField(null=True, blank=True)
 
-    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True)
-    object_id = models.PositiveIntegerField(null=True)
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveIntegerField()
     created_by = GenericForeignKey('content_type', 'object_id')
 
     repeat_frequency = models.IntegerField(null=True, blank=True, choices=Frequency.choices)
@@ -248,25 +253,6 @@ class ScheduleEvent(BaseModel, NotifiableModel):
         if self.end_date and self.start_date > self.end_date:
             raise ValidationError('Start date is greater than end date')
 
-        # Manual management of getting the group from created_by
-        if self.assignees:
-            model = self.content_type.model
-
-            group = None
-            match model:
-                case 'group':
-                    group = self.created_by
-                case 'poll':
-                    group = self.created_by.created_by.group
-                case 'workgroup':
-                    group = self.created_by.group
-
-            if group is None:
-                raise ValidationError("Assignees can only be assigned to events created by a group.")
-
-            if not all([assignee.group == group for assignee in self.assignees.all()]):
-                raise ValidationError("Not all group users are assignable to this event.")
-
     @property
     def notification_data(self):
         return dict(id=self.id,
@@ -277,7 +263,7 @@ class ScheduleEvent(BaseModel, NotifiableModel):
                     schedule_origin_name=self.schedule.content_type.model,
                     schedule_origin_id=self.schedule.object_id,
                     start_date=self.start_date.strftime('%Y-%m-%d %H:%M:%S'),
-                    end_date=self.end_date.strftime('%Y-%m-%d %H:%M:%S'))
+                    end_date=self.end_date.strftime('%Y-%m-%d %H:%M:%S') if self.end_date else None)
 
     def notify_start(self, action: NotificationObject.Action, timestamp: datetime.datetime, message: str):
         data = locals()
@@ -330,7 +316,10 @@ class ScheduleEvent(BaseModel, NotifiableModel):
             return timezone.now() + self._get_cron_from_date(self.start_date).remaining_estimate(timezone.now())
 
     @property
-    def next_end_date(self) -> datetime.datetime:
+    def next_end_date(self) -> datetime.datetime | None:
+        if not self.end_date:
+            return None
+
         if timezone.now() < self.end_date:
             return self.end_date
         else:
@@ -411,23 +400,22 @@ class ScheduleEvent(BaseModel, NotifiableModel):
 
             # If not created, update the instance task with a new crontab schedule
             task = PeriodicTask.objects.filter(name=f"schedule_event_{instance.id}").first()
-            if not created and not task:
+            if task:
                 if task.crontab != cron_schedule:
                     task.start_date = instance.start_date
                     task.crontab = cron_schedule
                     task.save()
 
-                return
+            else:
+                periodic_task = PeriodicTask.objects.create(name=f"schedule_event_{instance.id}",
+                                                            task="schedule.tasks.event_notify",
+                                                            kwargs=json.dumps(dict(event_id=instance.id)),
+                                                            crontab=cron_schedule,
+                                                            start_time=instance.start_date)
+                periodic_task.full_clean()
+                periodic_task.save()
 
-            periodic_task = PeriodicTask.objects.create(name=f"schedule_event_{instance.id}",
-                                                        task="schedule.tasks.event_notify",
-                                                        kwargs=json.dumps(dict(event_id=instance.id)),
-                                                        crontab=cron_schedule,
-                                                        start_time=instance.start_date)
-            periodic_task.full_clean()
-            periodic_task.save()
-
-            instance.regenerate_notifications()
+                instance.regenerate_notifications()
 
         if not created:
             if update_fields and any([x in update_fields for x in ['end_date', 'start_date', 'repeat_frequency']]):
@@ -527,7 +515,6 @@ class ScheduleUser(BaseModel):
     class Meta:
         unique_together = ('user', 'schedule')
 
-    # TODO check if this needs a refresh (given new changes ofc)
     def tag_unsubscribe(self,
                         tag_ids: list[int] | None,
                         include_locked: bool = False) -> None:
@@ -560,6 +547,7 @@ def generate_schedule(sender, instance, created, *args, **kwargs):
         Schedule.objects.create(created_by=instance)
 
 
+# TODO implement ScheduleModel & views across the codebase, especially poll & tasks
 class ScheduleModel(models.Model):
     schedule_relations = GenericRelation(Schedule, on_delete=models.CASCADE)
 

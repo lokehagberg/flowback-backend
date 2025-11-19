@@ -15,6 +15,7 @@ from flowback.chat.services import message_channel_create, message_channel_join
 from flowback.common.services import model_update, get_object
 from flowback.kanban.services import KanbanManager
 from flowback.notification.models import NotificationChannel
+from flowback.schedule.services import schedule_event_create, schedule_event_update, schedule_event_delete
 from flowback.user.models import User, OnboardUser, PasswordReset, Report, UserChatInvite
 
 user_kanban = KanbanManager(origin_type='user')
@@ -310,3 +311,18 @@ def report_create(*, user_id: int, title: str, description: str, group_id: int, 
     report.save()
 
     return report
+
+
+def user_schedule_event_create(user: User, **data):
+    data['schedule_id'] = user.schedule.id
+    return schedule_event_create(created_by=user, **data)
+
+
+def user_schedule_event_update(user: User, **data):
+    data['schedule_id'] = user.schedule.id
+    return schedule_event_update(**data)
+
+
+def user_schedule_event_delete(user: User, **data):
+    data['schedule_id'] = user.schedule.id
+    return schedule_event_delete(**data)

@@ -216,7 +216,7 @@ class ScheduleTagUnsubscribeAPI(APIView):
         return Response(status=status.HTTP_200_OK)
 
 
-class ScheduleEventCreateAPI(APIView):
+class ScheduleEventLazyCreateAPI(APIView):
     lazy_action = schedule_event_create
 
     class InputSerializer(serializers.Serializer):
@@ -232,15 +232,17 @@ class ScheduleEventCreateAPI(APIView):
     def post(self, request, *args, **kwargs):
         serializer = self.InputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
 
-        self.lazy_action.__func__(created_by=request.user,
-                                  schedule_id=kwargs.get('schedule_id'),
-                                  **serializer.validated_data)
+        if kwargs.get('schedule_id'):
+            data = kwargs.get('schedule_id')
+
+        self.lazy_action.__func__(user=request.user, **data)
 
         return Response(status=status.HTTP_200_OK)
 
 
-class ScheduleEventUpdateAPI(APIView):
+class ScheduleEventLazyUpdateAPI(APIView):
     lazy_action = schedule_event_update
 
     class InputSerializer(serializers.Serializer):
@@ -259,13 +261,14 @@ class ScheduleEventUpdateAPI(APIView):
         serializer = self.InputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        self.lazy_action.__func__(schedule_id=kwargs.get('schedule_id'),
+        self.lazy_action.__func__(user=request.user,
+                                  schedule_id=kwargs.get('schedule_id'),
                                   **serializer.validated_data)
 
         return Response(status=status.HTTP_200_OK)
 
 
-class ScheduleEventDeleteAPI(APIView):
+class ScheduleEventLazyDeleteAPI(APIView):
     lazy_action = schedule_event_delete
 
     class InputSerializer(serializers.Serializer):
@@ -275,6 +278,7 @@ class ScheduleEventDeleteAPI(APIView):
         serializer = self.InputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        self.lazy_action.__func__(schedule_id=kwargs.get('schedule_id'),
+        self.lazy_action.__func__(user=request.user,
+                                  schedule_id=kwargs.get('schedule_id'),
                                   **serializer.validated_data)
         return Response(status=status.HTTP_200_OK)

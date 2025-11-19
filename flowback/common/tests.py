@@ -26,9 +26,9 @@ def generate_request(api: Type[APIView],
         raise NotImplementedError('generate_request is unable to handle requests with both get/post methods.')
 
     if 'get' in method:
-        request = factory.get('', data=data)
+        request = factory.get('', data=data, format='json')
     elif 'post' in method:
-        request = factory.post('', data=data)
+        request = factory.post('', data=data, format='json')
     else:
         raise NotImplementedError('Missing handling for APIView method besides get/post.')
 

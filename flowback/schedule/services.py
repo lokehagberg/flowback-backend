@@ -7,28 +7,51 @@ from flowback.schedule.models import Schedule, ScheduleEvent, ScheduleUser
 
 
 def schedule_event_create(*,
-                 schedule_id: int,
-                 title: str,
-                 description: str = None,
-                 start_date: datetime.datetime,
-                 end_date: datetime.datetime = None,
-                 created_by = None,
-                 tag: str = None,
-                 assignees: list[int] = None,
-                 meeting_link: str = None,
-                 repeat_frequency: int = None) -> ScheduleEvent:
+                          schedule_id: int,
+                          title: str,
+                          description: str = None,
+                          start_date: datetime.datetime,
+                          end_date: datetime.datetime = None,
+                          created_by=None,
+                          tag: str = None,
+                          assignees: list[int] = None,
+                          meeting_link: str = None,
+                          repeat_frequency: int = None,
+                          **kwargs) -> ScheduleEvent:
     fields = locals()
+    schedule = Schedule.objects.get(id=schedule_id)
+
+    # Manual management of getting the group from created_by
+    if assignees:
+        group = None
+        match schedule.content_type.model:
+            case 'group':
+                group = schedule.created_by
+            case 'poll':
+                group = schedule.created_by.created_by.group
+            case 'workgroup':
+                group = schedule.created_by.group
+
+        if group is None:
+            raise ValidationError("Assignees can only be assigned to events created by a group.")
+
+        if not all([assignee.group == group for assignee in assignees.all()]):
+            raise ValidationError("Not all group users are assignable to this event.")
 
     schedule = Schedule.objects.get(id=schedule_id)
+    fields.pop('schedule_id')
+    fields.pop('kwargs')
+
     return schedule.create_event(**fields)
 
 
 def schedule_event_update(*,
-                 event_id: int,
-                 schedule_id: int = None,
-                 **data) -> ScheduleEvent:
+                          event_id: int,
+                          schedule_id: int = None,
+                          **data) -> ScheduleEvent:
     """
     Updates an event
+    :param user: Placeholder for lazy_action, won't do anything.
     :param event_id: The event id to update
     :param schedule_id: Schedule id (for validation)
     :param data: Update fields with data
@@ -45,21 +68,25 @@ def schedule_event_update(*,
                               'end_date',
                               'tag',
                               'meeting_link',
-                              'repeat_frequency',
-                              'assignees']
+                              'repeat_frequency']
 
     event, updated = model_update(instance=event,
                                   fields=non_side_effect_fields,
                                   data=data)
 
+    if data.get('assignees'):
+        event.assignees.set(data.get('assignees'))
+
     return event
 
 
 def schedule_event_delete(*,
-                 event_id: int,
-                 schedule_id: int = None) -> None:
+                          event_id: int,
+                          schedule_id: int = None,
+                          **kwargs) -> None:
     """
     Deletes an event
+    :param user: Placeholder for lazy_action, won't do anything.
     :param event_id: Event to remove
     :param schedule_id: Schedule id (for validation)
     :return: None
