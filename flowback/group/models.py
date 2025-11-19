@@ -429,7 +429,7 @@ class WorkGroupUserJoinRequest(BaseModel):
 
 
 # GroupThreads are mainly used for creating comment sections for various topics
-class GroupThread(BaseModel):
+class GroupThread(BaseModel, NotifiableModel):
     created_by = models.ForeignKey(GroupUser, on_delete=models.CASCADE)
     title = models.CharField(max_length=200)
     description = models.TextField(null=True, blank=True)
@@ -439,6 +439,31 @@ class GroupThread(BaseModel):
     attachments = models.ForeignKey(FileCollection, on_delete=models.CASCADE, null=True, blank=True)
     work_group = models.ForeignKey(WorkGroup, on_delete=models.SET_NULL, null=True, blank=True)
     public = models.BooleanField(default=False)
+
+
+    @property
+    def notification_data(self) -> dict | None:
+        return dict(thread_id=self.id,
+                    thread_title=self.title,
+                    group_id=self.created_by.group.id,
+                    group_name=self.created_by.group.name,
+                    group_image=self.created_by.group.image)
+
+    def notify_thread_comment(self,
+                            action: NotificationChannel.Action,
+                            message: str,
+                            work_group_id: int,
+                            work_group_name: str,
+                            subscription_filters: dict,
+                            exclude_subscription_filters: dict,
+                            comment_message: str):
+        """
+        Notifies about new comments
+        """
+        params = locals()
+        params.pop('self')
+
+        return self.notification_channel.notify(**params)
 
 
 # Likes and Dislikes for Group Thread

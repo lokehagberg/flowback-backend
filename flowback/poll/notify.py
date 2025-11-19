@@ -54,3 +54,4 @@ def notify_poll_comment(message: str,
                                     comment_message=comment.message,
                                     subscription_filters=dict(user_id__in=users) if users else None,
                                     exclude_subscription_filters=dict(user_id=comment.author_id))
+
