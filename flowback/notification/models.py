@@ -118,7 +118,7 @@ class NotificationSubscription(BaseModel):
 class NotificationSubscriptionTag(BaseModel):
     subscription = models.ForeignKey('notification.NotificationSubscription', on_delete=models.CASCADE)
     name = models.CharField(max_length=255)
-    reminders = ArrayField(models.IntegerField(), help_text='Reminder times for the given tag', null=True, blank=True)
+    reminders = ArrayField(models.PositiveIntegerField(), help_text='Reminder times for the given tag', null=True, blank=True)
 
     class Meta:
         unique_together = ('subscription', 'name')
@@ -135,14 +135,14 @@ class NotificationSubscriptionTag(BaseModel):
         if (created and instance.reminders is not None) or 'reminders' in update_fields:
             Notification.objects.filter(
                 ~Q(reminder=0),
-                user=instance.subscription.user,
+                user=instance.schedule_user.user,
                 notification_object__tag=instance.name
             ).annotate(ts=ExpressionWrapper(F('notification_object__timestamp') - F('reminder') * timedelta(seconds=1),
                               output_field=models.DateTimeField())
                        ).filter(ts__lte=timezone.now()).delete()
 
             notification_objects = NotificationObject.objects.filter(tag=instance.name,
-                                                                     notification__user=instance.subscription.user)
+                                                                     notification__user=instance.schedule_user.user)
 
             # Add new reminders if any
             if instance.reminders and len(instance.reminders) > 0:
@@ -150,7 +150,7 @@ class NotificationSubscriptionTag(BaseModel):
                 for notification_object in notification_objects:
                     for i in instance.reminders:
                         if notification_object.timestamp - timedelta(seconds=i) > timezone.now():
-                            notifications.append(Notification(user=instance.subscription.user,
+                            notifications.append(Notification(user=instance.schedule_user.user,
                                                               notification_object=notification_object,
                                                               reminder=i))
 
@@ -202,6 +202,13 @@ class NotificationChannel(BaseModel, TreeNode):
             return tag_fields
 
         return None
+
+    def get_subscriber(self, user) -> NotificationSubscription | None:
+        try:
+            return NotificationSubscription.objects.get(channel=self, user=user)
+
+        except NotificationSubscription.DoesNotExist:
+            return None
 
     # Grabs the notification_data property from content_object (if any)
     @property
@@ -325,7 +332,7 @@ class NotificationChannel(BaseModel, TreeNode):
         ]
 
     def subscribe(self, *, user,
-                  tags: tuple[str] = None,
+                  tags: tuple[str] | list[str] = None,
                   reminders: tuple[None | tuple[int]] = None) -> NotificationSubscription | None:
         """
         Subscribes user to the channel.
@@ -363,7 +370,8 @@ class NotificationChannel(BaseModel, TreeNode):
             if rem and any([r is not None and r == 0 for r in rem]):
                 raise ValidationError('Reminders cannot be set to 0')
 
-            subscription_tags.append(NotificationSubscriptionTag(name=tag, reminders=rem))
+            rem = {} if not rem else dict(reminders=rem)
+            subscription_tags.append(NotificationSubscriptionTag(name=tag, **rem))
 
         subscription, created = NotificationSubscription.objects.update_or_create(user=user,
                                                                                   channel=self)
@@ -376,6 +384,9 @@ class NotificationChannel(BaseModel, TreeNode):
         NotificationSubscriptionTag.objects.bulk_create(subscription_tags)
 
         return subscription
+
+    def unsubscribe(self, *, user):
+        self.subscribe(user=user)
 
     def unsubscribe_all(self, *, user):
         """

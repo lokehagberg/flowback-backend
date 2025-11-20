@@ -46,8 +46,8 @@ class PollProposalListAPI(APIView):
         score = serializers.IntegerField()
 
     class OutputSerializerTypeSchedule(OutputSerializer):
-        start_date = serializers.DateTimeField(source='pollproposaltypeschedule.event.start_date')
-        end_date = serializers.DateTimeField(source='pollproposaltypeschedule.event.end_date')
+        start_date = serializers.DateTimeField(source='pollproposaltypeschedule.event_start_date')
+        end_date = serializers.DateTimeField(source='pollproposaltypeschedule.event_end_date')
 
     def get(self, request, poll: int = None):
         poll = get_object(Poll, id=poll)
@@ -68,8 +68,7 @@ class PollProposalListAPI(APIView):
             serializer_class=output_serializer,
             queryset=proposals,
             request=request,
-            view=self
-        )
+            view=self)
 
 
 @extend_schema(tags=['poll/proposal'])

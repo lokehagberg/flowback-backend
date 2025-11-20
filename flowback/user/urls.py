@@ -3,6 +3,8 @@ from rest_framework.authtoken import views
 
 from backend.settings import FLOWBACK_DISABLE_DEFAULT_USER_REGISTRATION
 from flowback.user.views.report import ReportCreateAPI
+from flowback.user.views.schedule import UserScheduleEventCreateAPI, UserScheduleEventUpdateAPI, \
+    UserScheduleEventDeleteAPI
 from flowback.user.views.user import (UserCreateApi,
                                       UserCreateVerifyApi,
                                       UserListApi,
@@ -13,10 +15,6 @@ from flowback.user.views.user import (UserCreateApi,
                                       UserForgotPasswordVerifyApi, UserGetChatChannelAPI, UserChatInviteListAPI,
                                       UserChatInviteAPI, UserLogoutAPI, UserLeaveChatChannelAPI,
                                       UserChatChannelUpdateAPI, UserNotificationSubscribeAPI)
-from flowback.user.views.schedule import (UserScheduleEventListAPI,
-                                          UserScheduleEventCreateAPI,
-                                          UserScheduleEventUpdateAPI,
-                                          UserScheduleEventDeleteAPI, UserScheduleUnsubscribeAPI)
 from flowback.user.views.kanban import (UserKanbanEntryListAPI,
                                         UserKanbanEntryCreateAPI,
                                         UserKanbanEntryUpdateAPI,
@@ -37,16 +35,14 @@ user_patterns = [
          UserNotificationSubscribeAPI.as_view(),
          name='user_notification_subscribe'),
 
-    path('user/schedule', UserScheduleEventListAPI.as_view(), name='user_schedule'),
-    path('user/schedule/create', UserScheduleEventCreateAPI.as_view(), name='user_schedule_create'),
-    path('user/schedule/update', UserScheduleEventUpdateAPI.as_view(), name='user_schedule_update'),
-    path('user/schedule/delete', UserScheduleEventDeleteAPI.as_view(), name='user_schedule_delete'),
-    path('user/schedule/unsubscribe', UserScheduleUnsubscribeAPI.as_view(), name='user_schedule_unsubscribe'),
-
     path('user/kanban/entry/list', UserKanbanEntryListAPI.as_view(), name='user_kanban_entry'),
     path('user/kanban/entry/create', UserKanbanEntryCreateAPI.as_view(), name='user_kanban_entry_create'),
     path('user/kanban/entry/update', UserKanbanEntryUpdateAPI.as_view(), name='user_kanban_entry_update'),
     path('user/kanban/entry/delete', UserKanbanEntryDeleteAPI.as_view(), name='user_kanban_entry_delete'),
+
+    path('user/schedule/event/create', UserScheduleEventCreateAPI.as_view(), name='user_schedule_event_create'),
+    path('user/schedule/event/update', UserScheduleEventUpdateAPI.as_view(), name='user_schedule_event_update'),
+    path('user/schedule/event/delete', UserScheduleEventDeleteAPI.as_view(), name='user_schedule_event_delete'),
 
     path('user/home', UserHomeFeedAPI.as_view(), name='user_home_feed'),
     path('user/chat', UserGetChatChannelAPI.as_view(), name='user_get_chat_channel'),

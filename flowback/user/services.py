@@ -15,11 +15,9 @@ from flowback.chat.services import message_channel_create, message_channel_join
 from flowback.common.services import model_update, get_object
 from flowback.kanban.services import KanbanManager
 from flowback.notification.models import NotificationChannel
-from flowback.schedule.models import ScheduleEvent
-from flowback.schedule.services import ScheduleManager, unsubscribe_schedule
+from flowback.schedule.services import schedule_event_create, schedule_event_update, schedule_event_delete
 from flowback.user.models import User, OnboardUser, PasswordReset, Report, UserChatInvite
 
-user_schedule = ScheduleManager(schedule_origin_name='user')
 user_kanban = KanbanManager(origin_type='user')
 
 
@@ -148,55 +146,12 @@ def user_delete(*, user_id: int) -> None:
         user.full_clean()
         user.save()
 
-        user.schedule.delete()
         user.kanban.delete()
         OnboardUser.objects.filter(email=user.email).delete()
 
 
 def user_notification_subscribe(*, user: User, **kwargs):
     user.notification_channel.subscribe(user=user, **kwargs)
-
-
-def user_schedule_event_create(*,
-                               user_id: int,
-                               title: str,
-                               description: str = None,
-                               start_date: timezone.datetime,
-                               end_date: timezone.datetime = None,
-                               repeat_frequency: str = None,
-                               reminders: list[int] = None,
-                               **kwargs
-                               ) -> ScheduleEvent:
-    user = get_object(User, id=user_id)
-    return user_schedule.create_event(schedule_id=user.schedule.id,
-                                      title=title,
-                                      start_date=start_date,
-                                      end_date=end_date,
-                                      origin_id=user.id,
-                                      origin_name='user',
-                                      description=description,
-                                      repeat_frequency=repeat_frequency,
-                                      reminders=reminders)
-
-
-def user_schedule_event_update(*, user_id: int, event_id: int, **data):
-    user = get_object(User, id=user_id)
-    user_schedule.update_event(event_id=event_id, schedule_origin_id=user.id, data=data)
-
-
-def user_schedule_event_delete(*, user_id: int, event_id: int):
-    user = get_object(User, id=user_id)
-    user_schedule.delete_event(event_id=event_id, schedule_origin_id=user.id)
-
-
-def user_schedule_unsubscribe(*,
-                              user_id: int,
-                              target_type: str,
-                              target_id: int):
-    user = get_object(User, id=user_id)
-    schedule = user_schedule.get_schedule(origin_id=user_id)
-    target_schedule = user_schedule.get_schedule(origin_name=target_type, origin_id=target_id)
-    unsubscribe_schedule(schedule_id=schedule.id, target_id=target_schedule.id)
 
 
 def user_kanban_entry_create(*,
@@ -356,3 +311,18 @@ def report_create(*, user_id: int, title: str, description: str, group_id: int, 
     report.save()
 
     return report
+
+
+def user_schedule_event_create(user: User, **data):
+    data['schedule_id'] = user.schedule.id
+    return schedule_event_create(created_by=user, **data)
+
+
+def user_schedule_event_update(user: User, **data):
+    data['schedule_id'] = user.schedule.id
+    return schedule_event_update(**data)
+
+
+def user_schedule_event_delete(user: User, **data):
+    data['schedule_id'] = user.schedule.id
+    return schedule_event_delete(**data)

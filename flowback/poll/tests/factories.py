@@ -1,5 +1,7 @@
 import factory
 from django.utils import timezone
+from future.backports.datetime import timedelta
+
 from flowback.common.tests import fake
 from flowback.group.tests.factories import GroupUserFactory, GroupUserDelegatePoolFactory, GroupTagsFactory
 
@@ -19,7 +21,6 @@ from flowback.poll.models import (Poll,
                                   PollAreaStatementSegment,
                                   PollAreaStatementVote)
 from flowback.poll.tests.utils import generate_poll_phase_kwargs
-from flowback.schedule.tests.factories import ScheduleEventFactory
 
 
 class PollFactory(factory.django.DjangoModelFactory):
@@ -64,11 +65,9 @@ class PollProposalTypeScheduleFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = PollProposalTypeSchedule
 
+    event_start_date = factory.LazyAttribute(lambda _: timezone.now() + timedelta(days=1))
+    event_end_date = factory.LazyAttribute(lambda _: timezone.now() + timedelta(days=2))
     proposal = factory.SubFactory(PollProposalFactory, poll__poll_type=3)
-    event = factory.SubFactory(ScheduleEventFactory,
-                               schedule=factory.SelfAttribute('..proposal.poll.polltypeschedule.schedule'),
-                               origin_id=factory.SelfAttribute('..proposal.id'),
-                               origin_name=factory.SelfAttribute('..proposal.schedule_origin'))
 
 
 class PollVotingFactory(factory.django.DjangoModelFactory):

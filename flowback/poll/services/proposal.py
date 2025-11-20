@@ -5,9 +5,6 @@ from flowback.files.services import upload_collection
 from flowback.group.selectors.permission import group_user_permissions
 from flowback.poll.models import PollProposal, Poll, PollProposalTypeSchedule
 
-# TODO proposal can be created without schedule, dangerous
-from flowback.schedule.models import ScheduleEvent
-
 
 def poll_proposal_create(*, user_id: int,
                          poll_id: int,
@@ -46,18 +43,9 @@ def poll_proposal_create(*, user_id: int,
         if not (data.get('start_date') and data.get('end_date')):
             raise Exception('Missing start_date and/or end_date, for proposal schedule creation')
 
-        event = ScheduleEvent(schedule=poll.polltypeschedule.schedule,
-                              title=f"group_poll_{poll_id}_event",
-                              start_date=data['start_date'],
-                              end_date=data['end_date'],
-                              origin_name=PollProposal.schedule_origin,
-                              origin_id=proposal.id)
-
-        event.full_clean()
-        event.save()
-
         schedule_proposal = PollProposalTypeSchedule(proposal=proposal,
-                                                     event=event)
+                                                     event_start_date=data['start_date'],
+                                                     event_end_date=data['end_date'])
 
         try:
             schedule_proposal.full_clean()

@@ -6,7 +6,6 @@ from django.db.models import Q
 from django.db.models.signals import post_save, post_delete, pre_save
 from django.forms import model_to_dict
 from rest_framework.exceptions import ValidationError
-from sphinx.ext.autodoc.preserve_defaults import update_defvalue
 
 from backend.settings import FLOWBACK_DEFAULT_GROUP_JOIN
 from flowback.chat.models import MessageChannel, MessageChannelParticipant
@@ -15,7 +14,7 @@ from flowback.common.models import BaseModel
 from flowback.files.models import FileCollection
 from flowback.kanban.models import Kanban, KanbanSubscription
 from flowback.notification.models import NotifiableModel, NotificationChannel
-from flowback.schedule.models import Schedule
+from flowback.schedule.models import ScheduleModel
 from flowback.user.models import User
 from django.db import models
 
@@ -66,7 +65,7 @@ class GroupPermissions(BaseModel):
         return ['id', 'created_at', 'updated_at', 'role_name', 'author']
 
 
-class Group(BaseModel, NotifiableModel):
+class Group(BaseModel, NotifiableModel, ScheduleModel):
     created_by = models.ForeignKey(User, on_delete=models.CASCADE)
     active = models.BooleanField(default=True)
 
@@ -90,7 +89,6 @@ class Group(BaseModel, NotifiableModel):
     hide_poll_users = models.BooleanField(default=False)  # Hides users in polls, TODO remove bool from views
     poll_phase_minimum_space = models.IntegerField(default=0)  # The minimum space between poll phases (in seconds)
     default_quorum = models.IntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(100)])
-    schedule = models.ForeignKey(Schedule, null=True, blank=True, on_delete=models.PROTECT)
     kanban = models.ForeignKey(Kanban, null=True, blank=True, on_delete=models.PROTECT)
     chat = models.ForeignKey(MessageChannel, on_delete=models.PROTECT)
     group_folder = models.ForeignKey(GroupFolder, null=True, blank=True, on_delete=models.SET_NULL)
@@ -177,20 +175,6 @@ class Group(BaseModel, NotifiableModel):
 
         return self.notification_channel.notify(**params)
 
-    def notify_schedule_event(self, *,
-                              message: str,
-                              action: NotificationChannel.Action,
-                              schedule_event_id: int,
-                              schedule_event_title: str,
-                              work_group_id: int = None,
-                              work_group_name: str = None,
-                              subscription_filters: dict = None):
-        """Notifies about new schedule events"""
-        params = locals()
-        params.pop('self')
-
-        return self.notification_channel.notify(**params)
-
     # Signals
     @classmethod
     def pre_save(cls, instance, raw, using, update_fields, *args, **kwargs):
@@ -202,9 +186,6 @@ class Group(BaseModel, NotifiableModel):
     @classmethod
     def post_save(cls, instance, created, update_fields, *args, **kwargs):
         if created:
-            schedule = Schedule(name=instance.name, origin_name='group', origin_id=instance.id)
-            schedule.save()
-
             kanban = Kanban(name=instance.name, origin_type='group', origin_id=instance.id)
             kanban.save()
 
@@ -212,7 +193,6 @@ class Group(BaseModel, NotifiableModel):
             default_permission.save()
             instance.default_permission = default_permission
 
-            instance.schedule = schedule
             instance.kanban = kanban
             instance.save()
 
@@ -222,15 +202,16 @@ class Group(BaseModel, NotifiableModel):
                                    is_admin=True)
             group_user.save()
 
+            instance.kanban = kanban
+            instance.save()
+
         if update_fields:
             if not all(isinstance(field, str) for field in update_fields):
                 update_fields = [field.name for field in update_fields]
 
             if 'name' in update_fields:
                 instance.chat.title = instance.name
-                instance.schedule.name = instance.name
                 instance.kanban.name = instance.name
-                instance.schedule.save()
                 instance.kanban.save()
                 instance.chat.save()
 
@@ -250,7 +231,6 @@ class Group(BaseModel, NotifiableModel):
 
     @classmethod
     def post_delete(cls, instance, *args, **kwargs):
-        instance.schedule.delete()
         instance.kanban.delete()
         instance.chat.delete()
 
@@ -315,7 +295,6 @@ class GroupUser(BaseModel):
 
     @classmethod
     def post_save(cls, instance, created, update_fields, *args, **kwargs):
-        print(update_fields, args, kwargs)
         if created:
             subscription = KanbanSubscription(kanban_id=instance.user.kanban_id, target_id=instance.group.kanban_id)
             subscription.save()
@@ -360,7 +339,7 @@ post_delete.connect(GroupUser.post_delete, sender=GroupUser)
 
 
 # Work Group in Flowback
-class WorkGroup(BaseModel):
+class WorkGroup(BaseModel, ScheduleModel):
     name = models.CharField(max_length=255)
     direct_join = models.BooleanField(default=False)
     group = models.ForeignKey(Group, on_delete=models.CASCADE)

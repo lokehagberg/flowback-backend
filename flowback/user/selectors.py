@@ -1,15 +1,12 @@
 import django_filters
 from django.db import models
-from django.db.models import OuterRef, Q, Exists, Subquery, Count, F
+from django.db.models import OuterRef, Q, Exists, Subquery, F
 from django_filters import FilterSet
 from rest_framework.exceptions import ValidationError
 
-from flowback.comment.models import Comment
 from flowback.common.filters import NumberInFilter
-from flowback.common.services import get_object
 from flowback.group.models import Group, GroupUser, GroupThread, GroupThreadVote
-from flowback.poll.models import Poll, PollPredictionStatement, PollVoting
-from flowback.schedule.selectors import schedule_event_list
+from flowback.poll.models import Poll, PollVoting
 from flowback.kanban.selectors import kanban_entry_list
 from flowback.user.models import User, UserChatInvite
 from backend.settings import env
@@ -49,11 +46,6 @@ def get_user(fetched_by: User, user_id: int = None):
     else:
         return user_to_dict(user, ('id', 'username', 'profile_image',
                                    'banner_image', 'public_status', 'chat_status'))
-
-
-def user_schedule_event_list(*, fetched_by: User, filters=None):
-    filters = filters or {}
-    return schedule_event_list(schedule_id=fetched_by.schedule.id, filters=filters)
 
 
 def user_kanban_entry_list(*, fetched_by: User, filters=None):
