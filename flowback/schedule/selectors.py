@@ -49,7 +49,7 @@ def schedule_event_list(*, user: User, filters=None):
                                                            schedule_tag=OuterRef('tag'))
 
     qs = ScheduleEvent.objects.filter(
-        scheduleeventsubscription__schedule_user__user=user
+        schedule__schedule_user__user=user
     ).annotate(reminders=Subquery(subscription_qs.values('reminders')),
                user_tags=Subquery(subscription_qs.values('tags')),
                locked=Subquery(subscription_qs.values('locked')),

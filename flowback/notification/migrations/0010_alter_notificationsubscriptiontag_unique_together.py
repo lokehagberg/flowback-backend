@@ -17,7 +17,6 @@ def trim_subscription_tags(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ('notification', '0009_alter_notification_unique_together_and_more'),
     ]
