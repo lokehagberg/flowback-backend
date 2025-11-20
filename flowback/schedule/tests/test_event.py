@@ -8,14 +8,13 @@ This test suite covers:
 - Schedule Event Serializers (FilterSerializer, InputSerializer, OutputSerializer)
 """
 
-import json
 from datetime import timedelta
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from flowback.common.tests import generate_request
-from flowback.schedule.models import ScheduleUser, ScheduleEventSubscription, ScheduleTagSubscription
+from flowback.schedule.models import ScheduleEventSubscription, ScheduleEvent
 from flowback.schedule.selectors import schedule_event_list
 from flowback.schedule.services import schedule_event_subscribe, schedule_event_unsubscribe
 from flowback.schedule.tests.factories import (ScheduleEventFactory, ScheduleUserFactory,
@@ -24,7 +23,7 @@ from flowback.schedule.tests.factories import (ScheduleEventFactory, ScheduleUse
 from flowback.schedule.views import (ScheduleEventListAPI,
                                      ScheduleEventSubscribeAPI, ScheduleEventUnsubscribeAPI)
 from flowback.user.tests.factories import UserFactory
-from flowback.group.tests.factories import GroupFactory
+from flowback.group.tests.factories import GroupFactory, GroupUserFactory
 
 
 class ScheduleEventAPITest(APITestCase):
@@ -65,7 +64,7 @@ class ScheduleEventAPITest(APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data['count'], 1)  # Only subscribed events
+        self.assertEqual(response.data['count'], 2)  # Only subscribed events
 
         # Verify output serializer fields
         result = response.data['results'][0]
@@ -253,6 +252,126 @@ class ScheduleEventSelectorTest(APITestCase):
         events = schedule_event_list(user=self.user1, filters=filters)
         self.assertEqual(events.count(), 1)
 
+    def test_schedule_event_list_selector_origin_filters(self):
+        """Filter by origin (event owner) and schedule origin fields"""
+        # Each factory-created schedule/event uses Group as origin
+        event = ScheduleEventFactory.create(
+            schedule=self.group1.schedule,
+            tag=self.tag1
+        )
+
+        # Filter by event origin
+        filters = {'origin_name': 'group', 'origin_ids': str(event.object_id)}
+        events = schedule_event_list(user=self.user1, filters=filters)
+        self.assertIn(event.id, list(events.values_list('id', flat=True)))
+
+        # Filter by schedule origin
+        filters = {'schedule_origin_name': 'group', 'schedule_origin_id': str(self.group1.id)}
+        events = schedule_event_list(user=self.user1, filters=filters)
+        self.assertTrue(all(e.schedule_id == self.group1.schedule.id for e in events))
+
+    def test_schedule_event_list_selector_description_and_tagname_filters(self):
+        """description icontains and tag_name exact/contains should work"""
+        event = ScheduleEventFactory.create(
+            schedule=self.group1.schedule,
+            tag=self.tag1,
+            description='Quarterly planning meeting to discuss goals'
+        )
+
+        # description icontains
+        events = schedule_event_list(user=self.user1, filters={'description__icontains': 'planning'})
+        self.assertIn(event.id, list(events.values_list('id', flat=True)))
+
+        # tag_name exact
+        events = schedule_event_list(user=self.user1, filters={'tag_name': 'meeting'})
+        self.assertIn(event.id, list(events.values_list('id', flat=True)))
+
+        # tag_name icontains
+        events = schedule_event_list(user=self.user1, filters={'tag_name': self.tag1.name})
+        self.assertIn(event.id, list(events.values_list('id', flat=True)))
+
+    def test_schedule_event_list_selector_assignee_and_active_filters(self):
+        """Filter by assignee_user_ids and active state"""
+        event_active = ScheduleEventFactory.create(schedule=self.group1.schedule, tag=self.tag1, active=True)
+        event_inactive = ScheduleEventFactory.create(schedule=self.group1.schedule, tag=self.tag1, active=False)
+
+        # Assign a group user to event_active
+        group_user = GroupUserFactory(group=self.group1, user=self.user1)
+        event_active.assignees.add(group_user)
+
+        # Filter by active true
+        events = schedule_event_list(user=self.user1, filters={'active': True})
+        self.assertIn(event_active.id, list(events.values_list('id', flat=True)))
+        self.assertNotIn(event_inactive.id, list(events.values_list('id', flat=True)))
+
+        # Filter by assignee_user_ids
+        events = schedule_event_list(user=self.user1, filters={'assignee_user_ids': str(self.user1.id)})
+        self.assertEqual(list(events.values_list('id', flat=True)), [event_active.id])
+
+    def test_schedule_event_list_selector_repeat_and_date_filters_and_ordering(self):
+        """repeat_frequency__isnull, date comparisons, and ordering"""
+        base = timezone.now()
+        e1 = ScheduleEventFactory.create(
+            schedule=self.group1.schedule,
+            tag=self.tag1,
+            start_date=base + timedelta(days=1),
+            end_date=base + timedelta(days=1, hours=1),
+            repeat_frequency=None,
+            title='alpha'
+        )
+        e2 = ScheduleEventFactory.create(
+            schedule=self.group1.schedule,
+            tag=self.tag1,
+            start_date=base + timedelta(days=2),
+            end_date=base + timedelta(days=2, hours=1),
+            repeat_frequency=1,
+            title='beta'
+        )
+
+        # repeat_frequency__isnull True returns e1
+        events = schedule_event_list(user=self.user1, filters={'repeat_frequency__isnull': True})
+        self.assertIn(e1.id, list(events.values_list('id', flat=True)))
+        self.assertNotIn(e2.id, list(events.values_list('id', flat=True)))
+
+        # start_date__gt filter
+        events = schedule_event_list(user=self.user1,
+                                     filters={'start_date__gt': (base + timedelta(days=1, minutes=1)).isoformat()})
+        self.assertIn(e2.id, list(events.values_list('id', flat=True)))
+        self.assertNotIn(e1.id, list(events.values_list('id', flat=True)))
+
+        # end_date__lt filter
+        events = schedule_event_list(user=self.user1, filters={'end_date__lt': (base + timedelta(days=2)).isoformat()})
+        self.assertIn(e1.id, list(events.values_list('id', flat=True)))
+        self.assertNotIn(e2.id, list(events.values_list('id', flat=True)))
+
+        # order_by start_date_desc
+        events = schedule_event_list(user=self.user1, filters={'order_by': 'start_date_desc'})
+        ids = list(events.values_list('id', flat=True))
+        self.assertGreaterEqual(len(ids), 2)
+        self.assertEqual(ids[0], e2.id)
+
+    def test_schedule_event_list_selector_subscribed_and_locked_filters(self):
+        """Filter on annotated subscribed and locked fields"""
+        # Two events on same schedule/tag
+        e1 = ScheduleEventFactory.create(schedule=self.group1.schedule, tag=self.tag1)
+        e2 = ScheduleEventFactory.create(schedule=self.group1.schedule, tag=self.tag1)
+        # User has access
+
+        # Subscribe to tag so both events are annotated subscribed=True
+        ScheduleTagSubscriptionFactory.create(schedule_user=self.schedule_user1, schedule_tag=self.tag1)
+
+        # Additionally, create an event subscription for e1 with locked=False
+        ScheduleEventSubscriptionFactory.create(event=e1, schedule_user=self.schedule_user1, locked=False)
+
+        # Filter subscribed True should include events on the subscribed tag
+        events = schedule_event_list(user=self.user1, filters={'subscribed': True})
+        ids = set(events.values_list('id', flat=True))
+        self.assertTrue({e1.id, e2.id}.issubset(ids))
+
+        # locked False should only include e1 due to explicit event subscription with locked False
+        events = schedule_event_list(user=self.user1, filters={'locked': False})
+        self.assertEqual(list(events.values_list('id', flat=True)), [e1.id])
+
 
 class ScheduleEventServiceTest(APITestCase):
     """Test Schedule Event Services"""
@@ -352,10 +471,10 @@ class ScheduleEventSerializerTest(APITestCase):
 
         # Verify all output fields
         expected_fields = ['id', 'schedule_id', 'title', 'description', 'start_date',
-                          'end_date', 'active', 'meeting_link', 'repeat_frequency',
-                          'tag_id', 'tag_name', 'origin_name', 'origin_id',
-                          'schedule_origin_name', 'schedule_origin_id', 'assignees',
-                          'reminders', 'user_tags', 'locked', 'subscribed']
+                           'end_date', 'active', 'meeting_link', 'repeat_frequency',
+                           'tag_id', 'tag_name', 'origin_name', 'origin_id',
+                           'schedule_origin_name', 'schedule_origin_id', 'assignees',
+                           'reminders', 'user_tags', 'locked', 'subscribed']
         for field in expected_fields:
             self.assertIn(field, result)
 
