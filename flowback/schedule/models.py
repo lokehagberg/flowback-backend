@@ -62,31 +62,41 @@ class Schedule(BaseModel):
 
         return event
 
-    def add_user(self, user):
+    def add_user(self, user, raise_exception: bool = False):
         """
         Add user to schedule
         :param user: User to be added
+        :param raise_exception: Raises VaildationError if user is subscribed
         :return: ScheduleUser object
         """
         with transaction.atomic():
-            schedule_user = ScheduleUser(user=user, schedule=self)
-            schedule_user.full_clean()
-            schedule_user.save()
+            if not ScheduleUser.objects.filter(user=user, schedule=self).exists():
+                schedule_user = ScheduleUser(user=user, schedule=self)
+                schedule_user.full_clean()
+                schedule_user.save()
 
-            return schedule_user
+                return schedule_user
 
-    def remove_user(self, user) -> None:
+            elif raise_exception:
+                raise ValidationError("User is already added to this schedule.")
+
+        return None
+
+    def remove_user(self, user, raise_exception: bool = False) -> None:
         """
         Remove user from schedule
         :param user: User to be removed
+        :param raise_exception: Raises VaildationError if user is unsubscribed
         :return: None
         """
         with transaction.atomic():
             schedule_user = ScheduleUser.objects.filter(user=user, schedule=self).first()
             if schedule_user:
                 schedule_user.delete()
-            else:
+            elif raise_exception:
                 raise ValidationError("User is not added to this schedule.")
+
+            return None
 
     def subscribe_new_tags(self, user, reminders: list[int] = None):
         """

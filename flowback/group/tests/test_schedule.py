@@ -8,7 +8,7 @@ from flowback.group.tests.factories import (GroupFactory, GroupUserFactory, Work
 from flowback.group.views.schedule import (GroupScheduleEventCreateAPI, GroupScheduleEventUpdateAPI,
                                            GroupScheduleEventDeleteAPI, WorkGroupScheduleEventCreateAPI,
                                            WorkGroupScheduleEventUpdateAPI, WorkGroupScheduleEventDeleteAPI)
-from flowback.schedule.models import ScheduleEvent, ScheduleEventSubscription
+from flowback.schedule.models import ScheduleEvent, ScheduleEventSubscription, ScheduleUser
 from flowback.schedule.tests.factories import ScheduleEventFactory, ScheduleUserFactory
 from flowback.schedule.views import ScheduleEventSubscribeAPI, ScheduleEventUnsubscribeAPI
 from flowback.user.tests.factories import UserFactory
@@ -492,9 +492,6 @@ class TestScheduleIntegration(APITestCase):
             group_user=self.group_user
         )
 
-        # Create schedule users for testing subscriptions
-        self.schedule_user = ScheduleUserFactory(user=self.user, schedule=self.group.schedule)
-
     def test_group_schedule_event_appears_in_schedule(self):
         """Created group schedule events should appear in the group's schedule"""
         # Create event
@@ -556,7 +553,7 @@ class TestScheduleIntegration(APITestCase):
         self.assertTrue(
             ScheduleEventSubscription.objects.filter(
                 event=event,
-                schedule_user=self.schedule_user
+                schedule_user__user=self.user
             ).exists()
         )
 
@@ -566,7 +563,7 @@ class TestScheduleIntegration(APITestCase):
         event = ScheduleEventFactory(schedule=self.group.schedule)
         subscription = ScheduleEventSubscription.objects.create(
             event=event,
-            schedule_user=self.schedule_user,
+            schedule_user=ScheduleUser.objects.get(user=self.user, schedule=self.group.schedule),
             locked=True
         )
 
@@ -586,7 +583,7 @@ class TestScheduleIntegration(APITestCase):
         self.assertFalse(
             ScheduleEventSubscription.objects.filter(
                 event=event,
-                schedule_user=self.schedule_user
+                schedule_user__user=self.user
             ).exists()
         )
 

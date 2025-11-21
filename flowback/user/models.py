@@ -118,6 +118,7 @@ class User(AbstractBaseUser, PermissionsMixin, NotifiableModel, ScheduleModel):
     @classmethod
     def post_save(cls, instance, created, update_fields, **kwargs):
         if created:
+            instance.schedule.add_user(user=instance)
             kanban = Kanban(name=instance.username, origin_type='user', origin_id=instance.id)
             kanban.save()
 
