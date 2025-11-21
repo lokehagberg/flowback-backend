@@ -234,10 +234,10 @@ class ScheduleEventLazyCreateAPI(APIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
-        if kwargs.get('schedule_id'):
-            data = kwargs.get('schedule_id')
-
-        self.lazy_action.__func__(user=request.user, **data)
+        self.lazy_action.__func__(*args,
+                                  user=request.user,
+                                  **kwargs,
+                                  **data)
 
         return Response(status=status.HTTP_200_OK)
 
@@ -261,8 +261,9 @@ class ScheduleEventLazyUpdateAPI(APIView):
         serializer = self.InputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        self.lazy_action.__func__(user=request.user,
-                                  schedule_id=kwargs.get('schedule_id'),
+        self.lazy_action.__func__(*args,
+                                  user=request.user,
+                                  **kwargs,
                                   **serializer.validated_data)
 
         return Response(status=status.HTTP_200_OK)
@@ -278,7 +279,8 @@ class ScheduleEventLazyDeleteAPI(APIView):
         serializer = self.InputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        self.lazy_action.__func__(user=request.user,
-                                  schedule_id=kwargs.get('schedule_id'),
+        self.lazy_action.__func__(*args,
+                                  user=request.user,
+                                  **kwargs,
                                   **serializer.validated_data)
         return Response(status=status.HTTP_200_OK)

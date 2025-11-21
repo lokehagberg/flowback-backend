@@ -10,7 +10,7 @@ class GroupPermissionTest(APITestCase):
     def setUp(self):
         self.group = GroupFactory()
         self.group_creator = GroupUser.objects.get(user=self.group.created_by, group=self.group)
-        self.group_user = GroupUserFactory(group=self.group)
+        self.group_user = GroupUserFactory(group=self.group, is_admin=False)
 
     def test_group_permission(self):
         # Test regular permission

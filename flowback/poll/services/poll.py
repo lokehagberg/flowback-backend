@@ -27,6 +27,7 @@ def poll_create(*, user_id: int,
                 prediction_bet_end_date: datetime = None,
                 delegate_vote_end_date: datetime = None,
                 vote_end_date: datetime = None,
+                schedule_poll_meeting_link: str = None,
                 end_date: datetime = None,
                 poll_type: int,
                 allow_fast_forward: bool = False,
@@ -94,6 +95,7 @@ def poll_create(*, user_id: int,
                 public=public,
                 tag_id=tag,
                 pinned=pinned,
+                schedule_poll_meeting_link=schedule_poll_meeting_link,
                 dynamic=dynamic,
                 quorum=quorum,
                 work_group_id=work_group_id,
@@ -120,7 +122,7 @@ def poll_update(*, user_id: int, poll_id: int, data) -> Poll:
     poll = get_object(Poll, id=poll_id)
     group_user = group_user_permissions(user=user_id, group=poll.created_by.group.id)
 
-    non_side_effect_fields = ['title', 'description', 'pinned']
+    non_side_effect_fields = ['title', 'description', 'pinned', 'schedule_poll_meeting_link']
 
     if data.get('pinned') is None:
         data.pop('pinned')

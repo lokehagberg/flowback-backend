@@ -45,6 +45,10 @@ class GroupPermissions(BaseModel):
     update_proposal = models.BooleanField(default=True)
     delete_proposal = models.BooleanField(default=True)
 
+    schedule_event_create = models.BooleanField(default=False)
+    schedule_event_update = models.BooleanField(default=False)
+    schedule_event_delete = models.BooleanField(default=False)
+
     prediction_statement_create = models.BooleanField(default=True)
     prediction_statement_delete = models.BooleanField(default=True)
 

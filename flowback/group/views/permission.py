@@ -47,6 +47,10 @@ class GroupPermissionListApi(APIView):
                       'prediction_bet_update',
                       'prediction_bet_delete',
 
+                      'schedule_event_create',
+                      'schedule_event_update',
+                      'schedule_event_delete',
+
                       'create_kanban_task',
                       'update_kanban_task',
                       'delete_kanban_task',

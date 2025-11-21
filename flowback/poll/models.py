@@ -68,6 +68,7 @@ class Poll(BaseModel, NotifiableModel):
 
     blockchain_id = models.PositiveIntegerField(null=True, blank=True, default=None)
     work_group = models.ForeignKey(WorkGroup, on_delete=models.CASCADE, null=True, blank=True)
+    schedule_poll_meeting_link = models.URLField(null=True, blank=True)
 
     """
     Poll Status Code

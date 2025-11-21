@@ -70,6 +70,9 @@ def group_user_permissions(*,
     if 'work_group_moderator' in permissions:
         work_group_moderator_check = True
 
+    # TODO badly made, admin takes always priority,
+    #  if workgroup then workgroup moderator takes priority,
+    #  finally regular permissions gets checked.
     validated_permissions = any([user_permissions.get(key, False) for key in permissions]) or not permissions
     if not validated_permissions and not (admin and allow_admin):
         if raise_exception:

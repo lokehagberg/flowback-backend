@@ -1,5 +1,7 @@
 from datetime import datetime
+from unittest import skip
 
+from django.contrib.contenttypes.models import ContentType
 from rest_framework.test import APITestCase
 from rest_framework.exceptions import ValidationError
 from .factories import (PollFactory, PollProposalFactory, PollVotingFactory, PollDelegateVotingFactory,
@@ -214,13 +216,13 @@ class PollVoteTest(APITestCase):
         self.assertEqual(self.poll_schedule_proposal_two.score, 2)
         self.assertEqual(self.poll_schedule_proposal_three.score, 3)
 
-        event = self.poll_schedule.created_by.group.schedule.scheduleevent_set.get(
-            origin_name=self.poll_schedule.schedule_origin,
-            origin_id=self.poll_schedule.id)
+        event = self.poll_schedule.created_by.group.schedule.scheduleevent_set.get(content_type=ContentType.objects.get_for_model(Poll),
+                                                                                   object_id=self.poll_schedule.id)
 
-        self.assertEqual(event.start_date, self.poll_schedule_proposal_three.pollproposaltypeschedule.event.start_date)
-        self.assertEqual(event.end_date, self.poll_schedule_proposal_three.pollproposaltypeschedule.event.end_date)
+        self.assertEqual(event.start_date, self.poll_schedule_proposal_three.pollproposaltypeschedule.event_start_date)
+        self.assertEqual(event.end_date, self.poll_schedule_proposal_three.pollproposaltypeschedule.event_end_date)
 
+    @skip("Only test separately, it takes a lot of time.")
     def test_hundreds_of_polls_vote_count(self):
         """Test poll_proposal_vote_count with hundreds of Schedule and Cardinal polls with proposals, votes and delegate votes"""
         
