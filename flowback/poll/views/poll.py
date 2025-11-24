@@ -111,6 +111,7 @@ class PollListApi(APIView):
                       'start_date',
                       'proposal_end_date',
                       'prediction_statement_end_date',
+                      'schedule_poll_meeting_link',
                       'area_vote_end_date',
                       'prediction_bet_end_date',
                       'delegate_vote_end_date',
@@ -176,6 +177,7 @@ class PollCreateAPI(APIView):
                       'delegate_vote_end_date',
                       'vote_end_date',
                       'end_date',
+                      'schedule_poll_meeting_link',
                       'poll_type',
                       'blockchain_id',
                       'public',
@@ -199,6 +201,7 @@ class PollUpdateAPI(APIView):
     class InputSerializer(serializers.Serializer):
         title = serializers.CharField(required=False)
         pinned = serializers.BooleanField(required=False, allow_null=True, default=None)
+        schedule_poll_meeting_link = serializers.CharField(required=False, allow_null=True)
         description = serializers.CharField(required=False)
 
     def post(self, request, poll: int):
@@ -275,8 +278,7 @@ class PollUserScheduleListAPI(APIView):
             serializer_class=self.OutputSerializer,
             queryset=proposals,
             request=request,
-            view=self
-        )
+            view=self)
 
 
 @extend_schema(tags=['poll'])

@@ -45,6 +45,10 @@ class GroupPermissions(BaseModel):
     update_proposal = models.BooleanField(default=True)
     delete_proposal = models.BooleanField(default=True)
 
+    schedule_event_create = models.BooleanField(default=False)
+    schedule_event_update = models.BooleanField(default=False)
+    schedule_event_delete = models.BooleanField(default=False)
+
     prediction_statement_create = models.BooleanField(default=True)
     prediction_statement_delete = models.BooleanField(default=True)
 
@@ -296,12 +300,15 @@ class GroupUser(BaseModel):
     @classmethod
     def post_save(cls, instance, created, update_fields, *args, **kwargs):
         if created:
+            instance.group.schedule.add_user(user=instance.user)
             subscription = KanbanSubscription(kanban_id=instance.user.kanban_id, target_id=instance.group.kanban_id)
             subscription.save()
 
 
         elif update_fields and 'active' in update_fields:
             if instance.active:
+                instance.group.schedule.add_user(user=instance.user)
+
                 subscription = KanbanSubscription(kanban_id=instance.user.kanban_id, target_id=instance.group.kanban_id)
                 subscription.save()
 
@@ -309,6 +316,8 @@ class GroupUser(BaseModel):
                 instance.chat_participant.save()
 
             else:
+                instance.group.schedule.remove_user(user=instance.user)
+
                 KanbanSubscription.objects.filter(kanban_id=instance.user.kanban_id,
                                                   target_id=instance.group.kanban_id).delete()
 
@@ -320,6 +329,7 @@ class GroupUser(BaseModel):
 
     @classmethod
     def post_delete(cls, instance, *args, **kwargs):
+        instance.schedule.remove_user(user=instance)
         KanbanSubscription.objects.filter(kanban_id=instance.user.kanban_id,
                                           target_id=instance.group.kanban_id).delete()
 
@@ -384,9 +394,16 @@ class WorkGroupUser(BaseModel):
         if invite.exists():
             invite.delete()
 
+        if instance.active:
+            instance.work_group.schedule.add_user(user=instance.group_user.user)
+
+        else:
+            instance.work_group.schedule.remove_user(user=instance.group_user.user)
+
     @classmethod
     def post_delete(cls, instance, *args, **kwargs):
         instance.chat_participant.delete()  # Leave chatroom
+        instance.work_group.schedule.remove_user(user=instance)
 
     class Meta:
         constraints = [models.UniqueConstraint(name='WorkGroupUser_group_user_and_work_group_is_unique',

@@ -140,17 +140,17 @@ def poll_prediction_bet_count(poll_id: int):
     #         except PollPredictionBet.DoesNotExist:
     #             previous_bets[j].append(None)  # If the bet does not exist, add None as a placeholder
 
-        # prediction_bets.append()
-        # print(PollPredictionBet.objects.filter(
-        #     Q(created_by=predictor,
-        #     prediction_statement__in=statements)
-        #     & ~Q(prediction_statement__poll=poll)).count())
-        #
-        # previous_bets.append(list(PollPredictionBet.objects.filter(
-        #     Q(created_by=predictor,
-        #     prediction_statement__in=statements)
-        #     & ~Q(prediction_statement__poll=poll)).order_by('-prediction_statement__poll__created_at').annotate(
-        #     real_score=Cast(F('score'), models.FloatField()) / 5).values_list('real_score', flat=True)))
+    # prediction_bets.append()
+    # print(PollPredictionBet.objects.filter(
+    #     Q(created_by=predictor,
+    #     prediction_statement__in=statements)
+    #     & ~Q(prediction_statement__poll=poll)).count())
+    #
+    # previous_bets.append(list(PollPredictionBet.objects.filter(
+    #     Q(created_by=predictor,
+    #     prediction_statement__in=statements)
+    #     & ~Q(prediction_statement__poll=poll)).order_by('-prediction_statement__poll__created_at').annotate(
+    #     real_score=Cast(F('score'), models.FloatField()) / 5).values_list('real_score', flat=True)))
 
     # Get bets
 
@@ -422,7 +422,7 @@ def poll_proposal_vote_count(poll_id: int) -> None:
     # Check if quorum is fulfilled
     total_group_users = GroupUser.objects.filter(group=group).count()
     quorum = (poll.quorum if poll.quorum is not None else group.default_quorum) / 100
-    user_participants = PollVoting.objects.filter(permission_q('created_by','allow_vote'),
+    user_participants = PollVoting.objects.filter(permission_q('created_by', 'allow_vote'),
                                                   poll=poll).count()
     delegate_participants = PollDelegateVoting.objects.filter(poll=poll).aggregate(mandate=Sum('mandate'))['mandate']
     participants = ((user_participants if user_participants is not None else 0)
@@ -448,8 +448,10 @@ def poll_proposal_vote_count(poll_id: int) -> None:
             winning_proposal = PollProposal.objects.filter(
                 poll_id=poll_id).order_by('-score', '-pollproposaltypeschedule__event_start_date').first()
             if winning_proposal:
-                group.schedule.create_event(title=poll.title,
-                                            description=poll.description,
-                                            start_date=winning_proposal.pollproposaltypeschedule.event_start_date,
-                                            end_date=winning_proposal.pollproposaltypeschedule.event_end_date,
-                                            created_by=poll)
+                schedule = group.schedule if poll.work_group is None else poll.work_group.schedule
+                schedule.create_event(title=poll.title,
+                                      description=poll.description,
+                                      meeting_link=poll.schedule_poll_meeting_link,
+                                      start_date=winning_proposal.pollproposaltypeschedule.event_start_date,
+                                      end_date=winning_proposal.pollproposaltypeschedule.event_end_date,
+                                      created_by=poll)

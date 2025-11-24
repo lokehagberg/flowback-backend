@@ -33,6 +33,12 @@ from .views.kanban import (GroupKanbanEntryListAPI,
                            GroupKanbanEntryCreateAPI,
                            GroupKanbanEntryUpdateAPI,
                            GroupKanbanEntryDeleteAPI)
+from .views.schedule import (GroupScheduleEventCreateAPI,
+                             GroupScheduleEventUpdateAPI,
+                             GroupScheduleEventDeleteAPI,
+                             WorkGroupScheduleEventCreateAPI,
+                             WorkGroupScheduleEventUpdateAPI,
+                             WorkGroupScheduleEventDeleteAPI)
 from .views.thread import (GroupThreadListAPI,
                            GroupThreadCreateAPI,
                            GroupThreadUpdateAPI,
@@ -87,6 +93,10 @@ group_patterns = [
     path('workgroup/<int:work_group_id>/user/update', WorkGroupUserUpdateAPI.as_view(), name='work_group_user_update'),
     path('workgroup/<int:work_group_id>/user/remove', WorkGroupUserRemoveAPI.as_view(), name='work_group_user_remove'),
 
+    path('workgroup/<int:work_group_id>/schedule/event/create', WorkGroupScheduleEventCreateAPI.as_view(), name='work_group_schedule_event_create'),
+    path('workgroup/<int:work_group_id>/schedule/event/update', WorkGroupScheduleEventUpdateAPI.as_view(), name='work_group_schedule_event_update'),
+    path('workgroup/<int:work_group_id>/schedule/event/delete', WorkGroupScheduleEventDeleteAPI.as_view(), name='work_group_schedule_event_delete'),
+
     path('<int:group>/permissions', GroupPermissionListApi.as_view(), name='group_permissions'),
     path('<int:group>/permission/create', GroupPermissionCreateApi.as_view(), name='group_permission_create'),
     path('<int:group>/permission/update', GroupPermissionUpdateApi.as_view(), name='group_permission_update'),
@@ -131,6 +141,10 @@ group_patterns = [
     path('<int:group_id>/kanban/entry/create', GroupKanbanEntryCreateAPI.as_view(), name='group_kanban_entry_create'),
     path('<int:group_id>/kanban/entry/update', GroupKanbanEntryUpdateAPI.as_view(), name='group_kanban_entry_update'),
     path('<int:group_id>/kanban/entry/delete', GroupKanbanEntryDeleteAPI.as_view(), name='group_kanban_entry_delete'),
+
+    path('<int:group_id>/schedule/event/create', GroupScheduleEventCreateAPI.as_view(), name='group_schedule_event_create'),
+    path('<int:group_id>/schedule/event/update', GroupScheduleEventUpdateAPI.as_view(), name='group_schedule_event_update'),
+    path('<int:group_id>/schedule/event/delete', GroupScheduleEventDeleteAPI.as_view(), name='group_schedule_event_delete'),
 
     path('thread/list', GroupThreadListAPI.as_view(), name='group_thread'),
     path('<int:group_id>/thread/create', GroupThreadCreateAPI.as_view(), name='group_thread_create'),

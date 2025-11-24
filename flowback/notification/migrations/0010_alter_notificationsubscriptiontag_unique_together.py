@@ -3,13 +3,26 @@
 from django.db import migrations
 
 
-class Migration(migrations.Migration):
+def trim_subscription_tags(apps, schema_editor):
+    NotificationSubscriptionTag = apps.get_model('notification', 'NotificationSubscriptionTag')
+    tags = NotificationSubscriptionTag.objects.all()
 
+    staged_for_deletion = []
+    for tag in tags:
+        data = NotificationSubscriptionTag.objects.filter(subscription=tag.subscription, name=tag.name)
+        if data.count() > 1:
+            staged_for_deletion += data[1:].values_list('id', flat=True)
+
+    NotificationSubscriptionTag.objects.filter(id__in=staged_for_deletion).delete()
+
+
+class Migration(migrations.Migration):
     dependencies = [
         ('notification', '0009_alter_notification_unique_together_and_more'),
     ]
 
     operations = [
+        migrations.RunPython(trim_subscription_tags),
         migrations.AlterUniqueTogether(
             name='notificationsubscriptiontag',
             unique_together={('subscription', 'name')},

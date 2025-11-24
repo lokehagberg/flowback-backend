@@ -2,14 +2,13 @@ import datetime
 import json
 
 import pgtrigger
-from celery.events import event_exchange
 from celery.schedules import crontab
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.postgres.fields import ArrayField
 from django.db import models, transaction
 from django.db.models import Q
-from django.db.models.signals import post_save, post_delete, pre_delete
+from django.db.models.signals import post_save, pre_delete
 from django.utils import timezone
 from django_celery_beat.models import PeriodicTask, CrontabSchedule
 from rest_framework.exceptions import ValidationError
@@ -17,7 +16,7 @@ from rest_framework.exceptions import ValidationError
 from flowback.common.models import BaseModel
 from django.utils.translation import gettext_lazy as _
 
-from flowback.notification.models import NotifiableModel, NotificationObject, NotificationSubscription
+from flowback.notification.models import NotifiableModel, NotificationObject
 
 
 class Schedule(BaseModel):
@@ -63,31 +62,41 @@ class Schedule(BaseModel):
 
         return event
 
-    def add_user(self, user):
+    def add_user(self, user, raise_exception: bool = False):
         """
         Add user to schedule
         :param user: User to be added
+        :param raise_exception: Raises VaildationError if user is subscribed
         :return: ScheduleUser object
         """
         with transaction.atomic():
-            schedule_user = ScheduleUser(user=user, schedule=self)
-            schedule_user.full_clean()
-            schedule_user.save()
+            if not ScheduleUser.objects.filter(user=user, schedule=self).exists():
+                schedule_user = ScheduleUser(user=user, schedule=self)
+                schedule_user.full_clean()
+                schedule_user.save()
 
-            return schedule_user
+                return schedule_user
 
-    def remove_user(self, user) -> None:
+            elif raise_exception:
+                raise ValidationError("User is already added to this schedule.")
+
+        return None
+
+    def remove_user(self, user, raise_exception: bool = False) -> None:
         """
         Remove user from schedule
         :param user: User to be removed
+        :param raise_exception: Raises VaildationError if user is unsubscribed
         :return: None
         """
         with transaction.atomic():
             schedule_user = ScheduleUser.objects.filter(user=user, schedule=self).first()
             if schedule_user:
                 schedule_user.delete()
-            else:
+            elif raise_exception:
                 raise ValidationError("User is not added to this schedule.")
+
+            return None
 
     def subscribe_new_tags(self, user, reminders: list[int] = None):
         """
@@ -165,6 +174,10 @@ class Schedule(BaseModel):
         """
         with transaction.atomic():
             events = ScheduleEvent.objects.filter(id__in=event_ids, schedule=self)
+
+            if len(event_ids) > events.count():
+                raise ValidationError("One or more events does not exist.")
+
             for event in events:
                 event.event_subscribe(user, user_tags, locked, reminders)
 
@@ -303,10 +316,10 @@ class ScheduleEvent(BaseModel, NotifiableModel):
 
     @property
     def is_live(self) -> bool:
-        """Returns whether the event has yet to begin or already begun"""
+        """Returns true if the event has yet to begin or already begun, false otherwise."""
         return (self.active
-                and self.start_date <= timezone.now() <= self.end_date
-                if self.end_date else self.start_date <= timezone.now())
+                and self.end_date >= timezone.now()
+                if self.end_date else self.active)
 
     @property
     def next_start_date(self) -> datetime.datetime:
@@ -347,7 +360,7 @@ class ScheduleEvent(BaseModel, NotifiableModel):
                         locked: bool = True,
                         reminders: list[int] = None):
         if not (self.active and self.is_live):
-            return
+            raise ValidationError("Event is not active or has already ended.")
 
         user_schedule = ScheduleUser.objects.get(schedule=self.schedule, user=user)
         ScheduleEventSubscription.objects.update_or_create(event=self,
@@ -547,7 +560,6 @@ def generate_schedule(sender, instance, created, *args, **kwargs):
         Schedule.objects.create(created_by=instance)
 
 
-# TODO implement ScheduleModel & views across the codebase, especially poll & tasks
 class ScheduleModel(models.Model):
     schedule_relations = GenericRelation(Schedule, on_delete=models.CASCADE)
 

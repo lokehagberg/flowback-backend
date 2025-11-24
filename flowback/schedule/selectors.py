@@ -13,7 +13,7 @@ class ScheduleEventBaseFilter(django_filters.FilterSet):
     schedule_origin_name = django_filters.CharFilter(field_name='schedule__content_type__model',
                                                      lookup_expr='iexact')
     schedule_origin_id = NumberInFilter(field_name='schedule__object_id')
-    origin_name = django_filters.CharFilter(field_name='content_type.model', lookup_expr='iexact')
+    origin_name = django_filters.CharFilter(field_name='content_type__model', lookup_expr='iexact')
     origin_ids = NumberInFilter(field_name='object_id')
     schedule_ids = NumberInFilter(field_name='schedule_id')
     title = django_filters.CharFilter(lookup_expr='iexact')
@@ -25,7 +25,7 @@ class ScheduleEventBaseFilter(django_filters.FilterSet):
     user_tags = django_filters.CharFilter(lookup_expr='iexact')
     subscribed = django_filters.BooleanFilter()
     locked = django_filters.BooleanFilter()
-    tag_name = django_filters.CharFilter(lookup_expr=['exact', 'icontains'], field_name='tag__name')
+    tag_name = django_filters.CharFilter(lookup_expr='iexact', field_name='tag__name')
 
     order_by = django_filters.OrderingFilter(fields=(('created_at', 'created_at_asc'),
                                                      ('-created_at', 'created_at_desc'),
@@ -49,7 +49,7 @@ def schedule_event_list(*, user: User, filters=None):
                                                            schedule_tag=OuterRef('tag'))
 
     qs = ScheduleEvent.objects.filter(
-        scheduleeventsubscription__schedule_user__user=user
+        schedule__scheduleuser__user=user
     ).annotate(reminders=Subquery(subscription_qs.values('reminders')),
                user_tags=Subquery(subscription_qs.values('tags')),
                locked=Subquery(subscription_qs.values('locked')),

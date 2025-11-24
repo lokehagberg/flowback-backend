@@ -7,6 +7,7 @@ from backend.settings import env, DEFAULT_FROM_EMAIL, FLOWBACK_ALLOW_GROUP_CREAT
 from flowback.common.services import get_object, model_update
 from flowback.group.models import Group, GroupUser, GroupPermissions, GroupUserInvite, WorkGroupUser
 from flowback.group.selectors.permission import group_user_permissions
+from flowback.schedule.services import schedule_event_create, schedule_event_update, schedule_event_delete
 from flowback.user.models import User
 
 
@@ -178,3 +179,22 @@ def group_user_delete(*, user_id: int, group_id: int, target_user_id: int) -> No
 def group_notification_subscribe(*, user: User, group_id: int, **kwargs) -> None:
     group_user = group_user_permissions(user=user, group=group_id)
     group_user.group.notification_channel.subscribe(user=user, **kwargs)
+
+
+def group_schedule_event_create(user: User, group_id: int, **data):
+    group_user = group_user_permissions(user=user, group=group_id, permissions=['admin', 'schedule_event_create'])
+    print(group_user)
+    data['schedule_id'] = group_user.group.schedule.id
+    return schedule_event_create(created_by=group_user.group.created_by, **data)
+
+
+def group_schedule_event_update(user: User, group_id: int, **data):
+    group_user = group_user_permissions(user=user, group=group_id, permissions=['admin', 'schedule_event_update'])
+    data['schedule_id'] = group_user.group.schedule.id
+    return schedule_event_update(**data)
+
+
+def group_schedule_event_delete(user: User, group_id: int, **data):
+    group_user = group_user_permissions(user=user, group=group_id, permissions=['admin', 'schedule_event_delete'])
+    data['schedule_id'] = group_user.group.schedule.id
+    return schedule_event_delete(**data)
