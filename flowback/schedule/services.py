@@ -92,11 +92,15 @@ def schedule_event_delete(*,
     :return: None
     """
     event = ScheduleEvent.objects.get(id=event_id)
+    tag = event.tag
 
-    if not event.schedule_id == schedule_id:
+    if schedule_id and not event.schedule_id == schedule_id:
         raise ValidationError("Event does not belong to the schedule")
 
     event.delete()
+
+    if event.tag.scheduleevent_set.count() == 0:
+        tag.delete()
 
 
 # Subscription services

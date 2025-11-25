@@ -43,7 +43,7 @@ class Schedule(BaseModel):
                      assignees: list[int] = None,
                      meeting_link: str = None,
                      repeat_frequency: int = None):
-        tag = ScheduleTag.objects.filter(schedule=self, name=tag).first()
+        tag = ScheduleTag.objects.get_or_create(schedule=self, name=tag)
         event = ScheduleEvent(title=title,
                               description=description,
                               start_date=start_date,
