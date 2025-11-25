@@ -68,6 +68,10 @@ class GroupPermissions(BaseModel):
     def negate_field_perms() -> list[str]:
         return ['id', 'created_at', 'updated_at', 'role_name', 'author']
 
+    class Meta:
+        verbose_name_plural = 'Group permissions'
+        verbose_name = 'Group permission'
+
 
 class Group(BaseModel, NotifiableModel, ScheduleModel):
     created_by = models.ForeignKey(User, on_delete=models.CASCADE)
@@ -255,6 +259,9 @@ class GroupTags(BaseModel):
     # interval_mean_absolute_error = models.DecimalField(max_digits=14, decimal_places=4, null=True, blank=True)
 
     class Meta:
+        verbose_name_plural = 'Group tags'
+        verbose_name = 'Group tag'
+
         unique_together = ('name', 'group')
 
 
