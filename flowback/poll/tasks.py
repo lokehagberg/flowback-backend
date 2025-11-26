@@ -1,7 +1,7 @@
 import random
 from celery import shared_task
 from django.db import models
-from django.db.models import Count, Q, Sum, OuterRef, Case, When, F, Subquery
+from django.db.models import Count, Q, Sum, OuterRef, Case, When, F, Subquery, Max
 from django.db.models.functions import Cast
 from django.utils import timezone
 
@@ -430,6 +430,9 @@ def poll_proposal_vote_count(poll_id: int) -> None:
     poll.participants = participants
     poll.save()
 
+    winning_proposal_score = PollProposal.objects.filter(poll_id=poll_id).aggregate(score=Max('score'))['score']
+    winning_proposal = PollProposal.objects.filter(poll_id=poll_id, score=winning_proposal_score).order_by('?').first()
+
     if poll.finished and not poll.result:
         print(f"Total Participants: {participants}")
         print(f"Total Group Users: {total_group_users}")
@@ -437,21 +440,18 @@ def poll_proposal_vote_count(poll_id: int) -> None:
         poll.status = 1 if poll.participants >= total_group_users * quorum else -1
         poll.interval_mean_absolute_correctness = group_tags_list(group_id=poll.created_by.group_id,
                                                                   filters=dict(id=poll.tag_id)).first().imac
-        poll.result = True
+        poll.result = winning_proposal
         poll.save()
 
         notify_poll(message="Poll has ended and results have been counted",
                     action=NotificationChannel.Action.UPDATED,
                     poll=poll)
 
-        if poll.poll_type == Poll.PollType.SCHEDULE and poll.status == 1:
-            winning_proposal = PollProposal.objects.filter(
-                poll_id=poll_id).order_by('-score', '-pollproposaltypeschedule__event_start_date').first()
-            if winning_proposal:
-                schedule = group.schedule if poll.work_group is None else poll.work_group.schedule
-                schedule.create_event(title=poll.title,
-                                      description=poll.description,
-                                      meeting_link=poll.schedule_poll_meeting_link,
-                                      start_date=winning_proposal.pollproposaltypeschedule.event_start_date,
-                                      end_date=winning_proposal.pollproposaltypeschedule.event_end_date,
-                                      created_by=poll)
+        if poll.poll_type == Poll.PollType.SCHEDULE and poll.status == 1 and winning_proposal:
+            schedule = group.schedule if poll.work_group is None else poll.work_group.schedule
+            schedule.create_event(title=poll.title,
+                                  description=poll.description,
+                                  meeting_link=poll.schedule_poll_meeting_link,
+                                  start_date=winning_proposal.pollproposaltypeschedule.event_start_date,
+                                  end_date=winning_proposal.pollproposaltypeschedule.event_end_date,
+                                  created_by=poll)

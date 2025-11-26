@@ -118,7 +118,7 @@ class PollTest(APITestCase):
             user=poll_creator.user,
         )
 
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
 
         # Check if the subscriber received a notification
         notification = Notification.objects.get(
