@@ -21,7 +21,7 @@ class PollProposalVoteListAPI(APIView):
         default_limit = 10
 
     class FilterSerializer(serializers.Serializer):
-        created_by_user_id = serializers.IntegerField(source='author.user_id', required=False)
+        created_by_user_id = serializers.IntegerField(required=False)
         proposal_id = serializers.IntegerField(required=False)
         delegates = serializers.BooleanField(required=False, default=False)
         delegate_pool_id = serializers.IntegerField(required=False)

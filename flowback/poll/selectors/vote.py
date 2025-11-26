@@ -87,6 +87,8 @@ def poll_vote_list(*, fetched_by: User, poll_id: int, delegates: bool = False, f
     # Schedule (For Against)
     elif poll.poll_type == Poll.PollType.SCHEDULE:
         qs = PollVotingTypeForAgainst.objects.filter(proposal__poll=poll).order_by('-vote').all()
+        if poll.created_by.group.hide_poll_users and filters.get('created_by_user_id', fetched_by.id) != fetched_by.id:
+            filters.pop('created_by_user_id', None)
 
         return BasePollVoteForAgainstFilter(filters, qs).qs
 
