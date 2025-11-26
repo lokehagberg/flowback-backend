@@ -22,9 +22,6 @@ def poll_proposal_create(*, user_id: int,
 
     poll.check_phase('proposal', 'dynamic', 'schedule')
 
-    if poll.poll_type == Poll.PollType.SCHEDULE and group_user.user.id != poll.created_by.user.id:
-        raise ValidationError('Only poll author can create proposals for schedule polls')
-
     proposal = PollProposal(created_by=group_user,
                             poll=poll,
                             title=title,
