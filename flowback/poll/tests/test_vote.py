@@ -216,32 +216,69 @@ class PollVoteTest(APITestCase):
         self.assertEqual(self.poll_schedule_proposal_two.score, 2)
         self.assertEqual(self.poll_schedule_proposal_three.score, 3)
 
-        event = self.poll_schedule.created_by.group.schedule.scheduleevent_set.get(content_type=ContentType.objects.get_for_model(Poll),
-                                                                                   object_id=self.poll_schedule.id)
+        event = self.poll_schedule.created_by.group.schedule.scheduleevent_set.get(
+            content_type=ContentType.objects.get_for_model(Poll),
+            object_id=self.poll_schedule.id)
 
         self.assertEqual(event.start_date, self.poll_schedule_proposal_three.pollproposaltypeschedule.event_start_date)
         self.assertEqual(event.end_date, self.poll_schedule_proposal_three.pollproposaltypeschedule.event_end_date)
 
+    def test_vote_list_schedule(self):
+        # Create votes for schedule poll
+        user_one = self.group_user_one.user
+        proposals_one = [self.poll_schedule_proposal_three, self.poll_schedule_proposal_one]
+        response = self.schedule_vote_update(user_one, self.poll_schedule, proposals_one)
+        self.assertEqual(response.status_code, 200, response.data)
+
+        user_two = self.group_user_two.user
+        proposals_two = [self.poll_schedule_proposal_two, self.poll_schedule_proposal_three]
+        response = self.schedule_vote_update(user_two, self.poll_schedule, proposals_two)
+        self.assertEqual(response.status_code, 200, response.data)
+
+        user_three = self.group_user_three.user
+        proposals_three = [self.poll_schedule_proposal_one]
+        response = self.schedule_vote_update(user_three, self.poll_schedule, proposals_three)
+        self.assertEqual(response.status_code, 200, response.data)
+
+        # Test listing votes for the schedule poll - user can only see their own votes
+        response = generate_request(api=PollProposalVoteListAPI,
+                                    url_params={'poll': self.poll_schedule.id},
+                                    user=user_one)
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(len(response.data['results']), 5)  # user_one can see all 5 votes
+
+        # Test filter by proposal_id - user_one voted for proposal_three
+        response = generate_request(api=PollProposalVoteListAPI,
+                                    data={'proposal_id': self.poll_schedule_proposal_three.id},
+                                    url_params={'poll': self.poll_schedule.id},
+                                    user=user_one)
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(len(response.data['results']), 2)  # user_one can see 2 votes
+        for vote in response.data['results']:
+            self.assertEqual(vote['proposal'], self.poll_schedule_proposal_three.id)
+
     @skip("Only test separately, it takes a lot of time.")
     def test_hundreds_of_polls_vote_count(self):
         """Test poll_proposal_vote_count with hundreds of Schedule and Cardinal polls with proposals, votes and delegate votes"""
-        
+
         # Create additional group users for variety
         additional_users = GroupUserFactory.create_batch(10, group=self.group)
         all_users = [self.group_user_one, self.group_user_two, self.group_user_three] + additional_users
-        
+
         # Create delegates for delegate voting
         delegates = GroupUserDelegateFactory.create_batch(5, group=self.group)
-        
+
         # Create delegators for each delegate
         for delegate in delegates:
             delegators = GroupUserDelegatorFactory.create_batch(3, group=self.group, delegate_pool=delegate.pool)
             # Add tags to some delegators
             for delegator in delegators[:2]:  # Only first 2 delegators get tags
                 delegator.tags.add(self.poll_cardinal.tag)
-        
+
         polls_created = []
-        
+
         # Create 200 Schedule polls
         for i in range(200):
             poll = PollFactory(
@@ -252,14 +289,15 @@ class PollVoteTest(APITestCase):
                 **generate_poll_phase_kwargs('result')
             )
             polls_created.append(poll)
-            
+
             # Create 3-5 proposals per poll
             num_proposals = 3 + (i % 3)  # 3, 4, or 5 proposals
             proposals = []
             for j in range(num_proposals):
-                proposal = PollProposalFactory(poll=poll, created_by=poll.created_by, title=f"Schedule Proposal {i}-{j}")
+                proposal = PollProposalFactory(poll=poll, created_by=poll.created_by,
+                                               title=f"Schedule Proposal {i}-{j}")
                 proposals.append(proposal)
-            
+
             # Create regular votes from users
             for j, user in enumerate(all_users[:5 + (i % 3)]):  # 5-7 users vote
                 voting = PollVotingFactory(created_by=user, poll=poll)
@@ -267,7 +305,7 @@ class PollVoteTest(APITestCase):
                 voted_proposals = proposals[:2 + (j % 2)]
                 for proposal in voted_proposals:
                     PollVotingTypeForAgainstFactory(author=voting, proposal=proposal, vote=True)
-            
+
             # Create delegate votes
             if i % 3 == 0:  # Every 3rd poll gets delegate votes
                 delegate = delegates[i % len(delegates)]
@@ -275,7 +313,7 @@ class PollVoteTest(APITestCase):
                 # Delegate votes for some proposals
                 for proposal in proposals[:2]:
                     PollVotingTypeForAgainstFactory(author_delegate=delegate_voting, proposal=proposal, vote=True)
-        
+
         # Create 200 Cardinal polls  
         for i in range(200):
             poll = PollFactory(
@@ -285,14 +323,15 @@ class PollVoteTest(APITestCase):
                 **generate_poll_phase_kwargs('result')
             )
             polls_created.append(poll)
-            
+
             # Create 3-5 proposals per poll
             num_proposals = 3 + (i % 3)  # 3, 4, or 5 proposals
             proposals = []
             for j in range(num_proposals):
-                proposal = PollProposalFactory(poll=poll, created_by=poll.created_by, title=f"Cardinal Proposal {i}-{j}")
+                proposal = PollProposalFactory(poll=poll, created_by=poll.created_by,
+                                               title=f"Cardinal Proposal {i}-{j}")
                 proposals.append(proposal)
-            
+
             # Create regular votes from users
             for j, user in enumerate(all_users[:5 + (i % 3)]):  # 5-7 users vote
                 voting = PollVotingFactory(created_by=user, poll=poll)
@@ -300,7 +339,7 @@ class PollVoteTest(APITestCase):
                 for k, proposal in enumerate(proposals):
                     score = 10 + (i + j + k) % 90  # Scores between 10-99
                     PollVotingTypeCardinalFactory(author=voting, proposal=proposal, raw_score=score, score=score)
-            
+
             # Create delegate votes
             if i % 4 == 0:  # Every 4th poll gets delegate votes
                 delegate = delegates[i % len(delegates)]
@@ -308,10 +347,11 @@ class PollVoteTest(APITestCase):
                 # Delegate votes for all proposals
                 for k, proposal in enumerate(proposals):
                     score = 20 + (i + k) % 80  # Delegate scores between 20-99
-                    PollVotingTypeCardinalFactory(author_delegate=delegate_voting, proposal=proposal, raw_score=score, score=score)
-        
+                    PollVotingTypeCardinalFactory(author_delegate=delegate_voting, proposal=proposal, raw_score=score,
+                                                  score=score)
+
         self.assertEqual(len(polls_created), 400, "Should have created 400 polls total")
-        
+
         # Run poll_proposal_vote_count for all polls
         successful_counts = 0
         time = datetime.now()
@@ -320,17 +360,18 @@ class PollVoteTest(APITestCase):
             time = datetime.now()
             poll_proposal_vote_count(poll_id=poll.id)
             successful_counts += 1
-        
+
         # Verify that most polls were processed successfully
-        self.assertGreater(successful_counts, 350, f"At least 350 polls should be processed successfully, got {successful_counts}")
-        
+        self.assertGreater(successful_counts, 350,
+                           f"At least 350 polls should be processed successfully, got {successful_counts}")
+
         # Verify some polls have updated scores
         updated_polls = Poll.objects.filter(id__in=[p.id for p in polls_created], result=True)
         self.assertGreater(updated_polls.count(), 100, "At least 100 polls should have result=True")
-        
+
         # Verify some proposals have scores > 0
         proposals_with_scores = PollProposal.objects.filter(
-            poll__in=polls_created, 
+            poll__in=polls_created,
             score__gt=0
         ).count()
         self.assertGreater(proposals_with_scores, 500, "At least 500 proposals should have scores > 0")
@@ -373,8 +414,8 @@ class PollDelegateVoteTest(APITestCase):
         # Create a poll with tag
         tag = GroupTagsFactory(group=self.group)
         poll = PollFactory(created_by=self.group_user_creator, poll_type=Poll.PollType.CARDINAL, tag=tag,
-                          **generate_poll_phase_kwargs('delegate_vote'))
-        
+                           **generate_poll_phase_kwargs('delegate_vote'))
+
         # Create proposals for the poll
         proposal_one = PollProposalFactory(created_by=self.group_user_creator, poll=poll)
         proposal_two = PollProposalFactory(created_by=self.group_user_creator, poll=poll)
@@ -397,13 +438,13 @@ class PollDelegateVoteTest(APITestCase):
 
         # Create delegator relationships
         delegator_1 = GroupUserDelegatorFactory(group=self.group, delegator=delegator_with_permission_1,
-                                                     delegate_pool=delegate.pool)
+                                                delegate_pool=delegate.pool)
         delegator_2 = GroupUserDelegatorFactory(group=self.group, delegator=delegator_with_permission_2,
-                                                     delegate_pool=delegate.pool)
+                                                delegate_pool=delegate.pool)
         delegator_3 = GroupUserDelegatorFactory(group=self.group, delegator=delegator_without_permission_1,
-                                                     delegate_pool=delegate.pool)
+                                                delegate_pool=delegate.pool)
         delegator_4 = GroupUserDelegatorFactory(group=self.group, delegator=delegator_without_permission_2,
-                                                     delegate_pool=delegate.pool)
+                                                delegate_pool=delegate.pool)
 
         # Also make the delegate delegate to themselves
         delegator_delegate = GroupUserDelegatorFactory(group=self.group, delegator=delegate.group_user,
@@ -439,19 +480,19 @@ class PollDelegateVoteTest(APITestCase):
         # Verify that only delegators with voting permission are counted
         # Should be 3 (delegators with permission) - only delegators count toward mandate, not the delegate
         expected_mandate = 3  # Only the 3 delegators with voting permission should be counted
-        self.assertEqual(delegate_vote.mandate, expected_mandate, 
-                        f"Expected mandate of {expected_mandate} but got {delegate_vote.mandate}")
-        
+        self.assertEqual(delegate_vote.mandate, expected_mandate,
+                         f"Expected mandate of {expected_mandate} but got {delegate_vote.mandate}")
+
         # Verify proposals got correct scores based on only counting delegators with permission
         proposal_one.refresh_from_db()
         proposal_two.refresh_from_db()
-        
+
         # Each delegator with permission contributes their weight to the delegate's vote
         # Delegate vote: proposal_one=100, proposal_two=50
         # With mandate of 3, final scores should be: proposal_one=300, proposal_two=150
         self.assertEqual(proposal_one.score, 300, f"Expected proposal_one score of 300 but got {proposal_one.score}")
         self.assertEqual(proposal_two.score, 150, f"Expected proposal_two score of 150 but got {proposal_two.score}")
-        
+
         # Verify poll status is not failed (participants met requirements)
         poll.refresh_from_db()
         self.assertNotEqual(poll.status, -1, "Poll should not have failed status")
@@ -461,7 +502,7 @@ class PollDelegateVoteTest(APITestCase):
         # Create a poll with tag
         tag = GroupTagsFactory(group=self.group)
         poll = PollFactory(created_by=self.group_user_creator, poll_type=Poll.PollType.CARDINAL, tag=tag,
-                          **generate_poll_phase_kwargs('delegate_vote'))
+                           **generate_poll_phase_kwargs('delegate_vote'))
 
         # Create proposals for the poll
         proposal_one = PollProposalFactory(created_by=self.group_user_creator, poll=poll)
@@ -525,7 +566,7 @@ class PollDelegateVoteTest(APITestCase):
         # Now test Scenario 2: Create a new poll with delegators having no voting permission
         # Create a new poll for the second scenario
         poll_2 = PollFactory(created_by=self.group_user_creator, poll_type=Poll.PollType.CARDINAL, tag=tag,
-                            **generate_poll_phase_kwargs('delegate_vote'))
+                             **generate_poll_phase_kwargs('delegate_vote'))
 
         # Create new proposals for the second poll
         proposal_three = PollProposalFactory(created_by=self.group_user_creator, poll=poll_2)
@@ -586,7 +627,7 @@ class PollDelegateVoteTest(APITestCase):
         # Create a poll in delegate voting phase
         tag = GroupTagsFactory(group=self.group)
         poll = PollFactory(created_by=self.group_user_creator, poll_type=Poll.PollType.CARDINAL, tag=tag,
-                          **generate_poll_phase_kwargs('delegate_vote'))
+                           **generate_poll_phase_kwargs('delegate_vote'))
 
         # Create proposals for the poll
         proposal_one = PollProposalFactory(created_by=self.group_user_creator, poll=poll)
@@ -603,8 +644,8 @@ class PollDelegateVoteTest(APITestCase):
 
         # Create delegator relationship - delegator delegates to delegate
         delegator_pool = GroupUserDelegatorFactory(group=self.group,
-                                                  delegator=delegator_user,
-                                                  delegate_pool=delegate.pool)
+                                                   delegator=delegator_user,
+                                                   delegate_pool=delegate.pool)
 
         # Add tag to delegator
         delegator_pool.tags.add(tag)
@@ -620,14 +661,14 @@ class PollDelegateVoteTest(APITestCase):
             user=delegator_user.user
         )
         self.assertEqual(delegator_response.status_code, 400)
-        
+
         # Verify the error message indicates the poll phase restriction
         self.assertIn("not in", str(delegator_response.data).lower())
 
         # Verify no delegator voting record was created
         delegator_votes = PollVoting.objects.filter(created_by=delegator_user, poll=poll)
         self.assertEqual(delegator_votes.count(), 0,
-                        "No delegator voting records should be created during delegate phase")
+                         "No delegator voting records should be created during delegate phase")
 
         # Test 2: Verify delegate can vote through delegate API (this should always work)
         delegate_vote_data = dict(proposals=[proposal_one.id, proposal_two.id], scores=[80, 40])

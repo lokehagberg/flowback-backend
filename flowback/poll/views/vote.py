@@ -21,11 +21,15 @@ class PollProposalVoteListAPI(APIView):
         default_limit = 10
 
     class FilterSerializer(serializers.Serializer):
+        created_by_user_id = serializers.IntegerField(source='author.user_id', required=False)
+        proposal_id = serializers.IntegerField(required=False)
         delegates = serializers.BooleanField(required=False, default=False)
         delegate_pool_id = serializers.IntegerField(required=False)
         delegate_user_id = serializers.IntegerField(required=False)
 
     class OutputSerializerTypeRanking(serializers.ModelSerializer):
+        author = GroupUserSerializer(source='author.created_by', hide_relevant_users=True)
+
         class Meta:
             model = PollVotingTypeRanking
             fields = ('author',
@@ -35,6 +39,8 @@ class PollProposalVoteListAPI(APIView):
                       'score')
 
     class OutputSerializerTypeCardinal(serializers.ModelSerializer):
+        author = GroupUserSerializer(source='author.created_by', hide_relevant_users=True)
+
         class Meta:
             model = PollVotingTypeCardinal
             fields = ('author',
@@ -44,6 +50,8 @@ class PollProposalVoteListAPI(APIView):
                       'raw_score')
 
     class OutputSerializerTypeForAgainst(serializers.ModelSerializer):
+        author = GroupUserSerializer(source='author.created_by', hide_relevant_users=True)
+
         class Meta:
             model = PollVotingTypeForAgainst
             fields = ('author',
