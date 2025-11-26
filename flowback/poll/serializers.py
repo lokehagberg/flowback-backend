@@ -2,6 +2,7 @@ from rest_framework import serializers
 
 from flowback.files.serializers import FileSerializer
 from flowback.group.serializers import GroupUserSerializer
+from flowback.poll.models import PollProposal, Poll
 
 
 class PollSerializer(serializers.Serializer):
@@ -56,5 +57,19 @@ class PollProposalSerializer(serializers.Serializer):
     blockchain_id = serializers.IntegerField(min_value=0, allow_null=True)
     score = serializers.IntegerField()
 
-    start_date = serializers.DateTimeField(required=False)
-    end_date = serializers.DateTimeField(required=False)
+    start_date = serializers.SerializerMethodField(help_text="A datetime field or None (if poll is not a schedule)")
+    end_date = serializers.SerializerMethodField(help_text="A datetime field or None (if poll is not a schedule)")
+
+    def get_start_date(self, obj):
+        proposal = PollProposal.objects.get(id=obj.id)
+        if proposal.poll.poll_type == Poll.PollType.SCHEDULE:
+            return proposal.pollproposaltypeschedule.event_start_date
+
+        return None
+
+    def get_end_date(self, obj):
+        proposal = PollProposal.objects.get(id=obj.id)
+        if proposal.poll.poll_type == Poll.PollType.SCHEDULE:
+            return proposal.pollproposaltypeschedule.event_end_date
+
+        return None
