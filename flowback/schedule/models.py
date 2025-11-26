@@ -43,7 +43,10 @@ class Schedule(BaseModel):
                      assignees: list[int] = None,
                      meeting_link: str = None,
                      repeat_frequency: int = None):
-        tag = ScheduleTag.objects.get_or_create(schedule=self, name=tag)
+        if not tag and not self.default_tag:
+            raise ValidationError("Schedule must either have a tag or a default tag.")
+
+        tag, created = ScheduleTag.objects.get_or_create(schedule=self, name=tag if tag else self.default_tag)
         event = ScheduleEvent(title=title,
                               description=description,
                               start_date=start_date,

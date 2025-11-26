@@ -76,6 +76,7 @@ class PollListApi(APIView):
         tag_name = serializers.CharField(source='tag.name', allow_null=True)
         attachments = FileSerializer(many=True, source="attachments.filesegment_set", allow_null=True)
         hide_poll_users = serializers.BooleanField(source='created_by.group.hide_poll_users')
+        winning_proposal_id = serializers.IntegerField(source='result.id', allow_null=True)
         total_comments = serializers.IntegerField()
         total_proposals = serializers.IntegerField()
         total_predictions = serializers.IntegerField()
@@ -117,7 +118,7 @@ class PollListApi(APIView):
                       'delegate_vote_end_date',
                       'vote_end_date',
                       'end_date',
-                      'result',
+                      'winning_proposal_id',
                       'participants',
                       'pinned',
                       'dynamic',

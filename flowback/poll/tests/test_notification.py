@@ -245,7 +245,7 @@ class PollNotificationSubscribeTest(APITestCase):
 
         # Also subscribe the user to the poll's notification channel for the test
         self.poll.notification_channel.subscribe(user=self.user, tags=['poll'])
-        self.assertEqual(set(subscription.tags), {'poll'})
+        self.assertEqual(set(subscription.notificationsubscriptiontag_set.values_list('name', flat=True)), {'poll'})
 
         # Send a notification to the poll
         notification = notify_poll(

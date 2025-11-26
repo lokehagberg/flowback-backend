@@ -63,7 +63,7 @@ class PollDelegateTests(APITestCase):
         self.assertEqual(len(response.data['results']), 3)  # Should return all 3 polls
 
         # Verify poll IDs are in the response
-        poll_ids = [item['poll_id'] for item in response.data['results']]
+        poll_ids = [item['poll']['id'] for item in response.data['results']]
         self.assertIn(self.poll_one.id, poll_ids)
         self.assertIn(self.poll_two.id, poll_ids)
         self.assertIn(self.poll_three.id, poll_ids)
@@ -77,7 +77,7 @@ class PollDelegateTests(APITestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data['results']), 1)  # Should return only poll_one
-        self.assertEqual(response.data['results'][0]['poll_id'], self.poll_one.id)
+        self.assertEqual(response.data['results'][0]['poll']['id'], self.poll_one.id)
 
         # Test filtering by delegate_pool_id
         response = generate_request(
@@ -147,7 +147,7 @@ class PollDelegateTests(APITestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data['results']), 1)  # Should return only poll_two
-        self.assertEqual(response.data['results'][0]['poll_id'], self.poll_two.id)
+        self.assertEqual(response.data['results'][0]['poll']['id'], self.poll_two.id)
         
         # Test admin user with delegate_pool_id filter
         response = generate_request(
