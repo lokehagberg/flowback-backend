@@ -75,6 +75,8 @@ class UserHomeFeedFilter(django_filters.FilterSet):
     work_group_ids = NumberInFilter()
     title__icontains = django_filters.CharFilter(lookup_expr='icontains')
     description = django_filters.CharFilter(lookup_expr='icontains')
+    created_at__gt = django_filters.DateTimeFilter(field_name='created_at', lookup_expr='gt')
+    created_at__lt = django_filters.DateTimeFilter(field_name='created_at', lookup_expr='lt')
     related_model = django_filters.CharFilter(lookup_expr='exact')
     group_joined = django_filters.BooleanFilter(lookup_expr='exact')
     user_vote = django_filters.BooleanFilter(lookup_expr='exact')

@@ -19,6 +19,8 @@ class UserHomeFeedAPI(APIView):
         related_model = serializers.ChoiceField(required=False, choices=['poll', 'thread'])
         id = serializers.IntegerField(required=False)
         created_by_group_user_id = serializers.IntegerField(required=False, source='created_by_id')
+        created_at__gt = serializers.DateTimeField(required=False)
+        created_at__lt = serializers.DateTimeField(required=False)
 
         work_group_ids = NumberInFilter(required=False)
         title__icontains = serializers.CharField(required=False)
