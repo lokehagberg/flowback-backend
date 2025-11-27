@@ -70,6 +70,7 @@ class BaseMessageChannelPreviewFilter(django_filters.FilterSet):
 def message_channel_preview_list(*, user: User, filters=None):
     filters = filters or {}
     message_qs = Message.objects.filter(channel=OuterRef('channel'),
+                                        type='message',
                                         active=True).order_by('-created_at')[:1].values('created_at')
     qs = MessageChannelParticipant.objects.filter(
         user=user,

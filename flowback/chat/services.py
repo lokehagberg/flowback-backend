@@ -135,7 +135,7 @@ def message_channel_join(*, user_id: int, channel_id: int):
         channel_layer = get_channel_layer()
 
         payload = dict(
-            type="message",
+            type="info",
             message=f"User {user.username} joined the channel",
             method="message_channel_join",
             channel_id=channel.id,
