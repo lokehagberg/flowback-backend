@@ -325,11 +325,14 @@ class ScheduleEvent(BaseModel, NotifiableModel):
                 if self.end_date else self.active)
 
     @property
-    def next_start_date(self) -> datetime.datetime:
+    def next_start_date(self) -> datetime.datetime | None:
         if timezone.now() < self.start_date:
             return self.start_date
-        else:
+
+        elif self.repeat_frequency:
             return timezone.now() + self._get_cron_from_date(self.start_date).remaining_estimate(timezone.now())
+
+        return None
 
     @property
     def next_end_date(self) -> datetime.datetime | None:
@@ -338,8 +341,11 @@ class ScheduleEvent(BaseModel, NotifiableModel):
 
         if timezone.now() < self.end_date:
             return self.end_date
-        else:
+
+        elif self.repeat_frequency:
             return timezone.now() + self._get_cron_from_date(self.end_date).remaining_estimate(timezone.now())
+
+        return None
 
     def regenerate_notifications(self):
         """Regenerate notifications for the event"""
