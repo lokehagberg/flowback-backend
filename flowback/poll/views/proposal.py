@@ -11,6 +11,7 @@ from flowback.poll.models import Poll, PollProposal
 from ..selectors.proposal import poll_proposal_list
 from ..serializers import PollProposalSerializer
 from ..services.proposal import poll_proposal_create, poll_proposal_delete
+from ...files.serializers import FileCollectionCreateSerializerMixin
 
 
 # TODO check alternative solution for schedule
@@ -53,17 +54,15 @@ class PollProposalListAPI(APIView):
 
 @extend_schema(tags=['poll/proposal'])
 class PollProposalCreateAPI(APIView):
-    class InputSerializerDefault(serializers.ModelSerializer):
-        attachments = serializers.ListField(child=serializers.FileField(), required=False, max_length=10)
+    class InputSerializerDefault(serializers.ModelSerializer, FileCollectionCreateSerializerMixin):
 
         class Meta:
             model = PollProposal
             fields = ('title', 'description', 'attachments', 'blockchain_id')
 
-    class InputSerializerSchedule(serializers.ModelSerializer):
+    class InputSerializerSchedule(serializers.ModelSerializer, FileCollectionCreateSerializerMixin):
         start_date = serializers.DateTimeField()
         end_date = serializers.DateTimeField()
-        attachments = serializers.ListField(child=serializers.FileField(), required=False, max_length=10)
 
         def validate(self, data):
             if data.get('start_date') >= data.get('end_date'):

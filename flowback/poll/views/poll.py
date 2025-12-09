@@ -6,6 +6,7 @@ from rest_framework import serializers, status
 from rest_framework.views import APIView, Response
 
 from flowback.common.pagination import LimitOffsetPagination, get_paginated_response
+from flowback.files.serializers import FileCollectionCreateSerializerMixin, FileCollectionListSerializerMixin
 
 from flowback.group.serializers import GroupUserSerializer
 from flowback.notification.views import NotificationSubscribeTemplateAPI
@@ -62,7 +63,7 @@ class PollListApi(APIView):
         end_date__gt = serializers.DateTimeField(required=False)
         end_date__lt = serializers.DateTimeField(required=False)
 
-    class OutputSerializer(serializers.ModelSerializer):
+    class OutputSerializer(serializers.ModelSerializer, FileCollectionListSerializerMixin):
         class FileSerializer(serializers.Serializer):
             file = serializers.CharField()
             file_name = serializers.CharField()
@@ -74,7 +75,6 @@ class PollListApi(APIView):
         group_image = serializers.ImageField(source='created_by.group.image')
         tag_id = serializers.IntegerField(allow_null=True)
         tag_name = serializers.CharField(source='tag.name', allow_null=True)
-        attachments = FileSerializer(many=True, source="attachments.filesegment_set", allow_null=True)
         hide_poll_users = serializers.BooleanField(source='created_by.group.hide_poll_users')
         winning_proposal_id = serializers.IntegerField(source='result.id', allow_null=True)
         total_comments = serializers.IntegerField()
@@ -151,11 +151,10 @@ class PollListApi(APIView):
 
 @extend_schema(tags=['poll'])
 class PollCreateAPI(APIView):
-    class InputSerializer(serializers.ModelSerializer):
+    class InputSerializer(serializers.ModelSerializer, FileCollectionCreateSerializerMixin):
         tag = serializers.IntegerField(required=False)
         quorum = serializers.IntegerField(required=False)
         public = serializers.BooleanField(default=False)
-        attachments = serializers.ListField(child=serializers.FileField(), required=False, max_length=10)
 
         proposal_end_date = serializers.DateTimeField(required=False)
         prediction_statement_end_date = serializers.DateTimeField(required=False)

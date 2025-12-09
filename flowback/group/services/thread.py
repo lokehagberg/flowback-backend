@@ -2,7 +2,7 @@ from rest_framework.exceptions import ValidationError
 
 from flowback.comment.services import comment_create, comment_update, comment_delete, comment_vote
 from flowback.common.services import get_object, model_update
-from flowback.files.services import upload_collection
+from flowback.files.services import upload_collection, update_collection
 from flowback.group.models import GroupThread, GroupThreadVote
 from flowback.group.notify import notify_group_thread
 from flowback.group.selectors.permission import group_user_permissions
@@ -60,10 +60,11 @@ def group_thread_update(user_id: int, thread_id: int, data: dict):
     else:
         group_user_permissions(user=user_id, group=thread.created_by.group)
 
-    if 'attachments' in data.keys():
-        data['attachments'] = upload_collection(user_id=user_id,
-                                                file=data.pop('attachments'),
-                                                upload_to='group/thread')
+    update_collection(user_id=user_id,
+                      file_collection_id=thread.attachments_id,
+                      attachments_remove=data.get('attachments_remove'),
+                      attachments_add=data.get('attachments_add'),
+                      upload_to='group/thread')
 
     thread, has_updated = model_update(instance=thread,
                                        fields=non_side_effect_fields,

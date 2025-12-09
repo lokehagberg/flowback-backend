@@ -1,11 +1,11 @@
 from rest_framework import serializers
 
-from flowback.files.serializers import FileSerializer
+from flowback.files.serializers import FileSerializer, FileCollectionListSerializerMixin
 from flowback.group.serializers import GroupUserSerializer
 from flowback.poll.models import PollProposal, Poll
 
 
-class PollSerializer(serializers.Serializer):
+class PollSerializer(serializers.Serializer, FileCollectionListSerializerMixin):
     class FileSerializer(serializers.Serializer):
         file = serializers.CharField()
         file_name = serializers.CharField()
@@ -17,7 +17,6 @@ class PollSerializer(serializers.Serializer):
     group_image = serializers.ImageField(source='created_by.group.image')
     tag_id = serializers.IntegerField(allow_null=True)
     tag_name = serializers.CharField(source='tag.name', allow_null=True)
-    attachments = FileSerializer(many=True, source="attachments.filesegment_set", allow_null=True)
     hide_poll_users = serializers.BooleanField(source='created_by.group.hide_poll_users')
 
     title = serializers.CharField()
@@ -47,13 +46,12 @@ class PollSerializer(serializers.Serializer):
     quorum = serializers.IntegerField(allow_null=True)
 
 
-class PollProposalSerializer(serializers.Serializer):
+class PollProposalSerializer(serializers.Serializer, FileCollectionListSerializerMixin):
     id = serializers.IntegerField()
     created_by = GroupUserSerializer(required=False)
     poll = serializers.IntegerField(source='poll_id')
     title = serializers.CharField()
     description = serializers.CharField()
-    attachments = FileSerializer(many=True, source="attachments.filesegment_set", allow_null=True)
     blockchain_id = serializers.IntegerField(min_value=0, allow_null=True)
     score = serializers.IntegerField()
 
