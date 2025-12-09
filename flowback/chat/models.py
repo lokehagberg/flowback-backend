@@ -30,7 +30,7 @@ class MessageChannelParticipant(BaseModel):
 
     @property
     def recent_message(self):
-        return self.channel.message_set.filter(active=True).order_by('-created_at').first()
+        return self.channel.message_set.filter(active=True, type='message').order_by('-created_at').first()
 
 
     class Meta:

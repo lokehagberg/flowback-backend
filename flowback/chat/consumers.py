@@ -123,25 +123,34 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
         await self.send_message(channel_id=self.user_channel, message=message)
 
-    async def send_message(self, channel_id, message: Union[dict, str]):
+    async def send_message(self, channel_id: int | str | None, message: Union[dict, str]):
+        """
+        Sends a message to the specified channel.
+        :param channel_id: Channel to receive the message. Leave empty to send to the user's channel, accepts user_<id>.
+        :param message:
+        :return:
+        """
         if isinstance(message, dict):
             if not message.get("type"):
                 message["type"] = "message"
 
-        # TODO Faster, but lacks purpose (for now)
-        # await self.channel_layer.group_send(
-        #     f"{channel_id}",
-        #     message)
+        if isinstance(channel_id, int):
+            participants = MessageChannelParticipant.objects.filter(channel_id=channel_id)
+            message["status"] = "message_received"
 
-        participants = MessageChannelParticipant.objects.filter(channel_id=channel_id)
-        message["status"] = "message_received"
+            participant = await participants.select_related('channel').afirst()
+            if participant.channel.origin_name in ['user', 'user_group']:
+                async for participant in participants:
+                    await self.channel_layer.group_send(
+                        f"user_{participant.user_id}",
+                        message)
 
-        participant = await participants.select_related('channel').afirst()
-        if participant.channel.origin_name in ['user', 'user_group']:
-            async for participant in participants:
-                await self.channel_layer.group_send(
-                    f"user_{participant.user_id}",
-                    message)
+            else:
+                await self.channel_layer.group_send(f"{channel_id}", message)
+
+        else:
+            channel = self.user_channel if not channel_id else channel_id
+            await self.channel_layer.group_send(channel, message)
 
     @database_sync_to_async
     def _create_message(self, *,

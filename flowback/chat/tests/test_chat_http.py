@@ -50,7 +50,8 @@ class ChatTestHTTP(APITestCase):
         # Now user_one joins the channel, which should create an 'info' join message via signals
         message_channel_join(user_id=self.user_one.id, channel_id=channel.id)
 
-        # Preview for user_one should show the latest message which is the join info
+        # Preview for user_one should show the latest type='message', not the 'info' join message
+        # So it should still show "hello before join"
         response = generate_request(
             MessageChannelPreviewAPI,
             data=dict(order_by='created_at_desc', channel_id=channel.id),
@@ -59,8 +60,8 @@ class ChatTestHTTP(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         self.assertEqual(response.data.get('count'), 1, response.data)
         latest = response.data['results'][0]
-        self.assertIn('joined the channel', latest['recent_message']['message'])
-        self.assertEqual('info', latest['recent_message']['type'])
+        self.assertEqual('hello before join', latest['recent_message']['message'])
+        self.assertEqual('message', latest['recent_message']['type'])
 
         # If another normal message is sent afterwards, preview should update to that message
         message = message_create(user_id=self.user_two.id, channel_id=channel.id, message="after join message")
@@ -183,8 +184,8 @@ class ChatTestHTTP(APITestCase):
             if i > 0:
                 self.assertEqual(response.data.get('count'), 3 + i * 2, response.data)
                 self.assertTrue(response.data['results'][i]['timestamp'])
-                self.assertEqual(response.data['results'][(2 * i) + 1]['total_participants'], 2,
-                                 [(i['created_at'], i['total_participants']) for i in response.data['results']])
+                self.assertEqual(len(response.data['results'][(2 * i) + 1]['participants']), 2,
+                                 [(i['timestamp'], len(i['participants'])) for i in response.data['results']])
                 self.assertGreater(response.data['results'][i - 1]['created_at'],
                                    response.data['results'][i]['created_at'])
 
@@ -195,8 +196,8 @@ class ChatTestHTTP(APITestCase):
             if i > 0:
                 self.assertEqual(response.data.get('count'), 2 + i * 2)
                 self.assertTrue(response.data['results'][i]['timestamp'])
-                self.assertEqual(response.data['results'][2 * (i - 1)]['total_participants'], 3,
-                                 [(i['created_at'], i['total_participants']) for i in response.data['results']])
+                self.assertEqual(len(response.data['results'][2 * (i - 1)]['participants']), 3,
+                                 [(i['timestamp'], len(i['participants'])) for i in response.data['results']])
                 self.assertGreater(response.data['results'][i - 1]['created_at'],
                                    response.data['results'][i]['created_at'])
 
@@ -205,6 +206,69 @@ class ChatTestHTTP(APITestCase):
 
             if i > 0:
                 self.assertEqual(response.data.get('count'), 0)
+
+    def test_message_channel_preview_recent_message_type_filter(self):
+        """Test that MessageChannelPreviewAPI only shows type='message' in recent_message"""
+        # Create a channel with two participants
+        channel = MessageChannelFactory(origin_name='user')
+        participant_one = MessageChannelParticipantFactory(channel=channel, user=self.user_one)
+        participant_two = MessageChannelParticipantFactory(channel=channel, user=self.user_two)
+
+        # Create several regular messages
+        msg1 = message_create(user_id=self.user_one.id, channel_id=channel.id, message="first message")
+        msg2 = message_create(user_id=self.user_two.id, channel_id=channel.id, message="second message")
+        msg3 = message_create(user_id=self.user_one.id, channel_id=channel.id, message="third message")
+
+        # Verify that the most recent message is shown (type='message')
+        response = generate_request(
+            MessageChannelPreviewAPI,
+            data=dict(channel_id=channel.id),
+            user=self.user_one,
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data.get('count'), 1)
+        latest = response.data['results'][0]
+        self.assertIsNotNone(latest['recent_message'])
+        self.assertEqual(latest['recent_message']['message'], "third message")
+        self.assertEqual(latest['recent_message']['type'], 'message')
+
+        # Create an 'info' type message (like a system notification) that's newer
+        info_message = MessageFactory(
+            user=self.user_one,
+            channel=channel,
+            message="user joined the channel",
+            type='info'
+        )
+
+        # Verify that recent_message still shows the last type='message', not the newer 'info' type
+        response = generate_request(
+            MessageChannelPreviewAPI,
+            data=dict(channel_id=channel.id),
+            user=self.user_one,
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data.get('count'), 1)
+        latest = response.data['results'][0]
+        self.assertIsNotNone(latest['recent_message'])
+        # Should still be "third message", not the info message
+        self.assertEqual(latest['recent_message']['message'], "third message")
+        self.assertEqual(latest['recent_message']['type'], 'message')
+
+        # Create another regular message after the info message
+        msg4 = message_create(user_id=self.user_two.id, channel_id=channel.id, message="fourth message")
+
+        # Verify the new regular message is now shown
+        response = generate_request(
+            MessageChannelPreviewAPI,
+            data=dict(channel_id=channel.id),
+            user=self.user_one,
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data.get('count'), 1)
+        latest = response.data['results'][0]
+        self.assertIsNotNone(latest['recent_message'])
+        self.assertEqual(latest['recent_message']['message'], "fourth message")
+        self.assertEqual(latest['recent_message']['type'], 'message')
 
     def test_message_channel_participant(self):
         channel = MessageChannelFactory()
