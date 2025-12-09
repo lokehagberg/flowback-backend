@@ -129,7 +129,6 @@ class PollListApi(APIView):
                       'status',
                       'status_prediction',
                       'interval_mean_absolute_correctness',
-                      'attachments',
                       'work_group_id',
                       'work_group_name',
                       'phase')
@@ -186,8 +185,7 @@ class PollCreateAPI(APIView):
                       'pinned',
                       'dynamic',
                       'quorum',
-                      'work_group_id',
-                      'attachments')
+                      'work_group_id')
 
     def post(self, request, group_id: int):
         serializer = self.InputSerializer(data=request.data)
