@@ -31,7 +31,7 @@ class KanbanEntryListApi(APIView):
         priority = serializers.ChoiceField(range(1, FLOWBACK_KANBAN_PRIORITY_LIMIT + 1), required=False)
         lane = serializers.ChoiceField(range(1, len(FLOWBACK_KANBAN_LANES) + 1), required=False)
 
-    class OutputSerializer(serializers.Serializer, FileCollectionListSerializerMixin):
+    class OutputSerializer(FileCollectionListSerializerMixin, serializers.Serializer):
         class UserSerializer(serializers.Serializer):
             id = serializers.IntegerField()
             profile_image = serializers.ImageField()
@@ -51,8 +51,8 @@ class KanbanEntryListApi(APIView):
         category = serializers.CharField(allow_null=True)
 
 
-class KanbanEntryCreateAPI(APIView, FileCollectionCreateSerializerMixin):
-    class InputSerializer(serializers.Serializer):
+class KanbanEntryCreateAPI(APIView):
+    class InputSerializer(FileCollectionCreateSerializerMixin, serializers.Serializer):
         assignee_id = serializers.IntegerField(required=False, allow_null=True)
         work_group_id = serializers.IntegerField(required=False, allow_null=True)
         title = serializers.CharField()
@@ -64,7 +64,7 @@ class KanbanEntryCreateAPI(APIView, FileCollectionCreateSerializerMixin):
 
 
 class KanbanEntryUpdateAPI(APIView):
-    class InputSerializer(serializers.Serializer, FileCollectionUpdateSerializerMixin):
+    class InputSerializer(FileCollectionUpdateSerializerMixin, serializers.Serializer):
         entry_id = serializers.IntegerField()
         work_group_id = serializers.IntegerField(required=False, allow_null=True)
         assignee_id = serializers.IntegerField(required=False)

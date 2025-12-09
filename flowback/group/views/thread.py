@@ -6,8 +6,7 @@ from rest_framework.response import Response
 from flowback.common.pagination import LimitOffsetPagination, get_paginated_response
 from flowback.comment.views import CommentListAPI, CommentCreateAPI, CommentUpdateAPI, CommentDeleteAPI, CommentVoteAPI, \
     CommentAncestorListAPI
-from flowback.files.serializers import FileSerializer, FileCollectionCreateSerializerMixin, \
-    FileCollectionUpdateSerializerMixin, FileCollectionListSerializerMixin
+from flowback.files.serializers import FileSerializer
 from flowback.group.selectors.thread import group_thread_list, group_thread_comment_list, \
     group_thread_comment_ancestor_list
 from flowback.group.serializers import WorkGroupSerializer, GroupUserSerializer
@@ -39,7 +38,7 @@ class GroupThreadListAPI(APIView):
         user_vote = serializers.BooleanField(required=False, allow_null=True, default=None)
         work_group_ids = serializers.CharField(required=False)
 
-    class OutputSerializer(serializers.Serializer, FileCollectionListSerializerMixin):
+    class OutputSerializer(serializers.Serializer):
         created_by = GroupUserSerializer(hide_relevant_users=True)
         created_at = serializers.DateTimeField()
         id = serializers.IntegerField()
@@ -47,6 +46,7 @@ class GroupThreadListAPI(APIView):
         description = serializers.CharField(allow_null=True, default=None)
         pinned = serializers.BooleanField()
         total_comments = serializers.IntegerField()
+        attachments = FileSerializer(many=True, source='attachments.filesegment_set', allow_null=True)
         score = serializers.IntegerField(default=0)
         user_vote = serializers.BooleanField(allow_null=True)
         work_group = WorkGroupSerializer()
@@ -72,10 +72,11 @@ class GroupThreadListAPI(APIView):
 
 @extend_schema(tags=['group/thread'])
 class GroupThreadCreateAPI(APIView):
-    class InputSerializer(serializers.Serializer, FileCollectionCreateSerializerMixin):
+    class InputSerializer(serializers.Serializer):
         title = serializers.CharField()
         description = serializers.CharField(required=False)
         pinned = serializers.BooleanField(default=False)
+        attachments = serializers.ListField(child=serializers.FileField(), required=False, max_length=10)
         work_group_id = serializers.IntegerField(required=False)
         public = serializers.BooleanField(default=False)
 
@@ -89,9 +90,10 @@ class GroupThreadCreateAPI(APIView):
 
 @extend_schema(tags=['group/thread'])
 class GroupThreadUpdateAPI(APIView):
-    class InputSerializer(serializers.Serializer, FileCollectionUpdateSerializerMixin):
+    class InputSerializer(serializers.Serializer):
         title = serializers.CharField(required=False)
         pinned = serializers.BooleanField(allow_null=True, default=None)
+        attachments = serializers.ListField(child=serializers.FileField(), required=False, max_length=10)
 
     def post(self, request, thread_id: int):
         serializer = self.InputSerializer(data=request.data)

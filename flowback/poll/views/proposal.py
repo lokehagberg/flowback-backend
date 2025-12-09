@@ -54,13 +54,13 @@ class PollProposalListAPI(APIView):
 
 @extend_schema(tags=['poll/proposal'])
 class PollProposalCreateAPI(APIView):
-    class InputSerializerDefault(serializers.ModelSerializer, FileCollectionCreateSerializerMixin):
+    class InputSerializerDefault(FileCollectionCreateSerializerMixin, serializers.ModelSerializer):
 
         class Meta:
             model = PollProposal
             fields = ('title', 'description', 'blockchain_id')
 
-    class InputSerializerSchedule(serializers.ModelSerializer, FileCollectionCreateSerializerMixin):
+    class InputSerializerSchedule(FileCollectionCreateSerializerMixin, serializers.ModelSerializer):
         start_date = serializers.DateTimeField()
         end_date = serializers.DateTimeField()
 

@@ -63,7 +63,7 @@ class PollListApi(APIView):
         end_date__gt = serializers.DateTimeField(required=False)
         end_date__lt = serializers.DateTimeField(required=False)
 
-    class OutputSerializer(serializers.ModelSerializer, FileCollectionListSerializerMixin):
+    class OutputSerializer(FileCollectionListSerializerMixin, serializers.ModelSerializer):
         class FileSerializer(serializers.Serializer):
             file = serializers.CharField()
             file_name = serializers.CharField()
@@ -150,7 +150,7 @@ class PollListApi(APIView):
 
 @extend_schema(tags=['poll'])
 class PollCreateAPI(APIView):
-    class InputSerializer(serializers.ModelSerializer, FileCollectionCreateSerializerMixin):
+    class InputSerializer(FileCollectionCreateSerializerMixin, serializers.ModelSerializer):
         tag = serializers.IntegerField(required=False)
         quorum = serializers.IntegerField(required=False)
         public = serializers.BooleanField(default=False)

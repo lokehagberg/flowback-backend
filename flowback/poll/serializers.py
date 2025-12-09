@@ -5,7 +5,7 @@ from flowback.group.serializers import GroupUserSerializer
 from flowback.poll.models import PollProposal, Poll
 
 
-class PollSerializer(serializers.Serializer, FileCollectionListSerializerMixin):
+class PollSerializer(FileCollectionListSerializerMixin, serializers.Serializer):
     class FileSerializer(serializers.Serializer):
         file = serializers.CharField()
         file_name = serializers.CharField()
@@ -46,7 +46,7 @@ class PollSerializer(serializers.Serializer, FileCollectionListSerializerMixin):
     quorum = serializers.IntegerField(allow_null=True)
 
 
-class PollProposalSerializer(serializers.Serializer, FileCollectionListSerializerMixin):
+class PollProposalSerializer(FileCollectionListSerializerMixin, serializers.Serializer):
     id = serializers.IntegerField()
     created_by = GroupUserSerializer(required=False)
     poll = serializers.IntegerField(source='poll_id')

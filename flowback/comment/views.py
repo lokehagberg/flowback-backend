@@ -34,7 +34,7 @@ class CommentListAPI(APIView):
         score__gt = serializers.IntegerField(required=False)
         score__lt = serializers.IntegerField(required=False)
 
-    class OutputSerializer(serializers.Serializer, FileCollectionListSerializerMixin):
+    class OutputSerializer(FileCollectionListSerializerMixin, serializers.Serializer):
         id = serializers.IntegerField()
         author_id = serializers.IntegerField()
         author_name = serializers.CharField(source='author.username')
@@ -86,7 +86,7 @@ class CommentAncestorListAPI(APIView):
 class CommentCreateAPI(APIView):
     lazy_action = comment_create
 
-    class InputSerializer(serializers.Serializer, FileCollectionCreateSerializerMixin):
+    class InputSerializer(FileCollectionCreateSerializerMixin, serializers.Serializer):
         parent_id = serializers.IntegerField(required=False)
         message = serializers.CharField(required=False)
 
@@ -104,7 +104,7 @@ class CommentCreateAPI(APIView):
 class CommentUpdateAPI(APIView):
     lazy_action = comment_update
 
-    class InputSerializer(serializers.Serializer, FileCollectionUpdateSerializerMixin):
+    class InputSerializer(FileCollectionUpdateSerializerMixin, serializers.Serializer):
         message = serializers.CharField(required=False)
 
     def post(self, request, *args, **kwargs):

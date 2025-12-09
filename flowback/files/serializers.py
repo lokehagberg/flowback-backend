@@ -8,13 +8,24 @@ class FileSerializer(serializers.Serializer):
 
 
 class FileCollectionListSerializerMixin:
-    attachments = FileSerializer(many=True, source='attachments.filesegment_set', allow_null=True)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if not hasattr(self, 'attachments'):
+            self.fields['attachments'] = FileSerializer(many=True, source='attachments.filesegment_set', allow_null=True)
 
 
 class FileCollectionCreateSerializerMixin:
-    attachments = serializers.ListField(child=serializers.FileField(), required=False, max_length=10)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if not hasattr(self, 'attachments'):
+            self.fields['attachments'] = serializers.ListField(child=serializers.FileField(), required=False, max_length=10)
 
 
 class FileCollectionUpdateSerializerMixin:
-    attachments_add = serializers.ListField(child=serializers.FileField(), required=False, max_length=10)
-    attachments_remove = serializers.ListField(child=serializers.IntegerField(), required=False)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if not hasattr(self, 'attachments_add'):
+            self.fields['attachments_add'] = serializers.ListField(child=serializers.FileField(), required=False,
+                                                                   max_length=10)
+        if not hasattr(self, 'attachments_remove'):
+            self.fields['attachments_remove'] = serializers.ListField(child=serializers.IntegerField(), required=False)
