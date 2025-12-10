@@ -160,6 +160,7 @@ class Report(BaseModel):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     title = models.CharField(max_length=255)
     description = models.TextField()
+    action_description = models.TextField(null=True, blank=True)
     group_id = models.IntegerField(null=True, blank=True)
     post_id = models.IntegerField(null=True, blank=True)
     post_type = models.CharField(max_length=50, null=True, blank=True)

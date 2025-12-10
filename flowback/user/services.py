@@ -313,6 +313,14 @@ def report_create(*, user_id: int, title: str, description: str, group_id: int, 
     return report
 
 
+def report_update(*, report_id: int, **data):
+    report = Report.objects.get(id=report_id)
+    non_side_effects_fields = ['title', 'description', 'action_description', 'group_id', 'post_id', 'post_type']
+
+    report, has_updated = model_update(instance=report, fields=non_side_effects_fields, data=data)
+    return report
+
+
 def user_schedule_event_create(user: User, **data):
     data['schedule_id'] = user.schedule.id
     return schedule_event_create(created_by=user, **data)

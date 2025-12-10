@@ -42,7 +42,7 @@ class ReportAdmin(admin.ModelAdmin):
     readonly_fields = ['created_at']
 
     list_display = ('user', 'title', 'created_at')
-    list_filter = ('user', 'title', 'description', 'created_at')
+    list_filter = ('user', 'title', 'description', 'action_description', 'created_at')
 
     fieldsets = [
         (None, {'fields': ['user', 'title', 'description', 'created_at']}),
