@@ -12,10 +12,10 @@ from flowback.kanban.views import KanbanEntryListApi, KanbanEntryCreateAPI, Kanb
 @extend_schema(tags=['user/kanban'])
 class UserKanbanEntryListAPI(KanbanEntryListApi):
     def get(self, request):
-        serializer = self.FilterSerializer(data=request.data)
+        serializer = self.FilterSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
 
-        entries = user_kanban_entry_list(fetched_by=request.user, **serializer.validated_data)
+        entries = user_kanban_entry_list(fetched_by=request.user, filters=serializer.validated_data)
         return get_paginated_response(pagination_class=self.Pagination,
                                       serializer_class=self.OutputSerializer,
                                       queryset=entries,

@@ -50,7 +50,7 @@ def get_user(fetched_by: User, user_id: int = None):
 
 def user_kanban_entry_list(*, fetched_by: User, filters=None):
     filters = filters or {}
-    return kanban_entry_list(kanban_id=fetched_by.kanban.id, filters=filters, subscriptions=True)
+    return kanban_entry_list(user=fetched_by, filters=filters)
 
 
 def user_list(*, fetched_by: User, filters=None):

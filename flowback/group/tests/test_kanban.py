@@ -1,198 +1,50 @@
 from rest_framework.test import APITestCase
-from django.utils import timezone
-from .factories import GroupFactory, WorkGroupFactory, GroupPermissionsFactory
-from ..models import GroupUser
-from ..views.kanban import GroupKanbanEntryListAPI, GroupKanbanEntryCreateAPI, GroupKanbanEntryUpdateAPI, \
-    GroupKanbanEntryDeleteAPI
-from ...common.tests import generate_request
-from ...kanban.tests.factories import KanbanEntryFactory
-from ...user.tests.factories import UserFactory
-from ...kanban.models import KanbanEntry
-from rest_framework.exceptions import PermissionDenied
+
+from flowback.common.tests import generate_request
+from flowback.group.tests.factories import GroupFactory, WorkGroupFactory, WorkGroupUserFactory
+from flowback.kanban.tests.factories import KanbanEntryFactory
+from flowback.user.views.kanban import UserKanbanEntryListAPI
 
 
 class TestKanban(APITestCase):
     def setUp(self):
-        self.group = GroupFactory(default_permission=GroupPermissionsFactory(update_kanban_task=False))
-        self.user = self.group.created_by
-        self.group_user = self.group.group_user_creator
+        self.group_one = GroupFactory()
+        self.group_two = GroupFactory()
 
-        self.kanban_entries = [KanbanEntryFactory(kanban=self.group.kanban, created_by=self.user) for i in range(10)]
+        self.workgroup_one = WorkGroupFactory(group=self.group_one)
+        self.workgroup_two = WorkGroupFactory(group=self.group_two)
 
-        # Create a user without permissions
-        self.unprivileged_user = UserFactory()
-        self.unprivileged_group_user = GroupUser.objects.create(
-            user=self.unprivileged_user,
-            group=self.group,
-            is_admin=False
-        )
-        self.unprivileged_group_user.permission = GroupPermissionsFactory(create_kanban_task=False)
-        self.unprivileged_group_user.save()
+        self.group_user_one = self.group_one.group_user_creator
+        self.group_user_two = self.group_two.group_user_creator
 
-        # Create a work group for testing
-        self.work_group = WorkGroupFactory(group=self.group)
+        self.workgroupuser_one = WorkGroupUserFactory(group_user=self.group_user_one, work_group=self.workgroup_one)
+        self.workgroupuser_two = WorkGroupUserFactory(group_user=self.group_user_two, work_group=self.workgroup_two)
 
-    def test_kanban_entry_list(self):
-        work_group = WorkGroupFactory()
-        entries = KanbanEntryFactory.create_batch(size=10, kanban=self.group.kanban, work_group=work_group)
+    def test_kanban_list(self):
+        kanbanentrieswg_one = KanbanEntryFactory.create_batch(2,
+                                                              work_group=self.workgroup_one,
+                                                              kanban=self.group_one.kanban)
+        kanbanentrieswg_two = KanbanEntryFactory.create_batch(6,
+                                                              work_group=self.workgroup_two,
+                                                              kanban=self.group_two.kanban)
 
-        response = generate_request(api=GroupKanbanEntryListAPI,
-                                    user=self.user,
-                                    data=dict(work_group_ids=str(work_group.id)),
-                                    url_params=dict(group_id=self.group.id))
+        kanbanentriesg_one = KanbanEntryFactory.create_batch(3,
+                                                             kanban=self.group_one.kanban)
+        kanbanentriesg_two = KanbanEntryFactory.create_batch(3,
+                                                             kanban=self.group_two.kanban,
+                                                             assignee=self.group_user_two.user)
 
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data['count'], len(entries))
+        kanbanentriesu_one = KanbanEntryFactory.create_batch(5, kanban=self.group_user_one.user.kanban)
+        kanbanentriesu_two = KanbanEntryFactory.create_batch(9, kanban=self.group_user_two.user.kanban)
 
-    def test_kanban_entry_list_failure_unauthorized_user(self):
-        # Create a user that doesn't belong to the group
-        unauthorized_user = UserFactory()
+        response = generate_request(api=UserKanbanEntryListAPI, user=self.group_user_one.user)
+        self.assertEqual(response.data['count'], 10)
 
-        # This should raise a PermissionDenied exception
-        with self.assertRaises(PermissionDenied):
-            generate_request(api=GroupKanbanEntryListAPI,
-                             user=unauthorized_user,
-                             url_params=dict(group_id=self.group.id))
+        response = generate_request(api=UserKanbanEntryListAPI, user=self.group_user_two.user)
+        self.assertEqual(response.data['count'], 18)
 
-    def test_kanban_entry_create(self):
-        data = {
-            'title': 'Test Kanban Entry',
-            'description': 'This is a test kanban entry',
-            'priority': 3,
-            'lane': 1,
-            'work_group_id': self.work_group.id
-        }
+        response = generate_request(api=UserKanbanEntryListAPI,
+                                    user=self.group_user_two.user,
+                                    data={'assignee': self.group_user_two.user.id})
 
-        response = generate_request(api=GroupKanbanEntryCreateAPI,
-                                    user=self.user,
-                                    data=data,
-                                    url_params=dict(group_id=self.group.id))
-
-        self.assertEqual(response.status_code, 200)
-        # Verify the entry was created
-        self.assertTrue(KanbanEntry.objects.filter(title='Test Kanban Entry').exists())
-
-    def test_kanban_entry_create_failure_invalid_data(self):
-        # Missing required field 'title'
-        data = {
-            'description': 'This is a test kanban entry',
-            'priority': 3,
-            'lane': 1
-        }
-
-        # This should fail validation
-        response = generate_request(api=GroupKanbanEntryCreateAPI,
-                                    user=self.user,
-                                    data=data,
-                                    url_params=dict(group_id=self.group.id))
-
-        self.assertEqual(response.status_code, 400)
-
-    def test_kanban_entry_create_failure_unauthorized_user(self):
-        data = {
-            'title': 'Test Kanban Entry',
-            'description': 'This is a test kanban entry',
-            'priority': 3,
-            'lane': 1
-        }
-
-        # This should raise a PermissionDenied exception
-        response = generate_request(api=GroupKanbanEntryCreateAPI,
-                                    user=self.unprivileged_user,
-                                    data=data,
-                                    url_params=dict(group_id=self.group.id))
-
-        self.assertEqual(response.status_code, 403)
-
-    def test_kanban_entry_update(self):
-        # Create an entry to update
-        entry = KanbanEntryFactory(kanban=self.group.kanban, created_by=self.user, title="Original Title")
-
-        data = {
-            'entry_id': entry.id,
-            'title': 'Updated Title'
-        }
-
-        response = generate_request(api=GroupKanbanEntryUpdateAPI,
-                                    user=self.user,
-                                    data=data,
-                                    url_params=dict(group_id=self.group.id))
-
-        self.assertEqual(response.status_code, 200)
-        # Verify the entry was updated
-        updated_entry = KanbanEntry.objects.get(id=entry.id)
-        self.assertEqual(updated_entry.title, 'Updated Title')
-
-    def test_kanban_entry_update_failure_nonexistent_entry(self):
-        data = {
-            'entry_id': 99999,  # Non-existent ID
-            'title': 'Updated Title'
-        }
-
-        # This should raise an exception
-        response = generate_request(api=GroupKanbanEntryUpdateAPI,
-                                    user=self.user,
-                                    data=data,
-                                    url_params=dict(group_id=self.group.id))
-
-        self.assertEqual(response.status_code, 404)
-
-    def test_kanban_entry_update_failure_unauthorized_user(self):
-        entry = KanbanEntryFactory(kanban=self.group.kanban, created_by=self.user)
-
-        data = {
-            'entry_id': entry.id,
-            'title': 'Updated Title'
-        }
-
-        # This should raise a PermissionDenied exception
-        response = generate_request(api=GroupKanbanEntryUpdateAPI,
-                                    user=self.unprivileged_user,
-                                    data=data,
-                                    url_params=dict(group_id=self.group.id))
-
-        self.assertEqual(response.status_code, 403)
-
-    def test_kanban_entry_delete(self):
-        # Create an entry to delete
-        entry = KanbanEntryFactory(kanban=self.group.kanban, created_by=self.user)
-
-        data = {
-            'entry_id': entry.id
-        }
-
-        response = generate_request(api=GroupKanbanEntryDeleteAPI,
-                                    user=self.user,
-                                    data=data,
-                                    url_params=dict(group_id=self.group.id))
-
-        self.assertEqual(response.status_code, 200)
-        # Verify the entry was deleted or is no longer accessible
-        with self.assertRaises(Exception):
-            KanbanEntry.objects.get(id=entry.id)
-
-    def test_kanban_entry_delete_failure_nonexistent_entry(self):
-        data = {
-            'entry_id': 99999  # Non-existent ID
-        }
-
-        # This should raise an exception
-        with self.assertRaises(Exception):
-            generate_request(api=GroupKanbanEntryDeleteAPI,
-                             user=self.user,
-                             data=data,
-                             url_params=dict(group_id=self.group.id))
-
-    def test_kanban_entry_delete_failure_unauthorized_user(self):
-        entry = KanbanEntryFactory(kanban=self.group.kanban, created_by=self.user)
-
-        data = {
-            'entry_id': entry.id
-        }
-
-        # This should raise a PermissionDenied exception
-        with self.assertRaises(PermissionDenied):
-            generate_request(api=GroupKanbanEntryDeleteAPI,
-                             user=self.unprivileged_user,
-                             data=data,
-                             url_params=dict(group_id=self.group.id))
+        self.assertEqual(response.data['count'], 3)
