@@ -44,7 +44,7 @@ def message_channel_participant_post_delete(sender, instance, **kwargs):
             f"{instance.channel.id}",
             dict(type="info",
                  method="message_notify",
-                 message=f"User {instance.user.username} joined the channel")
+                 message=f"User {instance.user.username} left the channel")
         )
 
     Message.objects.create(user=instance.user,
