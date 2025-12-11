@@ -8,11 +8,12 @@ from rest_framework.exceptions import ValidationError
 
 from backend.settings import FLOWBACK_KANBAN_PRIORITY_LIMIT, FLOWBACK_KANBAN_LANES
 from flowback.common.models import BaseModel
+from flowback.common.validators import FieldNotBlankValidator
 
 
 class Kanban(BaseModel):
-    name = models.CharField(max_length=255)
-    origin_type = models.CharField(max_length=255)
+    name = models.CharField(max_length=255, validators=[FieldNotBlankValidator])
+    origin_type = models.CharField(max_length=255, validators=[FieldNotBlankValidator])
     origin_id = models.IntegerField()
 
     class Meta:
@@ -25,8 +26,8 @@ class KanbanEntry(BaseModel):
     assignee = models.ForeignKey('user.User', null=True, blank=True, on_delete=models.SET_NULL, related_name='kanban_entry_assignee')
     end_date = models.DateTimeField(null=True, blank=True)
     priority = models.IntegerField(default=1)
-    title = models.CharField(max_length=255)
-    description = models.TextField(null=True, blank=True)
+    title = models.CharField(max_length=255, validators=[FieldNotBlankValidator])
+    description = models.TextField(null=True, blank=True, validators=[FieldNotBlankValidator])
     attachments = models.ForeignKey('files.FileCollection', on_delete=models.SET_NULL, null=True, blank=True)
     work_group = models.ForeignKey('group.WorkGroup', on_delete=models.CASCADE, null=True, blank=True)
     lane = models.IntegerField(validators=[MinValueValidator(1)])
@@ -45,7 +46,7 @@ class KanbanEntry(BaseModel):
 
 
 class KanbanEntryTag(BaseModel):
-    name = models.CharField(max_length=255)
+    name = models.CharField(max_length=255, validators=[FieldNotBlankValidator])
 
 
 class KanbanSubscription(BaseModel):

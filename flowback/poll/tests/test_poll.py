@@ -107,7 +107,9 @@ class PollTest(APITestCase):
 
         data = dict(title='notification test poll', description='testing notifications',
                     poll_type=4, public=True, tag=self.group_tag.id,
-                    pinned=False, dynamic=False, attachments=[SimpleUploadedFile('test.jpg', b'test')],
+                    pinned=False, dynamic=False, attachments=[SimpleUploadedFile('test.txt',
+                                                                                 b'test',
+                                                                                 content_type='text/plain')],
                     **generate_poll_phase_kwargs('base'))
 
         # Use generate_request to create the poll

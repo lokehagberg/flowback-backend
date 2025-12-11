@@ -14,6 +14,7 @@ from django_celery_beat.models import PeriodicTask, CrontabSchedule
 from rest_framework.exceptions import ValidationError
 
 from flowback.common.models import BaseModel
+from flowback.common.validators import FieldNotBlankValidator
 from django.utils.translation import gettext_lazy as _
 
 from flowback.notification.models import NotifiableModel, NotificationObject
@@ -212,7 +213,7 @@ post_save.connect(Schedule.post_save, Schedule)
 
 class ScheduleTag(BaseModel, NotifiableModel):
     schedule = models.ForeignKey(Schedule, on_delete=models.CASCADE)
-    name = models.CharField(max_length=100)
+    name = models.CharField(max_length=100, validators=[FieldNotBlankValidator])
 
     @classmethod
     def post_save(cls, instance, created, *args, **kwargs):
@@ -238,8 +239,8 @@ class ScheduleEvent(BaseModel, NotifiableModel):
         YEARLY = 4, _("Yearly")
 
     schedule = models.ForeignKey(Schedule, on_delete=models.CASCADE)
-    title = models.TextField()
-    description = models.TextField(null=True, blank=True)
+    title = models.TextField(validators=[FieldNotBlankValidator])
+    description = models.TextField(null=True, blank=True, validators=[FieldNotBlankValidator])
     start_date = models.DateTimeField()
     end_date = models.DateTimeField(null=True, blank=True)
     active = models.BooleanField(default=True)

@@ -6,6 +6,7 @@ from django.db.models.signals import post_save, post_delete
 from tree_queries.models import TreeNode
 
 from flowback.common.models import BaseModel
+from flowback.common.validators import FieldNotBlankValidator
 
 
 class CommentSection(BaseModel):
@@ -15,7 +16,7 @@ class CommentSection(BaseModel):
 class Comment(BaseModel, TreeNode):
     comment_section = models.ForeignKey(CommentSection, on_delete=models.CASCADE)
     author = models.ForeignKey("user.User", on_delete=models.CASCADE)
-    message = models.TextField(max_length=10000, null=True, blank=True)
+    message = models.TextField(max_length=10000, null=True, blank=True, validators=[FieldNotBlankValidator])
     attachments = models.ForeignKey("files.FileCollection", on_delete=models.SET_NULL, null=True, blank=True)
     edited = models.BooleanField(default=False)
     active = models.BooleanField(default=True)

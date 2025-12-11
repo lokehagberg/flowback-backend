@@ -11,6 +11,7 @@ from backend.settings import FLOWBACK_DEFAULT_GROUP_JOIN
 from flowback.chat.models import MessageChannel, MessageChannelParticipant
 from flowback.comment.models import CommentSection, comment_section_create, comment_section_create_model_default
 from flowback.common.models import BaseModel
+from flowback.common.validators import FieldNotBlankValidator
 from flowback.files.models import FileCollection
 from flowback.kanban.models import Kanban, KanbanSubscription
 from flowback.notification.models import NotifiableModel, NotificationChannel
@@ -21,7 +22,7 @@ from django.db import models
 
 # Create your models here.
 class GroupFolder(BaseModel):
-    name = models.CharField(max_length=255)
+    name = models.CharField(max_length=255, validators=[FieldNotBlankValidator])
 
     def __str__(self) -> str:
         return f'{self.id} - {self.name}'
@@ -29,7 +30,7 @@ class GroupFolder(BaseModel):
 
 # Permission class for each Group
 class GroupPermissions(BaseModel):
-    role_name = models.TextField(default='default')
+    role_name = models.TextField(default='default', validators=[FieldNotBlankValidator])
     author = models.ForeignKey('Group', on_delete=models.CASCADE, null=True, blank=True)
     invite_user = models.BooleanField(default=False)
     create_poll = models.BooleanField(default=True)
@@ -90,8 +91,8 @@ class Group(BaseModel, NotifiableModel, ScheduleModel):
                                               null=True,
                                               blank=True)
 
-    name = models.TextField(unique=True)
-    description = models.TextField(null=True, blank=True)
+    name = models.TextField(unique=True, validators=[FieldNotBlankValidator])
+    description = models.TextField(null=True, blank=True, validators=[FieldNotBlankValidator])
     image = models.ImageField(upload_to='group/image', null=True, blank=True)
     cover_image = models.ImageField(upload_to='group/cover_image', null=True, blank=True)
     hide_poll_users = models.BooleanField(default=False)  # Hides users in polls, TODO remove bool from views
@@ -251,8 +252,8 @@ post_delete.connect(Group.post_delete, sender=Group)
 
 # Permission Tags for each group, and for user to put on delegators
 class GroupTags(BaseModel):
-    name = models.TextField()
-    description = models.TextField(null=True, blank=True)
+    name = models.TextField(validators=[FieldNotBlankValidator])
+    description = models.TextField(null=True, blank=True, validators=[FieldNotBlankValidator])
     group = models.ForeignKey('Group', on_delete=models.CASCADE)
     active = models.BooleanField(default=True)
 
@@ -357,7 +358,7 @@ post_delete.connect(GroupUser.post_delete, sender=GroupUser)
 
 # Work Group in Flowback
 class WorkGroup(BaseModel, ScheduleModel):
-    name = models.CharField(max_length=255)
+    name = models.CharField(max_length=255, validators=[FieldNotBlankValidator])
     direct_join = models.BooleanField(default=False)
     group = models.ForeignKey(Group, on_delete=models.CASCADE)
     chat = models.ForeignKey(MessageChannel, on_delete=models.PROTECT)
@@ -434,8 +435,8 @@ class WorkGroupUserJoinRequest(BaseModel):
 # GroupThreads are mainly used for creating comment sections for various topics
 class GroupThread(BaseModel, NotifiableModel):
     created_by = models.ForeignKey(GroupUser, on_delete=models.CASCADE)
-    title = models.CharField(max_length=200)
-    description = models.TextField(null=True, blank=True)
+    title = models.CharField(max_length=200, validators=[FieldNotBlankValidator])
+    description = models.TextField(null=True, blank=True, validators=[FieldNotBlankValidator])
     pinned = models.BooleanField(default=False)
     comment_section = models.ForeignKey(CommentSection, default=comment_section_create, on_delete=models.DO_NOTHING)
     active = models.BooleanField(default=True)

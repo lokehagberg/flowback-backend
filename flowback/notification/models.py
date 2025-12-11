@@ -16,6 +16,7 @@ from rest_framework.exceptions import ValidationError
 from tree_queries.models import TreeNode
 
 from flowback.common.models import BaseModel
+from flowback.common.validators import FieldNotBlankValidator
 
 
 # NotificationObject is created containing data for each occurrence
@@ -29,8 +30,8 @@ class NotificationObject(BaseModel):
         ERROR = 'ERROR', 'Error'
 
     action = models.CharField(choices=Action.choices)
-    message = models.TextField(max_length=2000)
-    tag = models.CharField(max_length=255, help_text='Tag of the notification')
+    message = models.TextField(max_length=2000, validators=[FieldNotBlankValidator])
+    tag = models.CharField(max_length=255, help_text='Tag of the notification', validators=[FieldNotBlankValidator])
     data = models.JSONField(null=True, blank=True)  # Suggested to store relevant data for user
     timestamp = models.DateTimeField(default=timezone.now)
     channel = models.ForeignKey('notification.NotificationChannel', on_delete=models.CASCADE)
@@ -117,7 +118,7 @@ class NotificationSubscription(BaseModel):
 
 class NotificationSubscriptionTag(BaseModel):
     subscription = models.ForeignKey('notification.NotificationSubscription', on_delete=models.CASCADE)
-    name = models.CharField(max_length=255)
+    name = models.CharField(max_length=255, validators=[FieldNotBlankValidator])
     reminders = ArrayField(models.PositiveIntegerField(), help_text='Reminder times for the given tag', null=True, blank=True)
 
     class Meta:
