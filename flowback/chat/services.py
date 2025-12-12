@@ -73,7 +73,6 @@ def message_delete(*, user_id: int, message_id: int):
     if not user == message.user:
         raise ValidationError('User is not author of message')
 
-    message.message = ""
     message.active = False
     message.save()
 

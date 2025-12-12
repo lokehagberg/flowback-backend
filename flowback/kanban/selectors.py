@@ -30,7 +30,8 @@ def kanban_entry_list(*, user: User, filters=None):
     qs = KanbanEntry.objects.filter(Q(Q(kanban__origin_type="user") & Q(kanban__origin_id=user.id)) |
                                     Q(Q(kanban__group__active=True)
                                       & Q(kanban__group__groupuser__user=user)
-                                      & Q(kanban__group__groupuser__active=True))
+                                      & Q(kanban__group__groupuser__active=True)),
+                                    active=True
                                     ).exclude(Q(work_group__isnull=False)
                                               & ~Q(work_group__workgroupuser__group_user__user=user)
                                               & Q(work_group__workgroupuser__active=True))

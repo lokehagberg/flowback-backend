@@ -44,11 +44,11 @@ class TestKanban(APITestCase):
             user=self.user,
             data={
                 "entry_id": entry.id,
-                "attachments": [file1, file2]
+                "attachments_add": [file1, file2]
             }
         )
 
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 200, response.data)
 
         # Validate attachments have been saved and linked to the entry
         entry.refresh_from_db()

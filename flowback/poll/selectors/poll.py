@@ -1,14 +1,13 @@
 from typing import Union
 
 import django_filters
-from django.db import models
 from django.db.models import Q, Exists, OuterRef, Count, Subquery, Case, When, Value, CharField, F
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
 from flowback.comment.models import Comment
 from flowback.common.filters import ExistsFilter, NumberInFilter
-from flowback.group.models import Group, GroupUser
+from flowback.group.models import Group
 from flowback.poll.models import Poll, PollPhaseTemplate, PollPredictionStatement
 from flowback.user.models import User
 from flowback.group.selectors.permission import group_user_permissions
@@ -111,7 +110,7 @@ def poll_list(*, fetched_by: User, group_id: Union[int, None], filters=None):
 
 
     joined_groups = Group.objects.filter(id=OuterRef('created_by__group_id'), groupuser__user__in=[fetched_by])
-    qs = Poll.objects.filter(base_qs).annotate(phase=poll_phase,
+    qs = Poll.objects.filter(base_qs, active=True).annotate(phase=poll_phase,
                 group_joined=Exists(joined_groups),
                 total_proposals=Count('pollproposal', distinct=True),
 

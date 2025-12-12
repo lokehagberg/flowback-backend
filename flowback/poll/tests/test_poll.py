@@ -259,11 +259,11 @@ class PollTest(APITestCase):
         response = self.delete_poll(poll=poll, user=self.group_user_one.user)
 
         self.assertTrue(response.status_code == 400)
-        self.assertTrue(Poll.objects.filter(id=poll.id).exists())
+        self.assertTrue(Poll.objects.get(id=poll.id).active)
 
     def test_delete_poll_in_progress_admin(self):
         poll = PollFactory(created_by=self.group_user_one, **generate_poll_phase_kwargs(poll_start_phase='proposal'))
         response = self.delete_poll(poll=poll, user=self.group_user_creator.user)
 
         self.assertTrue(response.status_code == 200)
-        self.assertTrue(not Poll.objects.filter(id=poll.id).exists())
+        self.assertFalse(Poll.objects.get(id=poll.id).active)

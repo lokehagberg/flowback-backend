@@ -389,11 +389,15 @@ class NotificationChannel(BaseModel, TreeNode):
     def unsubscribe(self, *, user):
         self.subscribe(user=user)
 
-    def unsubscribe_all(self, *, user):
+    def unsubscribe_all(self, *, user = None):
         """
-        Deletes all subscriptions for the given user, including related channels.
+        Deletes all subscriptions for the given user (or all if user is None), including related channels.
         """
-        NotificationSubscription.objects.filter(channel__in=self.descendants(include_self=True)).delete()
+        extra = {}
+        if user is not None:
+            extra['user_id'] = user if isinstance(user, int) else user.id
+
+        NotificationSubscription.objects.filter(channel__in=self.descendants(include_self=True), **extra).delete()
 
 
 def generate_notification_channel(sender, instance, created, *args, **kwargs):

@@ -20,6 +20,7 @@ class PredictionStatement(BaseModel):
                              blank=True,
                              max_length=10)
     blockchain_id = models.PositiveIntegerField(null=True, blank=True, default=None)
+    active = models.BooleanField(default=True)
 
     class Meta:
         abstract = True

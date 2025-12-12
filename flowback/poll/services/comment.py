@@ -9,7 +9,7 @@ from flowback.poll.notify import notify_poll_comment
 
 def poll_comment_create(*, author_id: int, poll_id: int, message: str = None, attachments: list = None,
                         parent_id: int = None) -> Comment:
-    poll = get_object(Poll, id=poll_id)
+    poll = get_object(Poll, id=poll_id, active=True)
     group_user = group_user_permissions(user=author_id, group=poll.created_by.group.id)
 
     comment = comment_create(author_id=author_id,
@@ -28,7 +28,7 @@ def poll_comment_create(*, author_id: int, poll_id: int, message: str = None, at
 
 
 def poll_comment_update(*, fetched_by: int, poll_id: int, comment_id: int, data) -> Comment:
-    poll = get_object(Poll, id=poll_id)
+    poll = get_object(Poll, id=poll_id, active=True)
     group_user_permissions(user=fetched_by, group=poll.created_by.group.id)
 
     return comment_update(fetched_by=fetched_by,
@@ -39,7 +39,7 @@ def poll_comment_update(*, fetched_by: int, poll_id: int, comment_id: int, data)
 
 
 def poll_comment_delete(*, fetched_by: int, poll_id: int, comment_id: int):
-    poll = get_object(Poll, id=poll_id)
+    poll = get_object(Poll, id=poll_id, active=True)
 
     force = bool(group_user_permissions(user=fetched_by,
                                         group=poll.created_by.group,
@@ -53,7 +53,7 @@ def poll_comment_delete(*, fetched_by: int, poll_id: int, comment_id: int):
 
 
 def poll_comment_vote(*, fetched_by: int, poll_id: int, comment_id: int, vote: bool = None):
-    poll = Poll.objects.get(id=poll_id)
+    poll = Poll.objects.get(id=poll_id, active=True)
     group_user_permissions(user=fetched_by, group=poll.created_by.group)
 
     return comment_vote(fetched_by=fetched_by,

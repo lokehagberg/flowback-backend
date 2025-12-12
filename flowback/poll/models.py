@@ -314,8 +314,9 @@ class PollProposal(BaseModel):
     description = models.TextField(null=True, blank=True, validators=[FieldNotBlankValidator])
     attachments = models.ForeignKey(FileCollection, on_delete=models.CASCADE, null=True, blank=True)
     score = models.IntegerField(null=True, blank=True)
-
     blockchain_id = models.PositiveIntegerField(null=True, blank=True, default=None)
+
+    active = models.BooleanField(default=True)
 
 
 class PollProposalTypeSchedule(BaseModel):

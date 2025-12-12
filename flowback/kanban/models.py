@@ -31,6 +31,7 @@ class KanbanEntry(BaseModel):
     attachments = models.ForeignKey('files.FileCollection', on_delete=models.SET_NULL, null=True, blank=True)
     work_group = models.ForeignKey('group.WorkGroup', on_delete=models.CASCADE, null=True, blank=True)
     lane = models.IntegerField(validators=[MinValueValidator(1)])
+    active = models.BooleanField(default=True)
 
     def clean(self):
         if self.priority > FLOWBACK_KANBAN_PRIORITY_LIMIT:
