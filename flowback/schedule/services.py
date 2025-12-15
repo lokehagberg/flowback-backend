@@ -38,7 +38,6 @@ def schedule_event_create(*,
         if not all([assignee.group == group for assignee in assignees.all()]):
             raise ValidationError("Not all group users are assignable to this event.")
 
-    schedule = Schedule.objects.get(id=schedule_id)
     fields.pop('schedule_id')
     fields.pop('kwargs')
 
