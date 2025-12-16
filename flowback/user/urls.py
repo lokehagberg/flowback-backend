@@ -14,7 +14,8 @@ from flowback.user.views.user import (UserCreateApi,
                                       UserForgotPasswordApi,
                                       UserForgotPasswordVerifyApi, UserGetChatChannelAPI, UserChatInviteListAPI,
                                       UserChatInviteAPI, UserLogoutAPI, UserLeaveChatChannelAPI,
-                                      UserChatChannelUpdateAPI, UserNotificationSubscribeAPI)
+                                      UserChatChannelUpdateAPI, UserNotificationSubscribeAPI, UserBookmarkCreateAPI,
+                                      UserBookmarkDeleteAPI)
 from flowback.user.views.kanban import (UserKanbanEntryListAPI,
                                         UserKanbanEntryCreateAPI,
                                         UserKanbanEntryUpdateAPI,
@@ -51,6 +52,9 @@ user_patterns = [
     path('user/chat/invite', UserChatInviteAPI.as_view(), name='user_chat_invite'),
     path('user/chat/update', UserChatChannelUpdateAPI.as_view(), name='user_chat_channel_update'),
     path('report/create', ReportCreateAPI.as_view(), name='report_create'),
+
+    path('user/bookmark/create', UserBookmarkCreateAPI.as_view(), name='user_bookmark_create'),
+    path('user/bookmark/delete', UserBookmarkDeleteAPI.as_view(), name='user_bookmark_delete'),
 ]
 
 if not FLOWBACK_DISABLE_DEFAULT_USER_REGISTRATION:
