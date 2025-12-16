@@ -8,7 +8,7 @@ from flowback.common.filters import NumberInFilter
 from flowback.group.models import Group, GroupUser, GroupThread, GroupThreadVote
 from flowback.poll.models import Poll, PollVoting
 from flowback.kanban.selectors import kanban_entry_list
-from flowback.user.models import User, UserChatInvite
+from flowback.user.models import User, UserChatInvite, UserBookmark
 from backend.settings import env
 
 
@@ -82,6 +82,7 @@ class UserHomeFeedFilter(django_filters.FilterSet):
     user_vote = django_filters.BooleanFilter(lookup_expr='exact')
     pinned = django_filters.BooleanFilter(lookup_expr='exact')
     group_ids = NumberInFilter(field_name='created_by__group_id')
+    bookmarked = django_filters.BooleanFilter()
 
 
 # TODO add relevant Count (proposal, prediction, comments) to the home feed if possible
@@ -104,7 +105,8 @@ def user_home_feed(*, fetched_by: User, filters=None):
                       'related_model',
                       'group_joined',
                       'user_vote',
-                      'pinned']
+                      'pinned',
+                      'bookmarked']
 
     q = (Q(created_by__group__groupuser__user__in=[fetched_by])
          & Q(created_by__group__groupuser__active=True))  # User in group
@@ -132,8 +134,11 @@ def user_home_feed(*, fetched_by: User, filters=None):
 
     group_thread_vote = GroupThreadVote.objects.filter(thread_id=OuterRef('id'),
                                                        created_by__user=fetched_by).values('vote')
+    bookmarked = UserBookmark.objects.filter(user=fetched_by, content_type__model='groupthread', object_id=OuterRef('id'))
+
     thread_qs = thread_qs.annotate(related_model=models.Value('thread', models.CharField()),
                                    group_id=F('created_by__group_id'),
+                                   bookmarked=Exists(bookmarked),
                                    group_joined=Exists(joined_groups),
                                    user_vote=Subquery(group_thread_vote))
     thread_qs = thread_qs.values(*related_fields)
@@ -164,8 +169,11 @@ def user_home_feed(*, fetched_by: User, filters=None):
         & Q(created_by__group__groupuser__is_admin=True))
 
     poll_user_vote = PollVoting.objects.filter(poll_id=OuterRef('id'), created_by__user=fetched_by)
+    bookmarked = UserBookmark.objects.filter(user=fetched_by, content_type__model='groupthread', object_id=OuterRef('id'))
+
     poll_qs = poll_qs.annotate(related_model=models.Value('poll', models.CharField()),
                                group_id=F('created_by__group_id'),
+                               bookmarked=Exists(bookmarked),
                                group_joined=Exists(joined_groups),
                                user_vote=Exists(poll_user_vote))
     poll_qs = poll_qs.values(*related_fields)

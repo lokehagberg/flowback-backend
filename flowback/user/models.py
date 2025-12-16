@@ -2,6 +2,8 @@ import uuid
 
 from django.contrib.auth.base_user import BaseUserManager
 from django.contrib.auth.validators import UnicodeUsernameValidator
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
 from django.db.models.signals import post_save, post_delete
@@ -142,6 +144,16 @@ class User(AbstractBaseUser, PermissionsMixin, NotifiableModel, ScheduleModel):
 
 post_save.connect(User.post_save, sender=User)
 post_delete.connect(User.post_delete, sender=User)
+
+
+class UserBookmark(BaseModel):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey('content_type', 'object_id')
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['user', 'content_type', 'object_id'], name='unique_bookmark')]
 
 
 class OnboardUser(BaseModel):
