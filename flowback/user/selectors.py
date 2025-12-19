@@ -72,7 +72,7 @@ class UserHomeFeedFilter(django_filters.FilterSet):
                                                      ('-pinned', 'pinned')))
     id = django_filters.NumberFilter(lookup_expr='exact')
     created_by_id = django_filters.NumberFilter(lookup_expr='exact')
-    work_group_ids = NumberInFilter()
+    work_group_ids = NumberInFilter(field_name='work_group_id')
     title__icontains = django_filters.CharFilter(lookup_expr='icontains')
     description = django_filters.CharFilter(lookup_expr='icontains')
     created_at__gt = django_filters.DateTimeFilter(field_name='created_at', lookup_expr='gt')
