@@ -411,7 +411,7 @@ class WorkGroupUser(BaseModel):
     @classmethod
     def post_delete(cls, instance, *args, **kwargs):
         instance.chat_participant.delete()  # Leave chatroom
-        instance.work_group.schedule.remove_user(user=instance)
+        instance.work_group.schedule.remove_user(user=instance.group_user.user)
 
     class Meta:
         constraints = [models.UniqueConstraint(name='WorkGroupUser_group_user_and_work_group_is_unique',

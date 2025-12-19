@@ -150,6 +150,7 @@ class UserTest(APITestCase):
         polls = PollFactory.create_batch(size=5, created_by=group_user)
         polls[1].pinned = True
         polls[3].work_group = work_group_user.work_group
+        polls[3].public = False
         polls[1].save()
         polls[3].save()
 
@@ -180,6 +181,15 @@ class UserTest(APITestCase):
 
         self.assertEqual(response_workgroup_test.data['count'], 1)
         self.assertEqual(response_workgroup_test.data['results'][0]['work_group_id'], work_group_user.work_group.id)
+
+        work_group_user.delete()
+
+        response_workgroup_test = generate_request(api=UserHomeFeedAPI,
+                                                   user=group_user.user,
+                                                   data=dict(order_by='pinned,created_at_desc',
+                                                             work_group_ids=f'{work_group_user.work_group.id}'))
+
+        self.assertEqual(response_workgroup_test.data['count'], 0)
 
         # Check if order_by is for created_at, in descending order
         for x in range(1, response.data['count']):

@@ -150,7 +150,7 @@ def user_home_feed(*, fetched_by: User, filters=None):
         q & Q(work_group__isnull=True)  # User in Group
 
         | Q(created_by__group__public=True)
-        & ~Q(created_by__group__groupuser__user__in=[fetched_by])  # Group is Public
+        & ~Q(created_by__group__groupuser__user__in=[fetched_by])  # Group is Public and Workgroup is null
         & Q(work_group__isnull=True)
         & Q(public=True)
 
