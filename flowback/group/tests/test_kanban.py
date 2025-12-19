@@ -48,3 +48,9 @@ class TestKanban(APITestCase):
                                     data={'assignee': self.group_user_two.user.id})
 
         self.assertEqual(response.data['count'], 3)
+
+        response = generate_request(api=UserKanbanEntryListAPI,
+                                    user=self.group_user_two.user,
+                                    data={'title__icontains': kanbanentriesg_two[0].title})
+
+        self.assertEqual(response.data['count'], 1)

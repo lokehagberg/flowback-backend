@@ -22,6 +22,7 @@ class KanbanEntryFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = KanbanEntry
 
+    title = factory.lazy_attribute(lambda _: fake.name())
     created_by = factory.SubFactory(UserFactory)
     description = factory.lazy_attribute(lambda _: fake.sentence())
     priority = factory.LazyAttribute(lambda _: random.randint(1, math.floor(FLOWBACK_KANBAN_PRIORITY_LIMIT / 2)))
