@@ -128,9 +128,10 @@ def user_home_feed(*, fetched_by: User, filters=None):
         | q & Q(work_group__isnull=False)  # User in workgroup
         & Q(work_group__workgroupuser__group_user__user=fetched_by)
 
-        | q & Q(work_group__isnull=False)  # User is admin in group
-        & Q(created_by__group__groupuser__user=fetched_by)
-        & Q(created_by__group__groupuser__is_admin=True))
+        # | q & Q(work_group__isnull=False)  # User is admin in group
+        # & Q(created_by__group__groupuser__user=fetched_by)
+        # & Q(created_by__group__groupuser__is_admin=True)
+    )
 
     group_thread_vote = GroupThreadVote.objects.filter(thread_id=OuterRef('id'),
                                                        created_by__user=fetched_by).values('vote')
@@ -163,10 +164,11 @@ def user_home_feed(*, fetched_by: User, filters=None):
         & Q(work_group__isnull=True)
         & Q(public=True)
 
-        | q & Q(work_group__isnull=False)  # User is admin in group
-        & Q(created_by__group__groupuser__user=fetched_by)
-        & ~Q(created_by__group__groupuser__user__in=[fetched_by])
-        & Q(created_by__group__groupuser__is_admin=True))
+        # | q & Q(work_group__isnull=False)  # User is admin in group
+        # & Q(created_by__group__groupuser__user=fetched_by)
+        # & ~Q(created_by__group__groupuser__user__in=[fetched_by])
+        # & Q(created_by__group__groupuser__is_admin=True)
+    )
 
     poll_user_vote = PollVoting.objects.filter(poll_id=OuterRef('id'), created_by__user=fetched_by)
     bookmarked = UserBookmark.objects.filter(user=fetched_by, content_type__model='groupthread', object_id=OuterRef('id'))
