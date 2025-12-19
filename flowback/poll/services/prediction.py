@@ -5,6 +5,7 @@ from django.db.models import Sum, Case, When, F, OuterRef, Subquery, Count
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
+from backend.settings import FLOWBACK_PREDICTION_VOTE_ON_RESULT_PHASE
 from ..models import (PollPredictionBet,
                       PollPredictionStatement,
                       PollPredictionStatementSegment,
@@ -169,7 +170,11 @@ def poll_prediction_statement_vote_update(user: Union[int, User],
     group_user = group_user_permissions(user=user,
                                         group=prediction_statement_vote.prediction_statement.poll.created_by.group)
 
-    prediction_statement_vote.prediction_statement.poll.check_phase('prediction_vote', 'result')
+    if FLOWBACK_PREDICTION_VOTE_ON_RESULT_PHASE:
+        prediction_statement_vote.prediction_statement.poll.check_phase('prediction_vote', 'result')
+
+    else:
+        prediction_statement_vote.prediction_statement.poll.check_phase('prediction_vote')
 
     if prediction_statement_vote.created_by != group_user:
         raise ValidationError('Prediction statement vote not created by user')
@@ -191,7 +196,11 @@ def poll_prediction_statement_vote_delete(user: Union[int, User], prediction_sta
     group_user = group_user_permissions(user=user,
                                         group=prediction_statement_vote.prediction_statement.poll.created_by.group)
 
-    prediction_statement_vote.prediction_statement.poll.check_phase('prediction_vote', 'result')
+    if FLOWBACK_PREDICTION_VOTE_ON_RESULT_PHASE:
+        prediction_statement_vote.prediction_statement.poll.check_phase('prediction_vote', 'result')
+
+    else:
+        prediction_statement_vote.prediction_statement.poll.check_phase('prediction_vote')
 
     if prediction_statement_vote.created_by != group_user:
         raise ValidationError('Prediction statement vote not created by user')
