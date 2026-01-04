@@ -1,3 +1,4 @@
+from asgiref.sync import sync_to_async
 from channels.testing import WebsocketCommunicator
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APITransactionTestCase
@@ -83,6 +84,29 @@ class TestChatWebsocket(APITransactionTestCase):
 
         await communicator_one.disconnect()
         await communicator_two.disconnect()
+
+    async def test_send_message_new_user(self):
+        communicator_one = await self.connect(user=self.user_one)
+        communicator_two = await self.connect(user=self.user_two)
+        communicator_three = await self.connect(user=self.user_three)
+        communication_four = await self.connect(user=self.user_four)
+
+        channel_factory = sync_to_async(MessageChannelFactory)
+        participant_factory = sync_to_async(MessageChannelParticipantFactory)
+
+        channel = await channel_factory(origin_name='user')
+        await participant_factory(channel=channel, user=self.user_one)
+        await participant_factory(channel=channel, user=self.user_three)
+
+        message = dict(channel_id=channel.id, message="test message", method="message_create")
+        await communicator_one.send_json_to(message)
+
+        await communicator_three.receive_json_from(timeout=5)
+
+        await communicator_one.disconnect()
+        await communicator_two.disconnect()
+        await communicator_three.disconnect()
+        await communication_four.disconnect()
 
     async def test_send_message_group(self):
         def message_check(data):

@@ -39,7 +39,8 @@ def poll_prediction_statement_list(*, fetched_by: User, group_id: int, filters=N
     user_vote = PollPredictionStatementVote.objects.filter(prediction_statement=OuterRef('pk'),
                                                            created_by=group_user).values('vote')
 
-    qs = PollPredictionStatement.objects.filter(poll__created_by__group_id=group_id
+    qs = PollPredictionStatement.objects.filter(poll__created_by__group_id=group_id,
+                                                active=True
                                                 ).annotate(score=score,
                                                            vote_yes=vote_yes,
                                                            vote_no=vote_no,
@@ -67,5 +68,6 @@ def poll_prediction_bet_list(*, fetched_by: User, group_id: int = None, filters=
     group_user_permissions(user=fetched_by, group=group_id)
 
     qs = PollPredictionBet.objects.filter(prediction_statement__created_by__group_id=group_id,
+                                          prediction_statement__active=True,
                                           created_by__user=fetched_by).all()
     return BasePollPredictionBetFilter(filters, qs).qs

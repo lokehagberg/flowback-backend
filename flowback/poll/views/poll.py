@@ -1,4 +1,3 @@
-from django.shortcuts import render
 from drf_spectacular.utils import extend_schema
 
 # Create your views here.
@@ -31,6 +30,7 @@ class PollListApi(APIView):
         order_by = serializers.CharField(default='start_date_desc',
                                          required=False)  # TODO add desc, add a way to limit order_by fields to two.
         pinned = serializers.BooleanField(required=False, default=None, allow_null=True)
+        bookmarked = serializers.BooleanField(required=False, default=None, allow_null=True)
 
         title = serializers.CharField(required=False)
         title__icontains = serializers.CharField(required=False)

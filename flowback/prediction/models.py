@@ -3,12 +3,13 @@ from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
 
 from flowback.common.models import BaseModel
+from flowback.common.validators import FieldNotBlankValidator
 from flowback.files.models import FileCollection
 
 
 class PredictionStatement(BaseModel):
-    title = models.CharField(max_length=255)
-    description = models.TextField(max_length=2000, null=True, blank=True)
+    title = models.CharField(max_length=255, validators=[FieldNotBlankValidator])
+    description = models.TextField(max_length=2000, null=True, blank=True, validators=[FieldNotBlankValidator])
     end_date = models.DateTimeField()
     # created_by: represents ownership
     # fk: represents relationship
@@ -19,6 +20,7 @@ class PredictionStatement(BaseModel):
                              blank=True,
                              max_length=10)
     blockchain_id = models.PositiveIntegerField(null=True, blank=True, default=None)
+    active = models.BooleanField(default=True)
 
     class Meta:
         abstract = True

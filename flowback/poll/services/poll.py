@@ -119,7 +119,7 @@ def poll_create(*, user_id: int,
 
 
 def poll_update(*, user_id: int, poll_id: int, data) -> Poll:
-    poll = get_object(Poll, id=poll_id)
+    poll = get_object(Poll, id=poll_id, active=True)
     group_user = group_user_permissions(user=user_id, group=poll.created_by.group.id)
 
     non_side_effect_fields = ['title', 'description', 'pinned', 'schedule_poll_meeting_link']
@@ -142,7 +142,7 @@ def poll_update(*, user_id: int, poll_id: int, data) -> Poll:
 
 
 def poll_delete(*, user_id: int, poll_id: int) -> None:
-    poll = get_object(Poll, id=poll_id)
+    poll = Poll.objects.get(id=poll_id, active=True)
     group_id = poll.created_by.group.id
     group_user = group_user_permissions(user=user_id, group=group_id)
 
@@ -156,14 +156,13 @@ def poll_delete(*, user_id: int, poll_id: int) -> None:
     else:
         group_user_permissions(group_user=group_user, permissions=['admin', 'force_delete_poll'])
 
-    if poll.attachments:
-        poll.attachments.delete()
-
-    poll.delete()
+    poll.active = False
+    poll.save()
 
     notify_group_poll(poll=poll,
                       action=NotificationChannel.Action.DELETED,
                       message="Poll has been deleted")
+    poll.notification_channel.unsubscribe_all()
 
 
 def poll_fast_forward(*, user_id: int, poll_id: int, phase: str):

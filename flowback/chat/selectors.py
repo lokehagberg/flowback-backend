@@ -26,9 +26,9 @@ class BaseMessageFilter(django_filters.FilterSet):
 
 def message_list(*, user: User, channel_id: int, filters=None):
     filters = filters or {}
-    participant = get_object(MessageChannelParticipant, channel_id=channel_id, user=user)
+    participant = get_object(MessageChannelParticipant, active=True, channel_id=channel_id, user=user)
 
-    qs = Message.objects.filter(channel=participant.channel).all()
+    qs = Message.objects.filter(channel=participant.channel, active=True).all()
 
     return BaseMessageFilter(filters, qs).qs
 
@@ -42,7 +42,7 @@ class BaseTopicFilter(django_filters.FilterSet):
 
 def message_channel_topic_list(*, user: User, channel_id: int, filters=None):
     filters = filters or {}
-    participant = get_object(MessageChannelParticipant, channel_id=channel_id, user=user)
+    participant = get_object(MessageChannelParticipant, active=True, channel_id=channel_id, user=user)
 
     qs = MessageChannelTopic.objects.filter(channel=participant.channel).all()
     return BaseTopicFilter(filters, qs).qs

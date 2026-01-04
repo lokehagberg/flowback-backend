@@ -2,6 +2,8 @@ import uuid
 
 from django.contrib.auth.base_user import BaseUserManager
 from django.contrib.auth.validators import UnicodeUsernameValidator
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
 from django.db.models.signals import post_save, post_delete
@@ -12,6 +14,7 @@ from django.utils.translation import gettext_lazy as _
 from rest_framework.authtoken.models import Token
 from flowback.chat.models import MessageChannelParticipant
 from flowback.common.models import BaseModel
+from flowback.common.validators import FieldNotBlankValidator
 from flowback.kanban.models import Kanban
 from flowback.notification.models import NotifiableModel, NotificationChannel
 from flowback.schedule.models import ScheduleModel
@@ -63,17 +66,17 @@ class User(AbstractBaseUser, PermissionsMixin, NotifiableModel, ScheduleModel):
     is_staff = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
 
-    username = models.CharField(max_length=120, validators=[UnicodeUsernameValidator()], unique=True)
+    username = models.CharField(max_length=120, validators=[UnicodeUsernameValidator(), FieldNotBlankValidator], unique=True)
     profile_image = models.ImageField(null=True, blank=True, upload_to='user/profile_image')
     banner_image = models.ImageField(null=True, blank=True, upload_to='user/banner_image')
     email_notifications = models.BooleanField(default=False)
     dark_theme = models.BooleanField(default=False)
-    user_config = models.TextField(null=True, blank=True)
+    user_config = models.TextField(null=True, blank=True, validators=[FieldNotBlankValidator])
 
-    bio = models.TextField(null=True, blank=True)
-    website = models.TextField(null=True, blank=True)
+    bio = models.TextField(null=True, blank=True, validators=[FieldNotBlankValidator])
+    website = models.TextField(null=True, blank=True, validators=[FieldNotBlankValidator])
     contact_email = models.EmailField(null=True, blank=True)
-    contact_phone = models.CharField(max_length=20, null=True, blank=True)
+    contact_phone = models.CharField(max_length=20, null=True, blank=True, validators=[FieldNotBlankValidator])
     public_status = models.CharField(choices=PublicStatus.choices, default=PublicStatus.PRIVATE)
     chat_status = models.CharField(choices=PublicStatus.choices, default=PublicStatus.PRIVATE)
 
@@ -143,6 +146,16 @@ post_save.connect(User.post_save, sender=User)
 post_delete.connect(User.post_delete, sender=User)
 
 
+class UserBookmark(BaseModel):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey('content_type', 'object_id')
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['user', 'content_type', 'object_id'], name='unique_bookmark')]
+
+
 class OnboardUser(BaseModel):
     email = models.EmailField(max_length=120, unique=True)
     verification_code = models.UUIDField(default=uuid.uuid4, editable=False)
@@ -158,11 +171,12 @@ class PasswordReset(BaseModel):
 
 class Report(BaseModel):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    title = models.CharField(max_length=255)
-    description = models.TextField()
+    title = models.CharField(max_length=255, validators=[FieldNotBlankValidator])
+    description = models.TextField(validators=[FieldNotBlankValidator])
+    action_description = models.TextField(null=True, blank=True, validators=[FieldNotBlankValidator])
     group_id = models.IntegerField(null=True, blank=True)
     post_id = models.IntegerField(null=True, blank=True)
-    post_type = models.CharField(max_length=50, null=True, blank=True)
+    post_type = models.CharField(max_length=50, null=True, blank=True, validators=[FieldNotBlankValidator])
 
 
 class UserChatInvite(BaseModel):

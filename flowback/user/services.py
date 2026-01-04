@@ -1,8 +1,9 @@
 import logging
 import uuid
 
+from django.contrib.contenttypes.models import ContentType
 from django.core.mail import send_mail
-from django.db.models import Q, Count
+from django.db.models import Q, Count, Model
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.password_validation import validate_password
 from django.utils import timezone
@@ -16,7 +17,7 @@ from flowback.common.services import model_update, get_object
 from flowback.kanban.services import KanbanManager
 from flowback.notification.models import NotificationChannel
 from flowback.schedule.services import schedule_event_create, schedule_event_update, schedule_event_delete
-from flowback.user.models import User, OnboardUser, PasswordReset, Report, UserChatInvite
+from flowback.user.models import User, OnboardUser, PasswordReset, Report, UserChatInvite, UserBookmark
 
 user_kanban = KanbanManager(origin_type='user')
 
@@ -313,6 +314,14 @@ def report_create(*, user_id: int, title: str, description: str, group_id: int, 
     return report
 
 
+def report_update(*, report_id: int, **data):
+    report = Report.objects.get(id=report_id)
+    non_side_effects_fields = ['title', 'description', 'action_description', 'group_id', 'post_id', 'post_type']
+
+    report, has_updated = model_update(instance=report, fields=non_side_effects_fields, data=data)
+    return report
+
+
 def user_schedule_event_create(user: User, **data):
     data['schedule_id'] = user.schedule.id
     return schedule_event_create(created_by=user, **data)
@@ -326,3 +335,23 @@ def user_schedule_event_update(user: User, **data):
 def user_schedule_event_delete(user: User, **data):
     data['schedule_id'] = user.schedule.id
     return schedule_event_delete(**data)
+
+
+def user_bookmark_create(*, user_id: int, object_id: int, content_type: str | Model):
+    if isinstance(content_type, Model):
+        content_type = content_type.objects.get(id=object_id)
+
+    if isinstance(content_type, str):
+        content_type = ContentType.objects.get(model=content_type.lower())
+
+    return UserBookmark.objects.create(user_id=user_id, content_type=content_type, object_id=object_id)
+
+
+def user_bookmark_delete(*, user_id: int, object_id: int, content_type: str | Model):
+    if isinstance(content_type, Model):
+        content_type = content_type.objects.get(id=object_id)
+
+    if isinstance(content_type, str):
+        content_type = ContentType.objects.get(model=content_type.lower())
+
+    UserBookmark.objects.get(user_id=user_id, content_type=content_type, object_id=object_id).delete()

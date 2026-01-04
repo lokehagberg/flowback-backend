@@ -17,6 +17,7 @@ from flowback.prediction.models import (PredictionBet,
                                         PredictionStatementSegment,
                                         PredictionStatementVote)
 from flowback.common.models import BaseModel
+from flowback.common.validators import FieldNotBlankValidator
 from flowback.group.models import GroupUser, GroupUserDelegatePool, GroupTags, WorkGroup
 from flowback.comment.models import CommentSection, comment_section_create_model_default
 import pgtrigger
@@ -33,8 +34,8 @@ class Poll(BaseModel, NotifiableModel):
     created_by = models.ForeignKey(GroupUser, on_delete=models.CASCADE)
 
     # General information
-    title = models.CharField(max_length=255)
-    description = models.TextField(null=True, blank=True)
+    title = models.CharField(max_length=255, validators=[FieldNotBlankValidator])
+    description = models.TextField(null=True, blank=True, validators=[FieldNotBlankValidator])
     attachments = models.ForeignKey(FileCollection, on_delete=models.SET_NULL, null=True, blank=True)
     poll_type = models.IntegerField(choices=PollType.choices)
     quorum = models.IntegerField(default=None, null=True, blank=True,
@@ -309,12 +310,13 @@ class PollProposal(BaseModel):
     created_by = models.ForeignKey(GroupUser, on_delete=models.CASCADE)
     poll = models.ForeignKey(Poll, on_delete=models.CASCADE)
 
-    title = models.CharField(max_length=255, null=True, blank=True)
-    description = models.TextField(null=True, blank=True)
+    title = models.CharField(max_length=255, null=True, blank=True, validators=[FieldNotBlankValidator])
+    description = models.TextField(null=True, blank=True, validators=[FieldNotBlankValidator])
     attachments = models.ForeignKey(FileCollection, on_delete=models.CASCADE, null=True, blank=True)
     score = models.IntegerField(null=True, blank=True)
-
     blockchain_id = models.PositiveIntegerField(null=True, blank=True, default=None)
+
+    active = models.BooleanField(default=True)
 
 
 class PollProposalTypeSchedule(BaseModel):
@@ -494,7 +496,7 @@ class PollPredictionBet(PredictionBet):
 
 class PollPhaseTemplate(BaseModel):
     created_by_group_user = models.ForeignKey(GroupUser, on_delete=models.CASCADE)
-    name = models.CharField(max_length=255)
+    name = models.CharField(max_length=255, validators=[FieldNotBlankValidator])
     poll_type = models.IntegerField(choices=Poll.PollType.choices)
     poll_is_dynamic = models.BooleanField(default=False)
 

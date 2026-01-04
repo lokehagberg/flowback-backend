@@ -18,7 +18,7 @@ from flowback.user.serializers import BasicUserSerializer
 from flowback.user.services import (user_create, user_create_verify, user_forgot_password,
                                     user_forgot_password_verify, user_update, user_delete, user_get_chat_channel,
                                     user_chat_invite, user_chat_channel_leave, user_chat_channel_update,
-                                    user_notification_subscribe)
+                                    user_notification_subscribe, user_bookmark_create, user_bookmark_delete)
 
 
 class UserCreateApi(APIView):
@@ -282,4 +282,30 @@ class UserChatChannelUpdateAPI(APIView):
 class UserLogoutAPI(APIView):
     def post(self, request):
         logout(request)
+        return Response(status=status.HTTP_200_OK)
+
+
+class UserBookmarkCreateAPI(APIView):
+    class InputSerializer(serializers.Serializer):
+        object_id = serializers.IntegerField()
+        content_type = serializers.CharField()
+
+    def post(self, request):
+        serializer = self.InputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user_bookmark_create(user_id=request.user.id, **serializer.validated_data)
+
+        return Response(status=status.HTTP_201_CREATED)
+
+
+class UserBookmarkDeleteAPI(APIView):
+    class InputSerializer(serializers.Serializer):
+        object_id = serializers.IntegerField()
+        content_type = serializers.CharField()
+
+    def post(self, request):
+        serializer = self.InputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user_bookmark_delete(user_id=request.user.id, **serializer.validated_data)
+
         return Response(status=status.HTTP_200_OK)

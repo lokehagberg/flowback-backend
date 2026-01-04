@@ -57,7 +57,7 @@ def poll_proposal_create(*, user_id: int,
 
 
 def poll_proposal_delete(*, user_id: int, proposal_id: int) -> None:
-    proposal = get_object(PollProposal, id=proposal_id)
+    proposal = get_object(PollProposal, id=proposal_id, active=True)
     group_user = group_user_permissions(user=user_id, group=proposal.created_by.group)
 
     if proposal.created_by == group_user and group_user.check_permission(delete_proposal=True):
@@ -67,4 +67,5 @@ def poll_proposal_delete(*, user_id: int, proposal_id: int) -> None:
         raise ValidationError("Deleting other users proposals needs either "
                               "group admin or force_delete_proposal permission")
 
-    proposal.delete()
+    proposal.active = False
+    proposal.save()

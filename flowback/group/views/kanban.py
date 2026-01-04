@@ -1,30 +1,9 @@
 from drf_spectacular.utils import extend_schema
 from rest_framework.response import Response
-from rest_framework import status, serializers
-
-from flowback.common.pagination import get_paginated_response
-from flowback.group.selectors.group import group_kanban_entry_list
+from rest_framework import status
 from flowback.group.services.kanban import group_kanban_entry_create, group_kanban_entry_update, group_kanban_entry_delete
 
-from flowback.kanban.views import KanbanEntryListApi, KanbanEntryCreateAPI, KanbanEntryUpdateAPI, KanbanEntryDeleteAPI
-
-
-@extend_schema(tags=['group/kanban'])
-class GroupKanbanEntryListAPI(KanbanEntryListApi):
-    class OutputSerializer(KanbanEntryListApi.OutputSerializer):
-        work_group_ids = serializers.CharField(required=False)
-        group_name = serializers.CharField()
-
-    def get(self, request, group_id: int):
-        serializer = self.FilterSerializer(data=request.query_params)
-        serializer.is_valid(raise_exception=True)
-
-        entries = group_kanban_entry_list(fetched_by=request.user, group_id=group_id, filters=serializer.validated_data)
-        return get_paginated_response(pagination_class=self.Pagination,
-                                      serializer_class=self.OutputSerializer,
-                                      queryset=entries,
-                                      request=request,
-                                      view=self)
+from flowback.kanban.views import KanbanEntryCreateAPI, KanbanEntryUpdateAPI, KanbanEntryDeleteAPI
 
 
 @extend_schema(tags=['group/kanban'])

@@ -16,6 +16,7 @@ from rest_framework.exceptions import ValidationError
 from tree_queries.models import TreeNode
 
 from flowback.common.models import BaseModel
+from flowback.common.validators import FieldNotBlankValidator
 
 
 # NotificationObject is created containing data for each occurrence
@@ -29,8 +30,8 @@ class NotificationObject(BaseModel):
         ERROR = 'ERROR', 'Error'
 
     action = models.CharField(choices=Action.choices)
-    message = models.TextField(max_length=2000)
-    tag = models.CharField(max_length=255, help_text='Tag of the notification')
+    message = models.TextField(max_length=2000, validators=[FieldNotBlankValidator])
+    tag = models.CharField(max_length=255, help_text='Tag of the notification', validators=[FieldNotBlankValidator])
     data = models.JSONField(null=True, blank=True)  # Suggested to store relevant data for user
     timestamp = models.DateTimeField(default=timezone.now)
     channel = models.ForeignKey('notification.NotificationChannel', on_delete=models.CASCADE)
@@ -117,7 +118,7 @@ class NotificationSubscription(BaseModel):
 
 class NotificationSubscriptionTag(BaseModel):
     subscription = models.ForeignKey('notification.NotificationSubscription', on_delete=models.CASCADE)
-    name = models.CharField(max_length=255)
+    name = models.CharField(max_length=255, validators=[FieldNotBlankValidator])
     reminders = ArrayField(models.PositiveIntegerField(), help_text='Reminder times for the given tag', null=True, blank=True)
 
     class Meta:
@@ -388,11 +389,15 @@ class NotificationChannel(BaseModel, TreeNode):
     def unsubscribe(self, *, user):
         self.subscribe(user=user)
 
-    def unsubscribe_all(self, *, user):
+    def unsubscribe_all(self, *, user = None):
         """
-        Deletes all subscriptions for the given user, including related channels.
+        Deletes all subscriptions for the given user (or all if user is None), including related channels.
         """
-        NotificationSubscription.objects.filter(channel__in=self.descendants(include_self=True)).delete()
+        extra = {}
+        if user is not None:
+            extra['user_id'] = user if isinstance(user, int) else user.id
+
+        NotificationSubscription.objects.filter(channel__in=self.descendants(include_self=True), **extra).delete()
 
 
 def generate_notification_channel(sender, instance, created, *args, **kwargs):
