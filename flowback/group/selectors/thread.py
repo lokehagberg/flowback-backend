@@ -1,13 +1,12 @@
 import django_filters
 from django.db import models
-from django.db.models import Q, Subquery, OuterRef, Count
+from django.db.models import Q, Exists, Subquery, OuterRef, Count
 from django.db.models.functions import Coalesce
-
 from flowback.comment.models import Comment
 from flowback.comment.selectors import comment_list, comment_ancestor_list
 from flowback.common.filters import NumberInFilter
 from flowback.common.services import get_object
-from flowback.group.models import GroupThread, GroupThreadVote
+from flowback.group.models import GroupThread, GroupThreadVote, Group
 from flowback.group.selectors.permission import group_user_permissions
 from flowback.user.models import User
 
@@ -68,7 +67,10 @@ def group_thread_list(*, fetched_by: User, filters=None):
         .values('negative_count')
     )
 
+    joined_groups_qs = Group.objects.filter(id=OuterRef('created_by__group_id'), groupuser__user__in=[fetched_by])
+
     qs = threads.annotate(total_comments=comment_qs,
+                          group_joined=Exists(joined_groups_qs),
                           user_vote=Subquery(user_vote_qs),
                           score=Coalesce(Subquery(positive_votes_qs,
                                                   output_field=models.IntegerField()), 0) -
