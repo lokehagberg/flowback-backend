@@ -67,7 +67,7 @@ def group_thread_list(*, fetched_by: User, filters=None):
         .values('negative_count')
     )
 
-    joined_groups_qs = Group.objects.filter(id=OuterRef('created_by__group_id'), groupuser__user__in=[fetched_by])
+    joined_groups_qs = Group.objects.filter(active=True, id=OuterRef('created_by__group_id'), groupuser__user__in=[fetched_by])
 
     qs = threads.annotate(total_comments=comment_qs,
                           group_joined=Exists(joined_groups_qs),

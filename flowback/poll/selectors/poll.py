@@ -83,10 +83,8 @@ def poll_list(*, fetched_by: User, group_id: Union[int, None], filters=None):
 
         ).values('id')
 
-
     q = (Q(created_by__group__groupuser__user__in=[fetched_by])
          & Q(created_by__group__groupuser__active=True))  # User in group
-
 
     base_qs = (
         q & Q(work_group__isnull=True)  # User in Group
@@ -109,8 +107,8 @@ def poll_list(*, fetched_by: User, group_id: Union[int, None], filters=None):
         & ~Q(created_by__group__groupuser__user__in=[fetched_by])
         & Q(created_by__group__groupuser__is_admin=True))
 
+    joined_groups = Group.objects.filter(active=True, id=OuterRef('created_by__group_id'), groupuser__user__in=[fetched_by])
 
-    joined_groups = Group.objects.filter(id=OuterRef('created_by__group_id'), groupuser__user__in=[fetched_by])
     bookmarked = UserBookmark.objects.filter(user=fetched_by, content_type__model='poll', object_id=OuterRef('id'))
     qs = Poll.objects.filter(base_qs, active=True).annotate(phase=poll_phase,
                 group_joined=Exists(joined_groups),
