@@ -9,6 +9,7 @@ from flowback.chat.tests.factories import MessageChannelFactory, MessageChannelP
 from flowback.group.models import GroupUser
 from flowback.group.tests.factories import GroupFactory, GroupUserFactory
 from flowback.user.models import User
+from flowback.user.services import user_get_chat_channel
 from flowback.user.tests.factories import UserFactory
 
 
@@ -107,6 +108,19 @@ class TestChatWebsocket(APITransactionTestCase):
         await communicator_two.disconnect()
         await communicator_three.disconnect()
         await communication_four.disconnect()
+
+    async def test_send_message_user_get_chat_channel(self):
+        communicator_one = await self.connect(user=self.user_three)
+        communicator_two = await self.connect(user=self.user_four)
+
+        ugcc = sync_to_async(user_get_chat_channel)
+
+        chat_channel = await ugcc(fetched_by=self.user_three, target_user_ids=[self.user_four.id])
+
+        await communicator_one.receive_json_from(timeout=5)
+
+        await communicator_one.disconnect()
+        await communicator_two.disconnect()
 
     async def test_send_message_group(self):
         def message_check(data):
