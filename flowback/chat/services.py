@@ -130,11 +130,11 @@ def message_channel_join(*, user_id: int, channel_id: int):
     participant.save()
 
     # Notify relevant user channels via ChatConsumer that a user joined
-    if not TESTING:
+    if TESTING:
         channel_layer = get_channel_layer()
 
         payload = dict(
-            type="info",
+            type="message",
             message=f"User {user.username} joined the channel",
             method="message_channel_join",
             channel_id=channel.id,
