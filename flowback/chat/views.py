@@ -66,6 +66,7 @@ class MessageChannelPreviewAPI(APIView):
         timestamp = serializers.DateTimeField(allow_null=True)
         channel_id = serializers.IntegerField()
         channel_title = serializers.CharField(source="channel.title")
+        channel_origin_name = serializers.CharField(source="channel.origin_name")
         participants = SerializerMethodField(help_text="List of Users who participated in the channel, max 20 displayed")
         recent_message = BasicMessageSerializer(allow_null=True)
 
