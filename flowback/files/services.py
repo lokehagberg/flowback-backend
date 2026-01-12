@@ -82,7 +82,7 @@ def update_collection(*, user_id: int = None,
         elif not user.is_staff and file_collection.created_by_id != user_id:
             raise ValidationError("Only the author of the attachment can update it.")
 
-    if (file_collection.filesegment_set.count() + (len(attachments_add) or 0) - (len(attachments_remove) or 0)) > 10:
+    if (file_collection.filesegment_set.count() + (len(attachments_add or [])) - (len(attachments_remove or []))) > 10:
         raise ValidationError("Cannot add more than 10 attachments.")
 
     if attachments_remove:
