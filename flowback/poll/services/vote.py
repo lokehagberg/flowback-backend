@@ -1,12 +1,13 @@
 from rest_framework.exceptions import ValidationError
 
+from django.db.models import F
 from backend.settings import FLOWBACK_SCORE_VOTE_CEILING, FLOWBACK_SCORE_VOTE_FLOOR
 from flowback.common.services import get_object
 from flowback.group.models import GroupUserDelegatePool
 from flowback.group.notify import notify_group_user_delegate_pool_poll_vote_update
 from flowback.notification.models import NotificationChannel
 from flowback.poll.models import Poll, PollVoting, PollVotingTypeRanking, PollDelegateVoting, \
-    PollVotingTypeForAgainst, PollVotingTypeCardinal
+    PollVotingTypeForAgainst, PollVotingTypeCardinal, PollProposalTypeSchedule
 from flowback.group.selectors.permission import group_user_permissions
 
 
@@ -69,6 +70,8 @@ def poll_proposal_vote_update(*, user_id: int, poll_id: int, data: dict) -> None
         PollVotingTypeCardinal.objects.bulk_create(poll_vote_cardinal)
 
     elif poll.poll_type == Poll.PollType.SCHEDULE:
+
+        # Delete all votes whenever null is passed in.
         if not data['proposals']:
             PollVoting.objects.filter(created_by=group_user, poll=poll).delete()
             return
@@ -83,8 +86,22 @@ def poll_proposal_vote_update(*, user_id: int, poll_id: int, data: dict) -> None
                                                        proposal_id=proposal,
                                                        vote=True)
                               for proposal in data['proposals']]
+
+        # Capture old proposal IDs before deleting
+        old_proposal_ids = list(
+            PollVotingTypeForAgainst.objects.filter(author=poll_vote).values_list('proposal_id', flat=True)
+        )
+
+        # Scuffed solution that removes and re-ads all votes
         PollVotingTypeForAgainst.objects.filter(author=poll_vote).delete()
         PollVotingTypeForAgainst.objects.bulk_create(poll_vote_schedule)
+
+        PollProposalTypeSchedule.objects.filter(proposal_id__in=old_proposal_ids).update(
+            preliminary_score=F('preliminary_score') - 1
+        )
+        PollProposalTypeSchedule.objects.filter(proposal_id__in=data['proposals']).update(
+            preliminary_score=F('preliminary_score') + 1
+        )
 
     else:
         raise ValidationError('Unknown poll type')
