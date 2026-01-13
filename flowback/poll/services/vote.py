@@ -87,15 +87,14 @@ def poll_proposal_vote_update(*, user_id: int, poll_id: int, data: dict) -> None
                                                        vote=True)
                               for proposal in data['proposals']]
 
-        # Capture old proposal IDs before deleting
-        old_proposal_ids = list(
-            PollVotingTypeForAgainst.objects.filter(author=poll_vote).values_list('proposal_id', flat=True)
-        )
-
         # Scuffed solution that removes and re-ads all votes
         PollVotingTypeForAgainst.objects.filter(author=poll_vote).delete()
         PollVotingTypeForAgainst.objects.bulk_create(poll_vote_schedule)
 
+        # Preliminary score is used to present data on how many users have voted on said date in datepoll
+        old_proposal_ids = list(
+            PollVotingTypeForAgainst.objects.filter(author=poll_vote).values_list('proposal_id', flat=True)
+        )
         PollProposalTypeSchedule.objects.filter(proposal_id__in=old_proposal_ids).update(
             preliminary_score=F('preliminary_score') - 1
         )
