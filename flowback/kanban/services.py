@@ -69,10 +69,18 @@ def kanban_entry_update(*, kanban_entry_id: int, data) -> KanbanEntry:
     non_side_effect_fields = ['title', 'description', 'assignee_id', 'priority',
                               'lane', 'end_date', 'work_group_id', 'attachments']
 
-    update_collection(file_collection_id=kanban.attachments_id,
-                      attachments_remove=data.get('attachments_remove'),
-                      attachments_add=data.get('attachments_add'),
-                      upload_to='kanban')
+    attachments_add = data.get('attachments_add')
+    attachments_remove = data.get('attachments_remove')
+
+    if kanban.attachments_id is not None:
+        update_collection(file_collection_id=kanban.attachments_id,
+                          attachments_remove=attachments_remove,
+                          attachments_add=attachments_add,
+                          upload_to='kanban')
+    elif attachments_add:
+        kanban.attachments = upload_collection(user_id=kanban.created_by_id,
+                                               file=attachments_add,
+                                               upload_to='kanban')
 
     kanban, has_updated = model_update(instance=kanban,
                                        fields=non_side_effect_fields,

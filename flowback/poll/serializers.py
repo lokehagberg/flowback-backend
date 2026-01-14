@@ -55,8 +55,10 @@ class PollProposalSerializer(FileCollectionListSerializerMixin, serializers.Seri
     blockchain_id = serializers.IntegerField(min_value=0, allow_null=True)
     score = serializers.IntegerField()
 
+    # Only for date poll
     start_date = serializers.SerializerMethodField(help_text="A datetime field or None (if poll is not a schedule)")
     end_date = serializers.SerializerMethodField(help_text="A datetime field or None (if poll is not a schedule)")
+    preliminary_score = serializers.SerializerMethodField(required=False)
 
     def get_start_date(self, obj):
         proposal = PollProposal.objects.get(id=obj.id)
@@ -69,5 +71,12 @@ class PollProposalSerializer(FileCollectionListSerializerMixin, serializers.Seri
         proposal = PollProposal.objects.get(id=obj.id)
         if proposal.poll.poll_type == Poll.PollType.SCHEDULE:
             return proposal.pollproposaltypeschedule.event_end_date
+
+        return None
+
+    def get_preliminary_score(self, obj):
+        proposal = PollProposal.objects.get(id=obj.id)
+        if proposal.poll.poll_type == Poll.PollType.SCHEDULE:
+            return proposal.pollproposaltypeschedule.preliminary_score
 
         return None

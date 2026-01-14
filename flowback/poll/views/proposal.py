@@ -30,6 +30,8 @@ class PollProposalListAPI(APIView):
         title = serializers.CharField(required=False)
         title__icontains = serializers.CharField(required=False)
         has_attachments = serializers.BooleanField(required=False, allow_null=True, default=None)
+
+        # Only for date poll
         start_date = serializers.DateTimeField(required=False)
         end_date = serializers.DateTimeField(required=False)
 
@@ -92,4 +94,3 @@ class PollProposalDeleteAPI(APIView):
     def post(self, request, proposal: int):
         poll_proposal_delete(user_id=request.user.id, proposal_id=proposal)
         return Response(status=status.HTTP_200_OK)
-
