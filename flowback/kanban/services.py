@@ -81,7 +81,6 @@ def kanban_entry_update(*, kanban_entry_id: int, data) -> KanbanEntry:
         kanban.attachments = upload_collection(user_id=kanban.created_by_id,
                                                file=attachments_add,
                                                upload_to='kanban')
-        kanban.save()
 
     kanban, has_updated = model_update(instance=kanban,
                                        fields=non_side_effect_fields,
