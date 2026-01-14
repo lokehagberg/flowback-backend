@@ -9,13 +9,13 @@ from flowback.group.services.thread import group_thread_comment_create, group_th
 from flowback.group.tests.factories import GroupThreadFactory, GroupUserFactory, GroupThreadVoteFactory, \
     WorkGroupFactory, WorkGroupUserFactory
 from flowback.group.views.thread import GroupThreadVoteUpdateAPI, GroupThreadListAPI, GroupThreadCommentCreateAPI, \
-    GroupThreadCommentDeleteAPI, GroupThreadCreateAPI
+    GroupThreadCommentDeleteAPI, GroupThreadCreateAPI, GroupThreadUpdateAPI
 from flowback.user.models import User
 
 
 class TestGroupThread(APITestCase):
     def setUp(self):
-        self.group_admin = GroupUserFactory()
+        self.group_admin = GroupUserFactory(is_admin=True)
         self.threads = GroupThreadFactory.create_batch(10, created_by=self.group_admin)
         self.group_user = GroupUserFactory(group=self.group_admin.group)
         self.group_user_two = GroupUserFactory(group=self.group_admin.group)
@@ -68,7 +68,6 @@ class TestGroupThread(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
         self.assertEqual(GroupThread.objects.get(id=response.data).work_group, work_group_user.work_group)
 
-
     def test_comment_delete(self):
         response = generate_request(api=GroupThreadCommentCreateAPI,
                                     data=dict(message="hi"),
@@ -90,6 +89,25 @@ class TestGroupThread(APITestCase):
                                     user=self.group_user.user)
 
         print(response.data)
+
+    def test_pin(self):
+        thread = GroupThreadFactory(created_by=self.group_admin)
+
+        print(f"group_admin.is_admin: {self.group_admin.is_admin}")
+        print(f"group_admin.group.id: {self.group_admin.group.id}")
+        print(f"thread.created_by.group.id: {thread.created_by.group.id}")
+
+        response = generate_request(api=GroupThreadUpdateAPI,
+                                    data=dict(pinned=True),
+                                    url_params=dict(thread_id=thread.id),
+                                    user=self.group_admin.user)
+
+        print(f"response.status_code: {response.status_code}")
+        print(f"response.data: {response.data}")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        the_thread = GroupThread.objects.get(id=thread.id)
+        self.assertTrue(the_thread.pinned)
 
 
 class TestGroupThreadVote(APITestCase):
@@ -128,6 +146,3 @@ class TestGroupThreadVote(APITestCase):
         # Vote is None and still cast None
         response = self.vote(thread_id, user, None)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-
-
-
