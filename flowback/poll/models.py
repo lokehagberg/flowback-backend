@@ -26,6 +26,7 @@ import pgtrigger
 # Create your models here.
 class Poll(BaseModel, NotifiableModel):
     class PollType(models.IntegerChoices):
+        # 1 and 2 are depricated
         RANKING = 1, _('ranking')
         FOR_AGAINST = 2, _('for_against')
         SCHEDULE = 3, _('schedule')
@@ -236,7 +237,7 @@ class Poll(BaseModel, NotifiableModel):
                                 ('group_name', str),
                                 ('group_image', str, 'The URL path to the image of the group'))
 
-    ## Notification
+    # Notification
     @property
     def notification_data(self) -> dict | None:
         return dict(poll_id=self.id,
@@ -323,6 +324,7 @@ class PollProposalTypeSchedule(BaseModel):
     proposal = models.OneToOneField(PollProposal, on_delete=models.CASCADE)
     event_start_date = models.DateTimeField()
     event_end_date = models.DateTimeField()
+    preliminary_score = models.IntegerField(default=0)
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=['proposal', 'event_start_date', 'event_end_date'],
