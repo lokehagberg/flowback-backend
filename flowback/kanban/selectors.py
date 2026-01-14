@@ -9,7 +9,7 @@ from flowback.user.models import User
 
 class BaseKanbanEntryFilter(django_filters.FilterSet):
     origin_type = django_filters.CharFilter(field_name='kanban__origin_type')
-    origin_id = django_filters.NumberFilter(field_name='kanban_origin_id')
+    origin_id = django_filters.NumberFilter(field_name='kanban__origin_id')
     created_by = django_filters.NumberFilter()
     work_group_ids = NumberInFilter(field_name='work_group_id')
     order_by = django_filters.OrderingFilter(fields=(('priority', 'priority_asc'),
