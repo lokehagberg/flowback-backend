@@ -188,30 +188,35 @@ def poll_fast_forward(*, user_id: int, poll_id: int, phase: str):
 
     # Save new times to dict
     for phase in time_table:
-        phase_time = poll.get_phase(phase) - time_difference
-        setattr(poll, poll.get_phase(phase, field_name=True), phase_time)
+        # Becomes none at date poll
+        _phase = poll.get_phase(phase)
+        if (_phase is not None):
+            phase_time = _phase - time_difference
+            setattr(poll, poll.get_phase(phase, field_name=True), phase_time)
 
     poll.full_clean()
     poll.save()
 
-    # TODO update/remove previous celery tasks
-    if poll.area_vote_end_date > timezone.now():
-        poll_area_vote_count.apply_async(kwargs=dict(poll_id=poll.id), eta=poll.area_vote_end_date)
+    # If not date poll, do these things depending on which phase one is going into
+    if (poll.poll_type == 4):
+        # TODO update/remove previous celery tasks
+        if poll.area_vote_end_date > timezone.now():
+            poll_area_vote_count.apply_async(kwargs=dict(poll_id=poll.id), eta=poll.area_vote_end_date)
 
-    else:
-        poll_area_vote_count(poll_id=poll.id)
+        else:
+            poll_area_vote_count(poll_id=poll.id)
 
-    if poll.prediction_bet_end_date > timezone.now():
-        poll_prediction_bet_count.apply_async(kwargs=dict(poll_id=poll.id), eta=poll.prediction_bet_end_date)
+        if poll.prediction_bet_end_date > timezone.now():
+            poll_prediction_bet_count.apply_async(kwargs=dict(poll_id=poll.id), eta=poll.prediction_bet_end_date)
 
-    else:
-        poll_prediction_bet_count(poll_id=poll.id)
+        else:
+            poll_prediction_bet_count(poll_id=poll.id)
 
-    if poll.end_date > timezone.now():
-        poll_proposal_vote_count.apply_async(kwargs=dict(poll_id=poll.id), eta=poll.end_date)
+        if poll.end_date > timezone.now():
+            poll_proposal_vote_count.apply_async(kwargs=dict(poll_id=poll.id), eta=poll.end_date)
 
-    else:
-        poll_proposal_vote_count(poll_id=poll.id)
+        else:
+            poll_proposal_vote_count(poll_id=poll.id)
 
     notify_poll_phase(message=f"Poll has been fast forwarded "
                               f"to {poll.current_phase.replace('_', ' ').capitalize()}",
