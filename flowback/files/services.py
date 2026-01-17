@@ -69,11 +69,12 @@ def update_collection(*, user_id: int = None,
                       upload_to="",
                       upload_to_uuid=True,
                       upload_to_include_timestamp=True):
-    file_collection = FileCollection.objects.get(id=file_collection_id)
     user = User.objects.get(id=user_id) if user_id else None
 
     if not (attachments_add or attachments_remove):
         return
+
+    file_collection = FileCollection.objects.get(id=file_collection_id)
 
     if user:
         if file_collection.created_by_id != user_id and user.is_staff and attachments_add:
