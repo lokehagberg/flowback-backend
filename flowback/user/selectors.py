@@ -112,21 +112,21 @@ def user_home_feed(*, fetched_by: User, filters=None):
          & Q(created_by__group__groupuser__active=True))  # User in group
 
     thread_qs = GroupThread.objects.filter(
-        Q(created_by__group__public=True)
-        & ~Q(created_by__group__groupuser__user__in=[fetched_by])  # Group is Public
+        q & Q(work_group__isnull=True)  # User in Group
+
+        | Q(created_by__group__public=True)
+        & ~Q(created_by__group__groupuser__user__in=[fetched_by])  # Group is Public and user not in group
         & Q(work_group__isnull=True)
         & Q(public=True)
+
+        | q & Q(work_group__isnull=False)  # User in workgroup
+        & Q(work_group__workgroupuser__group_user__user=fetched_by)
 
         | q & Q(created_by__group__public=True)
         & Q(created_by__group__groupuser__user__in=[fetched_by])
         & Q(created_by__group__groupuser__active=False)  # User in group but not active, and group is public
         & Q(work_group__isnull=True)
         & Q(public=True)
-
-        | q & Q(work_group__isnull=True)  # All threads without workgroup
-
-        | q & Q(work_group__isnull=False)  # User in workgroup
-        & Q(work_group__workgroupuser__group_user__user=fetched_by)
 
         # | q & Q(work_group__isnull=False)  # User is admin in group
         # & Q(created_by__group__groupuser__user=fetched_by)
