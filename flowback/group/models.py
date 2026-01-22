@@ -242,6 +242,7 @@ class Group(BaseModel, NotifiableModel, ScheduleModel):
     def post_delete(cls, instance, *args, **kwargs):
         instance.kanban.delete()
         instance.chat.delete()
+        instance.schedule.delete()
 
 
 pre_save.connect(Group.pre_save, sender=Group)
@@ -312,7 +313,6 @@ class GroupUser(BaseModel):
             subscription = KanbanSubscription(kanban_id=instance.user.kanban_id, target_id=instance.group.kanban_id)
             subscription.save()
 
-
         elif update_fields and 'active' in update_fields:
             if instance.active:
                 instance.group.schedule.add_user(user=instance.user)
@@ -337,7 +337,6 @@ class GroupUser(BaseModel):
 
     @classmethod
     def post_delete(cls, instance, *args, **kwargs):
-        instance.schedule.remove_user(user=instance)
         KanbanSubscription.objects.filter(kanban_id=instance.user.kanban_id,
                                           target_id=instance.group.kanban_id).delete()
 
@@ -443,7 +442,6 @@ class GroupThread(BaseModel, NotifiableModel):
     attachments = models.ForeignKey(FileCollection, on_delete=models.CASCADE, null=True, blank=True)
     work_group = models.ForeignKey(WorkGroup, on_delete=models.SET_NULL, null=True, blank=True)
     public = models.BooleanField(default=False)
-
 
     @property
     def notification_data(self) -> dict | None:
