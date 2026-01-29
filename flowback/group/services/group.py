@@ -125,7 +125,7 @@ def group_join(*, user: int, group: int) -> Union[GroupUser, GroupUserInvite]:
         try:
             user_status = GroupUser.objects.get(user=user, group=group)
             user_status.active = True
-            user_status.save()
+            user_status.save(update_fields=['active'])
         except GroupUser.DoesNotExist:
             user_status = GroupUser(user=user, group=group)
             # user_status.full_clean() TODO fix
@@ -142,6 +142,7 @@ def group_leave(*, user: int, group: int) -> None:
 
     user.active = False
     user.save(update_fields=['active'])
+
 
 def group_user_update(*, fetched_by: User, group: int, target_user_id: int, data) -> GroupUser:
     # If user updates someone else (requires Admin)
