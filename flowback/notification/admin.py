@@ -19,4 +19,4 @@ class NotificationAdmin(admin.ModelAdmin):
 
 @admin.register(NotificationSubscription)
 class NotificationSubscriptionAdmin(admin.ModelAdmin):
-    list_display = ('user', 'channel', 'tags')
+    list_display = ('user', 'channel')

@@ -1,6 +1,5 @@
 import logging
 import uuid
-from datetime import timezone
 
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db.models import Q
@@ -12,17 +11,18 @@ from backend.settings import FLOWBACK_DEFAULT_GROUP_JOIN
 from flowback.chat.models import MessageChannel, MessageChannelParticipant
 from flowback.comment.models import CommentSection, comment_section_create, comment_section_create_model_default
 from flowback.common.models import BaseModel
+from flowback.common.validators import FieldNotBlankValidator
 from flowback.files.models import FileCollection
 from flowback.kanban.models import Kanban, KanbanSubscription
 from flowback.notification.models import NotifiableModel, NotificationChannel
-from flowback.schedule.models import Schedule
+from flowback.schedule.models import ScheduleModel
 from flowback.user.models import User
 from django.db import models
 
 
 # Create your models here.
 class GroupFolder(BaseModel):
-    name = models.CharField(max_length=255)
+    name = models.CharField(max_length=255, validators=[FieldNotBlankValidator])
 
     def __str__(self) -> str:
         return f'{self.id} - {self.name}'
@@ -30,7 +30,7 @@ class GroupFolder(BaseModel):
 
 # Permission class for each Group
 class GroupPermissions(BaseModel):
-    role_name = models.TextField(default='default')
+    role_name = models.TextField(default='default', validators=[FieldNotBlankValidator])
     author = models.ForeignKey('Group', on_delete=models.CASCADE, null=True, blank=True)
     invite_user = models.BooleanField(default=False)
     create_poll = models.BooleanField(default=True)
@@ -45,6 +45,10 @@ class GroupPermissions(BaseModel):
     create_proposal = models.BooleanField(default=True)
     update_proposal = models.BooleanField(default=True)
     delete_proposal = models.BooleanField(default=True)
+
+    schedule_event_create = models.BooleanField(default=False)
+    schedule_event_update = models.BooleanField(default=False)
+    schedule_event_delete = models.BooleanField(default=False)
 
     prediction_statement_create = models.BooleanField(default=True)
     prediction_statement_delete = models.BooleanField(default=True)
@@ -62,11 +66,15 @@ class GroupPermissions(BaseModel):
     force_delete_comment = models.BooleanField(default=False)
 
     @staticmethod
-    def negate_field_perms():
+    def negate_field_perms() -> list[str]:
         return ['id', 'created_at', 'updated_at', 'role_name', 'author']
 
+    class Meta:
+        verbose_name_plural = 'Group permissions'
+        verbose_name = 'Group permission'
 
-class Group(BaseModel, NotifiableModel):
+
+class Group(BaseModel, NotifiableModel, ScheduleModel):
     created_by = models.ForeignKey(User, on_delete=models.CASCADE)
     active = models.BooleanField(default=True)
 
@@ -79,16 +87,17 @@ class Group(BaseModel, NotifiableModel):
     # Determines the default permission for every user get when they join
     # TODO return basic permissions by default if field is NULL
     default_permission = models.OneToOneField('GroupPermissions',
-                                              on_delete=models.CASCADE)
+                                              on_delete=models.CASCADE,
+                                              null=True,
+                                              blank=True)
 
-    name = models.TextField(unique=True)
-    description = models.TextField(null=True, blank=True)
+    name = models.TextField(unique=True, validators=[FieldNotBlankValidator])
+    description = models.TextField(null=True, blank=True, validators=[FieldNotBlankValidator])
     image = models.ImageField(upload_to='group/image', null=True, blank=True)
     cover_image = models.ImageField(upload_to='group/cover_image', null=True, blank=True)
     hide_poll_users = models.BooleanField(default=False)  # Hides users in polls, TODO remove bool from views
     poll_phase_minimum_space = models.IntegerField(default=0)  # The minimum space between poll phases (in seconds)
     default_quorum = models.IntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(100)])
-    schedule = models.ForeignKey(Schedule, null=True, blank=True, on_delete=models.PROTECT)
     kanban = models.ForeignKey(Kanban, null=True, blank=True, on_delete=models.PROTECT)
     chat = models.ForeignKey(MessageChannel, on_delete=models.PROTECT)
     group_folder = models.ForeignKey(GroupFolder, null=True, blank=True, on_delete=models.SET_NULL)
@@ -167,22 +176,9 @@ class Group(BaseModel, NotifiableModel):
                     poll_title: str,
                     work_group_id: int = None,
                     work_group_name: str = None,
-                    subscription_filters: dict = None):
+                    subscription_filters: dict = None,
+                    exclude_subscription_filters: dict = None):
         """Notifies about new polls"""
-        params = locals()
-        params.pop('self')
-
-        return self.notification_channel.notify(**params)
-
-    def notify_schedule_event(self, *,
-                              message: str,
-                              action: NotificationChannel.Action,
-                              schedule_event_id: int,
-                              schedule_event_title: str,
-                              work_group_id: int = None,
-                              work_group_name: str = None,
-                              subscription_filters: dict = None):
-        """Notifies about new schedule events"""
         params = locals()
         params.pop('self')
 
@@ -194,24 +190,20 @@ class Group(BaseModel, NotifiableModel):
         if instance.pk is None:
             channel = MessageChannel(origin_name='group', title=instance.name)
             channel.save()
-            default_permission = GroupPermissions()
-            default_permission.save()
-
             instance.chat = channel
-            instance.default_permission = default_permission
 
     @classmethod
     def post_save(cls, instance, created, update_fields, *args, **kwargs):
         if created:
-            schedule = Schedule(name=instance.name, origin_name='group', origin_id=instance.id)
-            schedule.save()
-
             kanban = Kanban(name=instance.name, origin_type='group', origin_id=instance.id)
             kanban.save()
 
-            instance.default_permission.name = instance.name
-            instance.default_permission.author = instance
-            instance.default_permission.save()
+            default_permission = GroupPermissions(author=instance, role_name=instance.name)
+            default_permission.save()
+            instance.default_permission = default_permission
+
+            instance.kanban = kanban
+            instance.save()
 
             group_user = GroupUser(user=instance.created_by,
                                    group=instance,
@@ -219,7 +211,6 @@ class Group(BaseModel, NotifiableModel):
                                    is_admin=True)
             group_user.save()
 
-            instance.schedule = schedule
             instance.kanban = kanban
             instance.save()
 
@@ -229,9 +220,7 @@ class Group(BaseModel, NotifiableModel):
 
             if 'name' in update_fields:
                 instance.chat.title = instance.name
-                instance.schedule.name = instance.name
                 instance.kanban.name = instance.name
-                instance.schedule.save()
                 instance.kanban.save()
                 instance.chat.save()
 
@@ -251,9 +240,9 @@ class Group(BaseModel, NotifiableModel):
 
     @classmethod
     def post_delete(cls, instance, *args, **kwargs):
-        instance.schedule.delete()
         instance.kanban.delete()
         instance.chat.delete()
+        instance.schedule.delete()
 
 
 pre_save.connect(Group.pre_save, sender=Group)
@@ -264,14 +253,17 @@ post_delete.connect(Group.post_delete, sender=Group)
 
 # Permission Tags for each group, and for user to put on delegators
 class GroupTags(BaseModel):
-    name = models.TextField()
-    description = models.TextField(null=True, blank=True)
+    name = models.TextField(validators=[FieldNotBlankValidator])
+    description = models.TextField(null=True, blank=True, validators=[FieldNotBlankValidator])
     group = models.ForeignKey('Group', on_delete=models.CASCADE)
     active = models.BooleanField(default=True)
 
     # interval_mean_absolute_error = models.DecimalField(max_digits=14, decimal_places=4, null=True, blank=True)
 
     class Meta:
+        verbose_name_plural = 'Group tags'
+        verbose_name = 'Group tag'
+
         unique_together = ('name', 'group')
 
 
@@ -308,22 +300,52 @@ class GroupUser(BaseModel):
     @classmethod
     def pre_save(cls, instance, raw, using, update_fields, *args, **kwargs):
         if instance.pk is None:
-            # Joins the chatroom associated with the poll
-            participant = MessageChannelParticipant(user=instance.user, channel=instance.group.chat)
-            participant.save()
 
+            # Reuse existing participant if user previously left and is rejoining
+            participant, created = MessageChannelParticipant.objects.get_or_create(
+                user=instance.user,
+                channel=instance.group.chat,
+            )
+
+            participant.active = True
+            participant.save()
             instance.chat_participant = participant
 
     @classmethod
     def post_save(cls, instance, created, update_fields, *args, **kwargs):
         if created:
-            KanbanSubscription(kanban_id=instance.user.kanban_id, target_id=instance.group.kanban_id)
+            instance.group.schedule.add_user(user=instance.user)
+            subscription = KanbanSubscription(kanban_id=instance.user.kanban_id, target_id=instance.group.kanban_id)
+            subscription.save()
+
+        elif update_fields and 'active' in update_fields:
+            if instance.active:
+                instance.group.schedule.add_user(user=instance.user)
+
+                instance.chat_participant.active = True
+                instance.chat_participant.save()
+
+            else:
+                instance.group.schedule.remove_user(user=instance.user)
+
+                KanbanSubscription.objects.filter(kanban_id=instance.user.kanban_id,
+                                                  target_id=instance.group.kanban_id).delete()
+
+                instance.chat_participant.active = False
+                instance.chat_participant.save()
+
+                if instance.group.notification_channel:
+                    instance.group.notification_channel.unsubscribe_all(user=instance.user)
 
     @classmethod
     def post_delete(cls, instance, *args, **kwargs):
         KanbanSubscription.objects.filter(kanban_id=instance.user.kanban_id,
                                           target_id=instance.group.kanban_id).delete()
-        instance.chat_participant.delete()
+
+        if instance.chat_participant:
+            instance.chat_participant.active = False
+            instance.chat_participant.save()
+
         if instance.group.notification_channel:
             instance.group.notification_channel.unsubscribe_all(user=instance.user)
 
@@ -337,8 +359,8 @@ post_delete.connect(GroupUser.post_delete, sender=GroupUser)
 
 
 # Work Group in Flowback
-class WorkGroup(BaseModel):
-    name = models.CharField(max_length=255)
+class WorkGroup(BaseModel, ScheduleModel):
+    name = models.CharField(max_length=255, validators=[FieldNotBlankValidator])
     direct_join = models.BooleanField(default=False)
     group = models.ForeignKey(Group, on_delete=models.CASCADE)
     chat = models.ForeignKey(MessageChannel, on_delete=models.PROTECT)
@@ -370,9 +392,16 @@ class WorkGroupUser(BaseModel):
     @classmethod
     def pre_save(cls, instance, raw, using, update_fields, *args, **kwargs):
         if instance.pk is None:
-            # Joins the chatroom associated with the workgroup
-            participant = MessageChannelParticipant(user=instance.group_user.user, channel=instance.work_group.chat)
-            participant.save()
+            # Reuse existing participant if user previously left and is rejoining
+            participant, created = MessageChannelParticipant.objects.get_or_create(
+                user=instance.group_user.user,
+                channel=instance.work_group.chat,
+                defaults={'active': True}
+            )
+            if not created:
+                # Joins the chatroom associated with the workgroup
+                participant.active = True
+                participant.save()
 
             instance.chat_participant = participant
 
@@ -382,9 +411,17 @@ class WorkGroupUser(BaseModel):
         if invite.exists():
             invite.delete()
 
+        if instance.active:
+            instance.work_group.schedule.add_user(user=instance.group_user.user)
+
+        else:
+            instance.work_group.schedule.remove_user(user=instance.group_user.user)
+
     @classmethod
     def post_delete(cls, instance, *args, **kwargs):
-        instance.chat_participant.delete()  # Leave chatroom
+        instance.chat_participant.active = False  # Leave chatroom
+        instance.chat_participant.save()
+        instance.work_group.schedule.remove_user(user=instance.group_user.user)
 
     class Meta:
         constraints = [models.UniqueConstraint(name='WorkGroupUser_group_user_and_work_group_is_unique',
@@ -406,16 +443,40 @@ class WorkGroupUserJoinRequest(BaseModel):
 
 
 # GroupThreads are mainly used for creating comment sections for various topics
-class GroupThread(BaseModel):
+class GroupThread(BaseModel, NotifiableModel):
     created_by = models.ForeignKey(GroupUser, on_delete=models.CASCADE)
-    title = models.CharField(max_length=200)
-    description = models.TextField(null=True, blank=True)
+    title = models.CharField(max_length=200, validators=[FieldNotBlankValidator])
+    description = models.TextField(null=True, blank=True, validators=[FieldNotBlankValidator])
     pinned = models.BooleanField(default=False)
     comment_section = models.ForeignKey(CommentSection, default=comment_section_create, on_delete=models.DO_NOTHING)
     active = models.BooleanField(default=True)
     attachments = models.ForeignKey(FileCollection, on_delete=models.CASCADE, null=True, blank=True)
     work_group = models.ForeignKey(WorkGroup, on_delete=models.SET_NULL, null=True, blank=True)
     public = models.BooleanField(default=False)
+
+    @property
+    def notification_data(self) -> dict | None:
+        return dict(thread_id=self.id,
+                    thread_title=self.title,
+                    group_id=self.created_by.group.id,
+                    group_name=self.created_by.group.name,
+                    group_image=self.created_by.group.image)
+
+    def notify_thread_comment(self,
+                            action: NotificationChannel.Action,
+                            message: str,
+                            work_group_id: int,
+                            work_group_name: str,
+                            subscription_filters: dict,
+                            exclude_subscription_filters: dict,
+                            comment_message: str):
+        """
+        Notifies about new comments
+        """
+        params = locals()
+        params.pop('self')
+
+        return self.notification_channel.notify(**params)
 
 
 # Likes and Dislikes for Group Thread

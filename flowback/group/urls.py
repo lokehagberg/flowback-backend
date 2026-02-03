@@ -29,14 +29,15 @@ from .views.delegate import (GroupUserDelegateListApi,
                              GroupUserDelegatePoolListApi,
                              GroupUserDelegatePoolCreateApi,
                              GroupUserDelegatePoolDeleteApi, GroupUserDelegatePoolNotificationSubscribeAPI)
-from .views.schedule import (GroupScheduleEventListAPI,
-                             GroupScheduleEventCreateAPI,
-                             GroupScheduleEventUpdateAPI,
-                             GroupScheduleEventDeleteAPI, GroupScheduleSubscribeAPI)
-from .views.kanban import (GroupKanbanEntryListAPI,
-                           GroupKanbanEntryCreateAPI,
+from .views.kanban import (GroupKanbanEntryCreateAPI,
                            GroupKanbanEntryUpdateAPI,
                            GroupKanbanEntryDeleteAPI)
+from .views.schedule import (GroupScheduleEventCreateAPI,
+                             GroupScheduleEventUpdateAPI,
+                             GroupScheduleEventDeleteAPI,
+                             WorkGroupScheduleEventCreateAPI,
+                             WorkGroupScheduleEventUpdateAPI,
+                             WorkGroupScheduleEventDeleteAPI)
 from .views.thread import (GroupThreadListAPI,
                            GroupThreadCreateAPI,
                            GroupThreadUpdateAPI,
@@ -47,7 +48,8 @@ from .views.thread import (GroupThreadListAPI,
                            GroupThreadCommentDeleteAPI,
                            GroupThreadCommentVoteAPI,
                            GroupThreadCommentAncestorListAPI,
-                           GroupThreadVoteUpdateAPI)
+                           GroupThreadVoteUpdateAPI,
+                           GroupThreadNotificationSubscribeAPI)
 from .views.comment import (GroupDelegatePoolCommentListAPI,
                             GroupDelegatePoolCommentCreateAPI,
                             GroupDelegatePoolCommentUpdateAPI,
@@ -90,6 +92,10 @@ group_patterns = [
     path('workgroup/<int:work_group_id>/user/update', WorkGroupUserUpdateAPI.as_view(), name='work_group_user_update'),
     path('workgroup/<int:work_group_id>/user/remove', WorkGroupUserRemoveAPI.as_view(), name='work_group_user_remove'),
 
+    path('workgroup/<int:work_group_id>/schedule/event/create', WorkGroupScheduleEventCreateAPI.as_view(), name='work_group_schedule_event_create'),
+    path('workgroup/<int:work_group_id>/schedule/event/update', WorkGroupScheduleEventUpdateAPI.as_view(), name='work_group_schedule_event_update'),
+    path('workgroup/<int:work_group_id>/schedule/event/delete', WorkGroupScheduleEventDeleteAPI.as_view(), name='work_group_schedule_event_delete'),
+
     path('<int:group>/permissions', GroupPermissionListApi.as_view(), name='group_permissions'),
     path('<int:group>/permission/create', GroupPermissionCreateApi.as_view(), name='group_permission_create'),
     path('<int:group>/permission/update', GroupPermissionUpdateApi.as_view(), name='group_permission_update'),
@@ -130,22 +136,20 @@ group_patterns = [
          GroupDelegatePoolCommentVoteAPI.as_view(),
          name='group_user_delegate_pool_vote'),
 
-    path('<int:group_id>/schedule', GroupScheduleEventListAPI.as_view(), name='group_schedule'),
-    path('<int:group_id>/schedule/create', GroupScheduleEventCreateAPI.as_view(), name='group_schedule_create'),
-    path('<int:group_id>/schedule/update', GroupScheduleEventUpdateAPI.as_view(), name='group_schedule_update'),
-    path('<int:group_id>/schedule/delete', GroupScheduleEventDeleteAPI.as_view(), name='group_schedule_delete'),
-    path('<int:group_id>/schedule/subscribe', GroupScheduleSubscribeAPI.as_view(), name='group_schedule_subscribe'),
-
-    path('<int:group_id>/kanban/entry/list', GroupKanbanEntryListAPI.as_view(), name='group_kanban_entry'),
     path('<int:group_id>/kanban/entry/create', GroupKanbanEntryCreateAPI.as_view(), name='group_kanban_entry_create'),
     path('<int:group_id>/kanban/entry/update', GroupKanbanEntryUpdateAPI.as_view(), name='group_kanban_entry_update'),
     path('<int:group_id>/kanban/entry/delete', GroupKanbanEntryDeleteAPI.as_view(), name='group_kanban_entry_delete'),
+
+    path('<int:group_id>/schedule/event/create', GroupScheduleEventCreateAPI.as_view(), name='group_schedule_event_create'),
+    path('<int:group_id>/schedule/event/update', GroupScheduleEventUpdateAPI.as_view(), name='group_schedule_event_update'),
+    path('<int:group_id>/schedule/event/delete', GroupScheduleEventDeleteAPI.as_view(), name='group_schedule_event_delete'),
 
     path('thread/list', GroupThreadListAPI.as_view(), name='group_thread'),
     path('<int:group_id>/thread/create', GroupThreadCreateAPI.as_view(), name='group_thread_create'),
     path('thread/<int:thread_id>/update', GroupThreadUpdateAPI.as_view(), name='group_thread_update'),
     path('thread/<int:thread_id>/delete', GroupThreadDeleteAPI.as_view(), name='group_thread_delete'),
     path('thread/<int:thread_id>/vote', GroupThreadVoteUpdateAPI.as_view(), name='group_thread_vote_update'),
+    path('thread/<int:thread_id>/subscribe', GroupThreadNotificationSubscribeAPI.as_view(), name='group_thread_subscribe'),
     path('thread/<int:thread_id>/comment/list',
          GroupThreadCommentListAPI.as_view(),
          name='group_thread_comment_list'),

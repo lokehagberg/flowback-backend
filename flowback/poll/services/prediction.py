@@ -5,6 +5,7 @@ from django.db.models import Sum, Case, When, F, OuterRef, Subquery, Count
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
+from backend.settings import FLOWBACK_PREDICTION_VOTE_ON_RESULT_PHASE
 from ..models import (PollPredictionBet,
                       PollPredictionStatement,
                       PollPredictionStatementSegment,
@@ -60,7 +61,7 @@ def poll_prediction_statement_create(poll: int,
 # PredictionBet Statement Update (with segments)
 # TODO add or remove
 def poll_prediction_statement_update(user: Union[int, User], prediction_statement_id: int) -> None:
-    prediction_statement = get_object(PollPredictionStatement, id=prediction_statement_id)
+    prediction_statement = get_object(PollPredictionStatement, id=prediction_statement_id, active=True)
     group_user = group_user_permissions(user=user, group=prediction_statement.poll.created_by.group,
                                         permissions=['prediction_statement_update', 'admin'])
 
@@ -71,7 +72,7 @@ def poll_prediction_statement_update(user: Union[int, User], prediction_statemen
 
 
 def poll_prediction_statement_delete(user: Union[int, User], prediction_statement_id: int) -> None:
-    prediction_statement = get_object(PollPredictionStatement, id=prediction_statement_id)
+    prediction_statement = get_object(PollPredictionStatement, id=prediction_statement_id, active=True)
     group_user = group_user_permissions(user=user, group=prediction_statement.poll.created_by.group,
                                         permissions=['prediction_statement_delete', 'admin'])
 
@@ -80,7 +81,8 @@ def poll_prediction_statement_delete(user: Union[int, User], prediction_statemen
     if not prediction_statement.created_by == group_user:
         raise ValidationError('Prediction statement not created by user')
 
-    prediction_statement.delete()
+    prediction_statement.active = False
+    prediction_statement.save()
 
 
 def poll_prediction_bet_create(user: Union[int, User],
@@ -168,7 +170,11 @@ def poll_prediction_statement_vote_update(user: Union[int, User],
     group_user = group_user_permissions(user=user,
                                         group=prediction_statement_vote.prediction_statement.poll.created_by.group)
 
-    prediction_statement_vote.prediction_statement.poll.check_phase('prediction_vote', 'result')
+    if FLOWBACK_PREDICTION_VOTE_ON_RESULT_PHASE:
+        prediction_statement_vote.prediction_statement.poll.check_phase('prediction_vote', 'result')
+
+    else:
+        prediction_statement_vote.prediction_statement.poll.check_phase('prediction_vote')
 
     if prediction_statement_vote.created_by != group_user:
         raise ValidationError('Prediction statement vote not created by user')
@@ -190,7 +196,11 @@ def poll_prediction_statement_vote_delete(user: Union[int, User], prediction_sta
     group_user = group_user_permissions(user=user,
                                         group=prediction_statement_vote.prediction_statement.poll.created_by.group)
 
-    prediction_statement_vote.prediction_statement.poll.check_phase('prediction_vote', 'result')
+    if FLOWBACK_PREDICTION_VOTE_ON_RESULT_PHASE:
+        prediction_statement_vote.prediction_statement.poll.check_phase('prediction_vote', 'result')
+
+    else:
+        prediction_statement_vote.prediction_statement.poll.check_phase('prediction_vote')
 
     if prediction_statement_vote.created_by != group_user:
         raise ValidationError('Prediction statement vote not created by user')

@@ -166,19 +166,6 @@ class GroupDelegationTestCase(APITestCase):
         self.assertIsNotNone(delegator)
         self.assertEqual(delegator.tags.count(), 2)
 
-    def test_update_delegate(self):
-        self.skipTest("This feature is not working yet, refer to delete and recreating the delegator instead.")
-        # response = generate_request(api=GroupUserDelegateUpdateApi,
-        #                             data=dict(delegate_pool_id=self.delegate_pool.id,
-        #                                       tags=f'{self.tag2.id}'),
-        #                             url_params=dict(group=self.group.id),
-        #                             user=self.user1)
-        #
-        # self.assertEqual(response.status_code, status.HTTP_200_OK)
-        # print(GroupUserDelegator.objects.get(delegator=self.group_user1).tags.first().name)
-        # self.assertTrue(GroupUserDelegator.objects.filter(delegator=self.group_user1,
-        #                                                   tags__in=[self.tag2]).exists())
-
     def test_delete_delegate(self):
         """Test GroupUserDelegateDeleteApi"""
         # Create a delegator for user3
@@ -237,3 +224,138 @@ class GroupDelegationTestCase(APITestCase):
         self.assertTrue(Notification.objects.filter(notification_object__channel__notificationsubscription=subscription,
                                                     notification_object__message="Test test!",
                                                     notification_object__data__poll_id=poll.id))
+
+    def test_delegate_can_delegate_to_themselves_only(self):
+        """Test that a GroupUser who is already a delegate should be able to run group_user_delegate 
+        on a pool they're already a delegate in, but won't be able to delegate to anyone besides themselves."""
+
+        # user2 is already a delegate in self.delegate_pool (set up in setUp)
+        # Test that user2 (the delegate) can delegate to their own pool (self-delegation)
+        response = generate_request(
+            api=GroupUserDelegateApi,
+            data={
+                'delegate_pool_id': self.delegate_pool.id,
+                'tags': [self.tag1.id]
+            },
+            url_params={'group': self.group.id},
+            user=self.user2  # user2 is the delegate
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        # Verify the self-delegation was created
+        self_delegator = GroupUserDelegator.objects.filter(delegator=self.group_user2,  # same as delegate
+                                                           delegate_pool=self.delegate_pool).first()
+
+        self.assertIsNotNone(self_delegator)
+        self.assertEqual(self_delegator.tags.count(), 1)
+        self.assertTrue(self_delegator.tags.filter(id=self.tag1.id).exists())
+
+        # Now test the validation logic: a delegate trying to delegate to a different pool
+        # should trigger the validation error "Delegate cannot be a delegator beside to themselves"
+        different_pool = GroupUserDelegatePoolFactory(group=self.group)
+        GroupUserDelegateFactory(group=self.group,
+                                 group_user=self.group_user3,  # different user as delegate
+                                 pool=different_pool)
+
+        # user2 (who is a delegate) tries to delegate to a different pool
+        # According to the business logic, this should fail with ValidationError
+        response = generate_request(api=GroupUserDelegateApi,
+                                    data={'delegate_pool_id': different_pool.id,
+                                          'tags': [self.tag2.id]},
+                                    url_params={'group': self.group.id},
+                                    user=self.user2)  # user2 is a delegate, trying to delegate elsewhere
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_delegator_removed_when_delegate_deleted(self):
+        """Test to see if a delegator who's delegated to themselves is removed properly 
+        when the delegate is removed."""
+
+        # Create a new delegate pool and delegate
+        new_pool = GroupUserDelegatePoolFactory(group=self.group)
+        new_delegate = GroupUserDelegateFactory(
+            group=self.group,
+            group_user=self.group_user3,
+            pool=new_pool
+        )
+
+        # Make the delegate also a delegator to themselves (self-delegation)
+        self_delegator = GroupUserDelegatorFactory(
+            group=self.group,
+            delegator=self.group_user3,  # same as the delegate
+            delegate_pool=new_pool
+        )
+        self_delegator.tags.add(self.tag1)
+
+        # Verify the self-delegation exists
+        self.assertTrue(
+            GroupUserDelegator.objects.filter(
+                delegator=self.group_user3,
+                delegate_pool=new_pool
+            ).exists()
+        )
+
+        # Now delete the delegate pool (which should remove the delegate)
+        response = generate_request(
+            api=GroupUserDelegatePoolDeleteApi,
+            url_params={'group': self.group.id},
+            user=self.user3  # user3 is the delegate who owns the pool
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        # Verify that both the delegate pool and the self-delegator are removed
+        self.assertFalse(
+            GroupUserDelegatePool.objects.filter(id=new_pool.id).exists()
+        )
+
+        self.assertFalse(
+            GroupUserDelegate.objects.filter(
+                group_user=self.group_user3,
+                pool_id=new_pool.id
+            ).exists()
+        )
+
+        # Most importantly, verify that the self-delegator is also removed
+        self.assertFalse(
+            GroupUserDelegator.objects.filter(
+                delegator=self.group_user3,
+                delegate_pool_id=new_pool.id
+            ).exists()
+        )
+
+    def test_cannot_delegate_same_tag_to_multiple_delegates(self):
+        """A user cannot delegate the same tag to multiple delegates (pools) within the same group."""
+        # Existing: user1 -> self.delegate_pool with tag1
+        # Create a second delegate pool with a different delegate
+        second_pool = GroupUserDelegatePoolFactory(group=self.group)
+        GroupUserDelegateFactory(
+            group=self.group,
+            group_user=self.group_user3,
+            pool=second_pool
+        )
+
+        # Try to delegate the same tag1 to the second delegate pool
+        response = generate_request(api=GroupUserDelegateApi,
+                                    data={'delegate_pool_id': second_pool.id, 'tags': [self.tag1.id]},
+                                    url_params={'group': self.group.id},
+                                    user=self.user1)
+
+        # Should not be permitted
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+        # Delegate to a different tag, then update to tag1 and see if it fails
+        generate_request(api=GroupUserDelegateApi,
+                         data={'delegate_pool_id': second_pool.id, 'tags': [self.tag2.id]},
+                         url_params={'group': self.group.id},
+                         user=self.user1)
+
+        response = generate_request(api=GroupUserDelegateUpdateApi,
+                                    data={'delegate_pool_id': second_pool.id, 'tags': [self.tag1.id]},
+                                    url_params={'group': self.group.id},
+                                    user=self.user1)
+
+        # Should not be permitted
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data['detail'][0], 'User already delegated to same tag in another pool')

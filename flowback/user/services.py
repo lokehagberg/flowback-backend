@@ -1,10 +1,9 @@
 import logging
-import operator
 import uuid
-from functools import reduce
 
+from django.contrib.contenttypes.models import ContentType
 from django.core.mail import send_mail
-from django.db.models import Q, Count
+from django.db.models import Q, Count, Model
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.password_validation import validate_password
 from django.utils import timezone
@@ -17,11 +16,9 @@ from flowback.chat.services import message_channel_create, message_channel_join
 from flowback.common.services import model_update, get_object
 from flowback.kanban.services import KanbanManager
 from flowback.notification.models import NotificationChannel
-from flowback.schedule.models import ScheduleEvent
-from flowback.schedule.services import ScheduleManager, unsubscribe_schedule
-from flowback.user.models import User, OnboardUser, PasswordReset, Report, UserChatInvite
+from flowback.schedule.services import schedule_event_create, schedule_event_update, schedule_event_delete
+from flowback.user.models import User, OnboardUser, PasswordReset, Report, UserChatInvite, UserBookmark
 
-user_schedule = ScheduleManager(schedule_origin_name='user')
 user_kanban = KanbanManager(origin_type='user')
 
 
@@ -29,29 +26,30 @@ def user_create(*, email: str) -> OnboardUser | None:
     email = email.lower()
     users = User.objects.filter(email=email)
     if users.exists():
-        for user in users:
-            if user.email == email:
+        for onboard_user in users:
+            if onboard_user.email == email:
                 raise ValidationError('Email already exists.')
 
             else:
                 raise ValidationError('Username already exists.')
 
-    user, created = OnboardUser.objects.update_or_create(email=email, defaults=dict(is_verified=False,
-                                                                                    verification_code=uuid.uuid4().hex))
+    onboard_user, created = OnboardUser.objects.update_or_create(email=email,
+                                                                 defaults=dict(is_verified=False,
+                                                                               verification_code=uuid.uuid4()))
 
-    link = f'Use this code to create your account: {user.verification_code}'
+    link = f'Use this code to create your account: {onboard_user.verification_code}'
     if URL_USER_CREATE:
         link = (f"Use this link to create your account: {URL_USER_CREATE}"
-                f"?email={email}&verification_code={user.verification_code}")
+                f"?verification_code={onboard_user.verification_code}")
 
     if EMAIL_HOST:
         send_mail('Flowback Verification Code', link, DEFAULT_FROM_EMAIL, [email])
 
     else:
         logging.info("Email host not configured. Email not sent, but code was sent to the console.")
-        print(f"Verification code for '{user.email}': {user.verification_code}")
+        print(f"Verification code for '{onboard_user.email}': {onboard_user.verification_code}")
 
-    return user
+    return onboard_user
 
 
 def user_create_verify(*, username: str, verification_code: str, password: str):
@@ -88,7 +86,7 @@ def user_forgot_password(*, email: str) -> PasswordReset:
 
     if URL_USER_FORGOT_PASSWORD:
         link = (f'Use this link to reset your account password: {URL_USER_FORGOT_PASSWORD}'
-                f'?email={email}&verification_code={password_reset.verification_code}')
+                f'?verification_code={password_reset.verification_code}')
 
     if EMAIL_HOST:
         send_mail('Flowback Verification Code', link, DEFAULT_FROM_EMAIL, [email])
@@ -149,55 +147,12 @@ def user_delete(*, user_id: int) -> None:
         user.full_clean()
         user.save()
 
-        user.schedule.delete()
         user.kanban.delete()
         OnboardUser.objects.filter(email=user.email).delete()
 
 
-def user_notification_subscribe(*, user: User, tags: list[str]):
-    user.notification_channel.subscribe(user=user, tags=tags)
-
-
-def user_schedule_event_create(*,
-                               user_id: int,
-                               title: str,
-                               description: str = None,
-                               start_date: timezone.datetime,
-                               end_date: timezone.datetime = None,
-                               repeat_frequency: str = None,
-                               reminders: list[int] = None,
-                               **kwargs
-                               ) -> ScheduleEvent:
-    user = get_object(User, id=user_id)
-    return user_schedule.create_event(schedule_id=user.schedule.id,
-                                      title=title,
-                                      start_date=start_date,
-                                      end_date=end_date,
-                                      origin_id=user.id,
-                                      origin_name='user',
-                                      description=description,
-                                      repeat_frequency=repeat_frequency,
-                                      reminders=reminders)
-
-
-def user_schedule_event_update(*, user_id: int, event_id: int, **data):
-    user = get_object(User, id=user_id)
-    user_schedule.update_event(event_id=event_id, schedule_origin_id=user.id, data=data)
-
-
-def user_schedule_event_delete(*, user_id: int, event_id: int):
-    user = get_object(User, id=user_id)
-    user_schedule.delete_event(event_id=event_id, schedule_origin_id=user.id)
-
-
-def user_schedule_unsubscribe(*,
-                              user_id: int,
-                              target_type: str,
-                              target_id: int):
-    user = get_object(User, id=user_id)
-    schedule = user_schedule.get_schedule(origin_id=user_id)
-    target_schedule = user_schedule.get_schedule(origin_name=target_type, origin_id=target_id)
-    unsubscribe_schedule(schedule_id=schedule.id, target_id=target_schedule.id)
+def user_notification_subscribe(*, user: User, **kwargs):
+    user.notification_channel.subscribe(user=user, **kwargs)
 
 
 def user_kanban_entry_create(*,
@@ -357,3 +312,46 @@ def report_create(*, user_id: int, title: str, description: str, group_id: int, 
     report.save()
 
     return report
+
+
+def report_update(*, report_id: int, **data):
+    report = Report.objects.get(id=report_id)
+    non_side_effects_fields = ['title', 'description', 'action_description', 'group_id', 'post_id', 'post_type']
+
+    report, has_updated = model_update(instance=report, fields=non_side_effects_fields, data=data)
+    return report
+
+
+def user_schedule_event_create(user: User, **data):
+    data['schedule_id'] = user.schedule.id
+    return schedule_event_create(created_by=user, **data)
+
+
+def user_schedule_event_update(user: User, **data):
+    data['schedule_id'] = user.schedule.id
+    return schedule_event_update(**data)
+
+
+def user_schedule_event_delete(user: User, **data):
+    data['schedule_id'] = user.schedule.id
+    return schedule_event_delete(**data)
+
+
+def user_bookmark_create(*, user_id: int, object_id: int, content_type: str | Model):
+    if isinstance(content_type, Model):
+        content_type = content_type.objects.get(id=object_id)
+
+    if isinstance(content_type, str):
+        content_type = ContentType.objects.get(model=content_type.lower())
+
+    return UserBookmark.objects.create(user_id=user_id, content_type=content_type, object_id=object_id)
+
+
+def user_bookmark_delete(*, user_id: int, object_id: int, content_type: str | Model):
+    if isinstance(content_type, Model):
+        content_type = content_type.objects.get(id=object_id)
+
+    if isinstance(content_type, str):
+        content_type = ContentType.objects.get(model=content_type.lower())
+
+    UserBookmark.objects.get(user_id=user_id, content_type=content_type, object_id=object_id).delete()

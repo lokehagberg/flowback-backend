@@ -2,12 +2,12 @@ from rest_framework.exceptions import ValidationError
 
 from flowback.comment.services import comment_create, comment_update, comment_delete, comment_vote
 from flowback.common.services import get_object, model_update
-from flowback.files.services import upload_collection
+from flowback.files.services import upload_collection, update_collection
 from flowback.group.models import GroupThread, GroupThreadVote
 from flowback.group.notify import notify_group_thread
 from flowback.group.selectors.permission import group_user_permissions
 from flowback.notification.models import NotificationChannel
-
+from flowback.group.notify import notify_thread_comment
 
 def group_thread_create(user_id: int,
                         group_id: int,
@@ -50,7 +50,7 @@ def group_thread_create(user_id: int,
 
 
 def group_thread_update(user_id: int, thread_id: int, data: dict):
-    thread = get_object(GroupThread, id=thread_id)
+    thread = get_object(GroupThread, id=thread_id, active=True)
     non_side_effect_fields = ['title', 'description', 'attachments', 'pinned']
 
     if 'pinned' in data.keys():
@@ -59,10 +59,11 @@ def group_thread_update(user_id: int, thread_id: int, data: dict):
     else:
         group_user_permissions(user=user_id, group=thread.created_by.group)
 
-    if 'attachments' in data.keys():
-        data['attachments'] = upload_collection(user_id=user_id,
-                                                file=data.pop('attachments'),
-                                                upload_to='group/thread')
+    update_collection(user_id=user_id,
+                      file_collection_id=thread.attachments_id,
+                      attachments_remove=data.get('attachments_remove'),
+                      attachments_add=data.get('attachments_add'),
+                      upload_to='group/thread')
 
     thread, has_updated = model_update(instance=thread,
                                        fields=non_side_effect_fields,
@@ -72,15 +73,17 @@ def group_thread_update(user_id: int, thread_id: int, data: dict):
 
 
 def group_thread_delete(user_id: int, thread_id: int):
-    thread = get_object(GroupThread, id=thread_id)
+    thread = GroupThread.objects.get(id=thread_id, active=True)
     group_user_permissions(user=user_id, group=thread.created_by.group)
 
-    thread.delete()
+    thread.active = False
+    thread.save()
+    thread.notification_channel.unsubscribe_all()
 
 
 def group_thread_vote_update(user_id: int, thread_id: int, vote: bool = None):
     try:
-        thread = GroupThread.objects.get(id=thread_id)
+        thread = GroupThread.objects.get(id=thread_id, active=True)
 
     except GroupThread.DoesNotExist:
         raise ValidationError('Thread does not exist')
@@ -102,7 +105,7 @@ def group_thread_comment_create(author_id: int,
                                 message: str = None,
                                 attachments: list = None,
                                 parent_id: int = None):
-    thread = get_object(GroupThread, id=thread_id)
+    thread = get_object(GroupThread, id=thread_id, active=True)
     group_user = group_user_permissions(user=author_id, group=thread.created_by.group)
 
     comment = comment_create(author_id=group_user.user.id,
@@ -112,11 +115,15 @@ def group_thread_comment_create(author_id: int,
                              attachments=attachments,
                              attachment_upload_to="group/thread/attachments")
 
+    notify_thread_comment(message="A new comment has been posted",
+                        action=NotificationChannel.Action.CREATED,
+                        thread=thread,
+                        comment=comment)
     return comment
 
 
 def group_thread_comment_update(fetched_by: int, thread_id: int, comment_id: int, data):
-    thread = get_object(GroupThread, id=thread_id)
+    thread = get_object(GroupThread, id=thread_id, active=True)
     group_user_permissions(user=fetched_by, group=thread.created_by.group)
 
     return comment_update(fetched_by=fetched_by,
@@ -127,7 +134,7 @@ def group_thread_comment_update(fetched_by: int, thread_id: int, comment_id: int
 
 
 def group_thread_comment_delete(fetched_by: int, thread_id: int, comment_id: int):
-    thread = get_object(GroupThread, id=thread_id)
+    thread = get_object(GroupThread, id=thread_id, active=True)
     group_user = group_user_permissions(user=fetched_by, group=thread.created_by.group)
 
     return comment_delete(fetched_by=fetched_by,
@@ -137,10 +144,17 @@ def group_thread_comment_delete(fetched_by: int, thread_id: int, comment_id: int
 
 
 def group_thread_comment_vote(*, fetched_by: int, thread_id: int, comment_id: int, vote: bool = None):
-    group_thread = GroupThread.objects.get(id=thread_id)
+    group_thread = GroupThread.objects.get(id=thread_id, active=True)
     group_user_permissions(user=fetched_by, group=group_thread.created_by.group)
 
     return comment_vote(fetched_by=fetched_by,
                         comment_section_id=group_thread.comment_section.id,
                         comment_id=comment_id,
                         vote=vote)
+
+
+def group_thread_notification_subscribe(*, user: int, thread_id: int, **kwargs):
+    group_thread = GroupThread.objects.get(id=thread_id, active=True)
+    group_user = group_user_permissions(user=user, group=group_thread.created_by.group)
+
+    group_thread.notification_channel.subscribe(user=group_user.user, **kwargs)

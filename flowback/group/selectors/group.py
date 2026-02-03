@@ -1,10 +1,8 @@
 import django_filters
-from django.db.models import OuterRef, Exists, Count, Q, Subquery
+from django.db.models import OuterRef, Exists, Count, Q
 
 from flowback.group.models import Group, GroupFolder
 from flowback.group.selectors.permission import group_user_permissions
-from flowback.kanban.selectors import kanban_entry_list
-from flowback.schedule.selectors import schedule_event_list
 from flowback.user.models import User
 
 
@@ -50,22 +48,6 @@ def group_folder_list():
     return GroupFolder.objects.all()
 
 
-def group_kanban_entry_list(*, fetched_by: User, group_id: int, filters=None):
-    group_user = group_user_permissions(user=fetched_by, group=group_id)
-    subquery = Group.objects.filter(id=OuterRef('kanban__origin_id')).values('name')
-    return kanban_entry_list(group_user=group_user,
-                             kanban_id=group_user.group.kanban.id,
-                             filters=filters,
-                             subscriptions=False
-                             ).annotate(group_name=Subquery(subquery))
-
-
 def group_detail(*, fetched_by: User, group_id: int):
     group_user = group_user_permissions(user=fetched_by, group=group_id)
     return Group.objects.annotate(member_count=Count('groupuser')).get(id=group_user.group.id)
-
-
-def group_schedule_event_list(*, fetched_by: User, group_id: int, filters=None):
-    filters = filters or {}
-    group_user = group_user_permissions(user=fetched_by, group=group_id)
-    return schedule_event_list(schedule_id=group_user.group.schedule.id, group_user=group_user, filters=filters)

@@ -10,6 +10,7 @@ from flowback.files.serializers import FileSerializer
 from flowback.group.selectors.thread import group_thread_list, group_thread_comment_list, \
     group_thread_comment_ancestor_list
 from flowback.group.serializers import WorkGroupSerializer, GroupUserSerializer
+from flowback.notification.views import NotificationSubscribeTemplateAPI
 from flowback.group.services.thread import (group_thread_create,
                                             group_thread_update,
                                             group_thread_delete,
@@ -17,7 +18,8 @@ from flowback.group.services.thread import (group_thread_create,
                                             group_thread_comment_update,
                                             group_thread_comment_delete,
                                             group_thread_comment_vote,
-                                            group_thread_vote_update)
+                                            group_thread_vote_update,
+                                            group_thread_notification_subscribe)
 
 
 @extend_schema(tags=['group/thread'])
@@ -49,9 +51,8 @@ class GroupThreadListAPI(APIView):
         user_vote = serializers.BooleanField(allow_null=True)
         work_group = WorkGroupSerializer()
         public = serializers.BooleanField()
-        
-        created_by = GroupUserSerializer()
-        group_joined = serializers.BooleanField(required=False)
+
+        group_joined = serializers.BooleanField()
         group_id = serializers.IntegerField(source='created_by.group_id')
         group_name = serializers.CharField(source='created_by.group.name')
         group_image = serializers.ImageField(source='created_by.group.image')
@@ -154,3 +155,8 @@ class GroupThreadCommentDeleteAPI(CommentDeleteAPI):
 @extend_schema(tags=['group/thread'])
 class GroupThreadCommentVoteAPI(CommentVoteAPI):
     lazy_action = group_thread_comment_vote
+
+
+@extend_schema(tags=['group/thread'])
+class GroupThreadNotificationSubscribeAPI(NotificationSubscribeTemplateAPI):
+    lazy_action = group_thread_notification_subscribe

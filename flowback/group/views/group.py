@@ -47,6 +47,7 @@ class GroupListApi(APIView):
                       'cover_image',
                       'joined',
                       'chat_id',
+                      'default_quorum',
                       'member_count',
                       'pending_invite',
                       'pending_join',
@@ -216,6 +217,7 @@ class WorkGroupListAPI(APIView):
         joined = serializers.BooleanField()
         chat_id = serializers.IntegerField()
         requested_access = serializers.BooleanField()
+        group_id = serializers.IntegerField()
 
     def get(self, request, group_id: int):
         serializer = self.FilterSerializer(data=request.query_params)

@@ -1,4 +1,6 @@
 from rest_framework.exceptions import ValidationError
+
+from backend.settings import DEBUG
 from flowback.common.services import get_object, model_update
 from flowback.files.services import upload_collection
 from flowback.group.notify import notify_group_poll
@@ -25,6 +27,7 @@ def poll_create(*, user_id: int,
                 prediction_bet_end_date: datetime = None,
                 delegate_vote_end_date: datetime = None,
                 vote_end_date: datetime = None,
+                schedule_poll_meeting_link: str = None,
                 end_date: datetime = None,
                 poll_type: int,
                 allow_fast_forward: bool = False,
@@ -92,6 +95,7 @@ def poll_create(*, user_id: int,
                 public=public,
                 tag_id=tag,
                 pinned=pinned,
+                schedule_poll_meeting_link=schedule_poll_meeting_link,
                 dynamic=dynamic,
                 quorum=quorum,
                 work_group_id=work_group_id,
@@ -102,8 +106,10 @@ def poll_create(*, user_id: int,
     poll.save()
 
     poll_area_vote_count.apply_async(kwargs=dict(poll_id=poll.id), eta=poll.area_vote_end_date)
-    poll_prediction_bet_count.apply_async(kwargs=dict(poll_id=poll.id), eta=poll.prediction_bet_end_date)
-    poll_proposal_vote_count.apply_async(kwargs=dict(poll_id=poll.id), eta=poll.end_date)
+    poll_prediction_bet_count.apply_async(kwargs=dict(poll_id=poll.id),
+                                          eta=poll.prediction_bet_end_date)
+    poll_proposal_vote_count.apply_async(kwargs=dict(poll_id=poll.id),
+                                         eta=poll.end_date)
 
     notify_group_poll(message="A new poll has been posted",
                       action=NotificationChannel.Action.CREATED,
@@ -113,10 +119,10 @@ def poll_create(*, user_id: int,
 
 
 def poll_update(*, user_id: int, poll_id: int, data) -> Poll:
-    poll = get_object(Poll, id=poll_id)
+    poll = get_object(Poll, id=poll_id, active=True)
     group_user = group_user_permissions(user=user_id, group=poll.created_by.group.id)
 
-    non_side_effect_fields = ['title', 'description', 'pinned']
+    non_side_effect_fields = ['title', 'description', 'pinned', 'schedule_poll_meeting_link']
 
     if data.get('pinned') is None:
         data.pop('pinned')
@@ -136,7 +142,7 @@ def poll_update(*, user_id: int, poll_id: int, data) -> Poll:
 
 
 def poll_delete(*, user_id: int, poll_id: int) -> None:
-    poll = get_object(Poll, id=poll_id)
+    poll = Poll.objects.get(id=poll_id, active=True)
     group_id = poll.created_by.group.id
     group_user = group_user_permissions(user=user_id, group=group_id)
 
@@ -150,14 +156,13 @@ def poll_delete(*, user_id: int, poll_id: int) -> None:
     else:
         group_user_permissions(group_user=group_user, permissions=['admin', 'force_delete_poll'])
 
-    if poll.attachments:
-        poll.attachments.delete()
-
-    poll.delete()
+    poll.active = False
+    poll.save()
 
     notify_group_poll(poll=poll,
                       action=NotificationChannel.Action.DELETED,
                       message="Poll has been deleted")
+    poll.notification_channel.unsubscribe_all()
 
 
 def poll_fast_forward(*, user_id: int, poll_id: int, phase: str):
@@ -183,30 +188,35 @@ def poll_fast_forward(*, user_id: int, poll_id: int, phase: str):
 
     # Save new times to dict
     for phase in time_table:
-        phase_time = poll.get_phase(phase) - time_difference
-        setattr(poll, poll.get_phase(phase, field_name=True), phase_time)
+        # Becomes none at date poll
+        _phase = poll.get_phase(phase)
+        if (_phase is not None):
+            phase_time = _phase - time_difference
+            setattr(poll, poll.get_phase(phase, field_name=True), phase_time)
 
     poll.full_clean()
     poll.save()
 
-    # TODO update/remove previous celery tasks
-    if poll.area_vote_end_date > timezone.now():
-        poll_area_vote_count.apply_async(kwargs=dict(poll_id=poll.id), eta=poll.area_vote_end_date)
+    # If not date poll, do these things depending on which phase one is going into
+    if (poll.poll_type == 4):
+        # TODO update/remove previous celery tasks
+        if poll.area_vote_end_date > timezone.now():
+            poll_area_vote_count.apply_async(kwargs=dict(poll_id=poll.id), eta=poll.area_vote_end_date)
 
-    else:
-        poll_area_vote_count.apply_async(kwargs=dict(poll_id=poll.id), countdown=1)
+        else:
+            poll_area_vote_count(poll_id=poll.id)
 
-    if poll.prediction_bet_end_date > timezone.now():
-        poll_prediction_bet_count.apply_async(kwargs=dict(poll_id=poll.id), eta=poll.prediction_bet_end_date)
+        if poll.prediction_bet_end_date > timezone.now():
+            poll_prediction_bet_count.apply_async(kwargs=dict(poll_id=poll.id), eta=poll.prediction_bet_end_date)
 
-    else:
-        poll_prediction_bet_count.apply_async(kwargs=dict(poll_id=poll.id), countdown=1)
+        else:
+            poll_prediction_bet_count(poll_id=poll.id)
 
-    if poll.end_date > timezone.now():
-        poll_proposal_vote_count.apply_async(kwargs=dict(poll_id=poll.id), eta=poll.end_date)
+        if poll.end_date > timezone.now():
+            poll_proposal_vote_count.apply_async(kwargs=dict(poll_id=poll.id), eta=poll.end_date)
 
-    else:
-        poll_proposal_vote_count.apply_async(kwargs=dict(poll_id=poll.id), countdown=1)
+        else:
+            poll_proposal_vote_count(poll_id=poll.id)
 
     notify_poll_phase(message=f"Poll has been fast forwarded "
                               f"to {poll.current_phase.replace('_', ' ').capitalize()}",
@@ -275,8 +285,8 @@ def poll_phase_template_delete(*, user_id: int, template_id: int):
     template.delete()
 
 
-def poll_notification_subscribe(*, user: User, poll_id: int, tags: list[str] = None):
+def poll_notification_subscribe(*, user: User, poll_id: int, **kwargs):
     poll = Poll.objects.get(id=poll_id)
     group_user = group_user_permissions(user=user, group=poll.created_by.group, work_group=poll.work_group)
 
-    poll.notification_channel.subscribe(user=group_user.user, tags=tags)
+    poll.notification_channel.subscribe(user=group_user.user, **kwargs)

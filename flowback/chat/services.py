@@ -1,13 +1,14 @@
-from django.contrib.admin import action
-from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import ValidationError
 
 from flowback.chat.models import MessageChannel, Message, MessageChannelParticipant, MessageFileCollection, \
     MessageChannelTopic
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
+from backend.settings import TESTING
 from flowback.common.services import get_object, model_update
-from flowback.files.models import FileCollection
 from flowback.files.services import upload_collection
 from flowback.user.models import User
+from flowback.user.serializers import BasicUserSerializer
 
 
 def user_message_channel_permission(*, user: User, channel: MessageChannel):
@@ -72,7 +73,6 @@ def message_delete(*, user_id: int, message_id: int):
     if not user == message.user:
         raise ValidationError('User is not author of message')
 
-    message.message = ""
     message.active = False
     message.save()
 
@@ -128,6 +128,25 @@ def message_channel_join(*, user_id: int, channel_id: int):
                                             channel=channel)
     participant.full_clean()
     participant.save()
+
+    # Notify relevant user channels via ChatConsumer that a user joined
+    if TESTING:
+        channel_layer = get_channel_layer()
+
+        payload = dict(
+            type="message",
+            message=f"User {user.username} joined the channel",
+            method="message_channel_join",
+            channel_id=channel.id,
+            channel_title=channel.title,
+            users=BasicUserSerializer(channel.users.all(), many=True).data,
+            origin_name=channel.origin_name,
+            user_id=user.id,
+            username=user.username,
+        )
+
+        for user in channel.users.all():
+            async_to_sync(channel_layer.group_send)(f"user_{user.id}", payload)
 
     return participant
 

@@ -1,9 +1,11 @@
 from typing import Union
 
 import django_filters
+from django.db.models import Q
 from django.forms import model_to_dict
 from rest_framework.exceptions import ValidationError, PermissionDenied
 
+from flowback.group.literals import GroupPermission
 from flowback.group.models import Group, GroupUser, WorkGroup, WorkGroupUser, GroupPermissions
 from flowback.user.models import User
 
@@ -68,6 +70,9 @@ def group_user_permissions(*,
     if 'work_group_moderator' in permissions:
         work_group_moderator_check = True
 
+    # TODO badly made, admin takes always priority,
+    #  if workgroup then workgroup moderator takes priority,
+    #  finally regular permissions gets checked.
     validated_permissions = any([user_permissions.get(key, False) for key in permissions]) or not permissions
     if not validated_permissions and not (admin and allow_admin):
         if raise_exception:
@@ -88,6 +93,31 @@ def group_user_permissions(*,
 
     return group_user
 
+
+def permission_q(root: str, *permissions: GroupPermission):
+    """
+    Returns a Q object that checks if a group user has the required permissions
+    :param root: The root of the Q object that leads to the group user e.g.
+     "groupuserdelegate__group_user"
+    :param permissions: The permission to check for e.g. "allow_vote"
+    """
+    # Check if group user exists
+    q0 = Q(**{f'{root}__isnull': False})
+
+    # Check if the user is admin in group
+    q1 = Q(**{f'{root}__is_admin': True})
+
+    # Check if the user has permission set
+    q2 = Q(**{f'{root}__permission__isnull': False})
+    for p in permissions:
+        q2 &= Q(**{f'{root}__permission__{p}': True})
+
+    # Otherwise, check the group default permission
+    q3 = Q(**{f'{root}__permission__isnull': True})
+    for p in permissions:
+        q3 &= Q(**{f'{root}__group__default_permission__{p}': True})
+
+    return Q(q0 & Q(q1 | q2 | q3))
 
 class BaseGroupPermissionsFilter(django_filters.FilterSet):
     class Meta:

@@ -3,8 +3,7 @@ from django.test import TestCase
 from flowback.group.notify import (
     notify_group_kanban,
     notify_group_thread,
-    notify_group_poll,
-    notify_group_schedule_event
+    notify_group_poll
 )
 from flowback.group.tests.factories import (
     GroupFactory,
@@ -17,7 +16,6 @@ from flowback.group.tests.factories import (
 from flowback.kanban.tests.factories import KanbanEntryFactory
 from flowback.notification.models import NotificationChannel, Notification
 from flowback.poll.tests.factories import PollFactory
-from flowback.schedule.tests.factories import ScheduleEventFactory
 from flowback.user.tests.factories import UserFactory
 
 
@@ -38,7 +36,6 @@ class GroupNotificationTest(TestCase):
         self.group.notification_channel.subscribe(user=self.user, tags=['group',
                                                                         'group_user',
                                                                         'kanban',
-                                                                        'schedule_event',
                                                                         'poll',
                                                                         'thread'])
 
@@ -253,95 +250,3 @@ class GroupNotificationTest(TestCase):
                 notification_object__action=action
             ).exists()
         )
-
-    def test_notify_group_schedule_event(self):
-        """Test that notify_group_schedule_event creates a notification in the database"""
-        # Create a schedule event with a work group
-        schedule_event = ScheduleEventFactory(
-            schedule=self.group.schedule,
-            title="Test Schedule Event",
-            work_group=self.work_group
-        )
-
-        # Call the function
-        message = "Test schedule event message"
-        action = NotificationChannel.Action.CREATED
-        notify_group_schedule_event(message, action, schedule_event)
-
-        # Assert that a notification was created in the database
-        self.assertTrue(
-            Notification.objects.filter(
-                notification_object__channel__object_id=self.group.id,
-                notification_object__channel__content_type__model="group",
-                notification_object__message=message,
-                notification_object__action=action,
-                user=self.user
-            ).exists()
-        )
-
-    def test_notify_group_schedule_event_without_work_group(self):
-        """Test notify_group_schedule_event when work_group is None"""
-        # Create a schedule event without a work group
-        schedule_event = ScheduleEventFactory(
-            schedule=self.group.schedule,
-            title="Test Schedule Event Without Work Group",
-            work_group=None
-        )
-
-        # Call the function
-        message = "Test schedule event message without work group"
-        action = NotificationChannel.Action.CREATED
-        notify_group_schedule_event(message, action, schedule_event)
-
-        # Assert that a notification was created in the database
-        # Since there's no work group, the notification should be sent to all group users
-        self.assertTrue(
-            Notification.objects.filter(
-                notification_object__channel__object_id=self.group.id,
-                notification_object__channel__content_type__model="group",
-                notification_object__message=message,
-                notification_object__action=action
-            ).exists()
-        )
-
-    def test_notify_group_schedule_event_with_user_list(self):
-        """Test notify_group_schedule_event with a specific user list"""
-        # Create a schedule event with a work group
-        schedule_event = ScheduleEventFactory(
-            schedule=self.group.schedule,
-            title="Test Schedule Event With User List",
-            work_group=self.work_group
-        )
-
-        # Create additional users
-        additional_users = [UserFactory() for _ in range(2)]
-        user_id_list = [self.user.id] + [user.id for user in additional_users]
-
-        # Add the additional users to the group and work group
-        for user in additional_users:
-            # Create a group user for each additional user
-            group_user = GroupUserFactory(user=user, group=self.group)
-
-            # Add the user to the work group
-            WorkGroupUserFactory(group_user=group_user, work_group=self.work_group)
-
-        # Subscribe the additional users to the notification channel
-        for user in additional_users:
-            self.group.notification_channel.subscribe(user=user, tags=['schedule_event'])
-
-        # Call the function with the user_id_list
-        message = "Test schedule event message with user list"
-        action = NotificationChannel.Action.CREATED
-        notify_group_schedule_event(message, action, schedule_event, user_id_list)
-
-        # Assert that notifications were created in the database for all users in the list
-        for user_id in user_id_list:
-            self.assertTrue(
-                Notification.objects.filter(
-                    notification_object__channel__object_id=self.group.id,
-                    notification_object__channel__content_type__model="group",
-                    notification_object__message=message,
-                    notification_object__action=action,
-                    user_id=user_id
-                ).exists()
-            )

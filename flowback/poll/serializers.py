@@ -1,9 +1,11 @@
 from rest_framework import serializers
 
+from flowback.files.serializers import FileSerializer, FileCollectionListSerializerMixin
 from flowback.group.serializers import GroupUserSerializer
+from flowback.poll.models import PollProposal, Poll
 
 
-class PollSerializer(serializers.Serializer):
+class PollSerializer(FileCollectionListSerializerMixin, serializers.Serializer):
     class FileSerializer(serializers.Serializer):
         file = serializers.CharField()
         file_name = serializers.CharField()
@@ -15,7 +17,6 @@ class PollSerializer(serializers.Serializer):
     group_image = serializers.ImageField(source='created_by.group.image')
     tag_id = serializers.IntegerField(allow_null=True)
     tag_name = serializers.CharField(source='tag.name', allow_null=True)
-    attachments = FileSerializer(many=True, source="attachments.filesegment_set", allow_null=True)
     hide_poll_users = serializers.BooleanField(source='created_by.group.hide_poll_users')
 
     title = serializers.CharField()
@@ -38,7 +39,44 @@ class PollSerializer(serializers.Serializer):
     participants = serializers.IntegerField()
     pinned = serializers.BooleanField()
     dynamic = serializers.BooleanField()
+    interval_mean_absolute_correctness = serializers.DecimalField(max_digits=12, decimal_places=9, allow_null=True)
 
     group_joined = serializers.BooleanField(required=False)
     total_comments = serializers.IntegerField(required=False)
     quorum = serializers.IntegerField(allow_null=True)
+
+
+class PollProposalSerializer(FileCollectionListSerializerMixin, serializers.Serializer):
+    id = serializers.IntegerField()
+    created_by = GroupUserSerializer(required=False)
+    poll = serializers.IntegerField(source='poll_id')
+    title = serializers.CharField()
+    description = serializers.CharField()
+    blockchain_id = serializers.IntegerField(min_value=0, allow_null=True)
+    score = serializers.IntegerField()
+
+    # Only for date poll
+    start_date = serializers.SerializerMethodField(help_text="A datetime field or None (if poll is not a schedule)")
+    end_date = serializers.SerializerMethodField(help_text="A datetime field or None (if poll is not a schedule)")
+    preliminary_score = serializers.SerializerMethodField(required=False)
+
+    def get_start_date(self, obj):
+        proposal = PollProposal.objects.get(id=obj.id)
+        if proposal.poll.poll_type == Poll.PollType.SCHEDULE:
+            return proposal.pollproposaltypeschedule.event_start_date
+
+        return None
+
+    def get_end_date(self, obj):
+        proposal = PollProposal.objects.get(id=obj.id)
+        if proposal.poll.poll_type == Poll.PollType.SCHEDULE:
+            return proposal.pollproposaltypeschedule.event_end_date
+
+        return None
+
+    def get_preliminary_score(self, obj):
+        proposal = PollProposal.objects.get(id=obj.id)
+        if proposal.poll.poll_type == Poll.PollType.SCHEDULE:
+            return proposal.pollproposaltypeschedule.preliminary_score
+
+        return None

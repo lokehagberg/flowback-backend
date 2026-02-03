@@ -17,17 +17,16 @@ from flowback.prediction.models import (PredictionBet,
                                         PredictionStatementSegment,
                                         PredictionStatementVote)
 from flowback.common.models import BaseModel
-from flowback.group.models import Group, GroupUser, GroupUserDelegatePool, GroupTags, WorkGroup
+from flowback.common.validators import FieldNotBlankValidator
+from flowback.group.models import GroupUser, GroupUserDelegatePool, GroupTags, WorkGroup
 from flowback.comment.models import CommentSection, comment_section_create_model_default
 import pgtrigger
-
-from flowback.schedule.models import Schedule, ScheduleEvent
-from flowback.schedule.services import create_schedule
 
 
 # Create your models here.
 class Poll(BaseModel, NotifiableModel):
     class PollType(models.IntegerChoices):
+        # 1 and 2 are depricated
         RANKING = 1, _('ranking')
         FOR_AGAINST = 2, _('for_against')
         SCHEDULE = 3, _('schedule')
@@ -36,8 +35,8 @@ class Poll(BaseModel, NotifiableModel):
     created_by = models.ForeignKey(GroupUser, on_delete=models.CASCADE)
 
     # General information
-    title = models.CharField(max_length=255)
-    description = models.TextField(null=True, blank=True)
+    title = models.CharField(max_length=255, validators=[FieldNotBlankValidator])
+    description = models.TextField(null=True, blank=True, validators=[FieldNotBlankValidator])
     attachments = models.ForeignKey(FileCollection, on_delete=models.SET_NULL, null=True, blank=True)
     poll_type = models.IntegerField(choices=PollType.choices)
     quorum = models.IntegerField(default=None, null=True, blank=True,
@@ -71,6 +70,7 @@ class Poll(BaseModel, NotifiableModel):
 
     blockchain_id = models.PositiveIntegerField(null=True, blank=True, default=None)
     work_group = models.ForeignKey(WorkGroup, on_delete=models.CASCADE, null=True, blank=True)
+    schedule_poll_meeting_link = models.URLField(null=True, blank=True)
 
     """
     Poll Status Code
@@ -87,7 +87,7 @@ class Poll(BaseModel, NotifiableModel):
     2 - Calculating Combined Bets
     """
     status_prediction = models.IntegerField(default=0)
-    result = models.BooleanField(default=False)
+    result = models.ForeignKey('poll.PollProposal', null=True, blank=True, on_delete=models.SET_NULL, related_name='winning_proposal')
 
     # Comment section
     comment_section = models.ForeignKey(CommentSection, default=comment_section_create_model_default,
@@ -96,6 +96,10 @@ class Poll(BaseModel, NotifiableModel):
     # Optional dynamic counting support
     participants = models.IntegerField(default=0)
     dynamic = models.BooleanField()
+
+    @property
+    def group(self):
+        return self.created_by.group
 
     @property
     def finished(self):
@@ -185,10 +189,6 @@ class Poll(BaseModel, NotifiableModel):
                                               name='polltypeisscheduleanddynamic_check')]
 
     @property
-    def schedule_origin(self):
-        return 'group_poll'
-
-    @property
     def current_phase(self) -> str:
         labels = self.labels
         current_time = timezone.now()
@@ -237,7 +237,7 @@ class Poll(BaseModel, NotifiableModel):
                                 ('group_name', str),
                                 ('group_image', str, 'The URL path to the image of the group'))
 
-    ## Notification
+    # Notification
     @property
     def notification_data(self) -> dict | None:
         return dict(poll_id=self.id,
@@ -298,70 +298,37 @@ class Poll(BaseModel, NotifiableModel):
 
         return self.notification_channel.notify(**params)
 
-    # Signals
-    @classmethod
-    def post_save(cls, instance, created, update_fields, **kwargs):
-        if created and instance.poll_type == cls.PollType.SCHEDULE:
-            try:
-                schedule = create_schedule(name='group_poll_schedule', origin_name='group_poll', origin_id=instance.id)
-                schedule_poll = PollTypeSchedule(poll=instance, schedule=schedule)
-                schedule_poll.full_clean()
-                schedule_poll.save()
-
-            except Exception as e:
-                instance.delete()
-                raise Exception('Internal server error when creating poll' + f':\n{e}' if DEBUG else '')
-
     @classmethod
     def post_delete(cls, instance, **kwargs):
         if hasattr(instance, 'schedule'):
             instance.schedule.delete()
 
 
-post_save.connect(Poll.post_save, sender=Poll)
 post_delete.connect(Poll.post_delete, sender=Poll)
-
-
-class PollTypeSchedule(BaseModel):
-    poll = models.OneToOneField(Poll, on_delete=models.CASCADE)
-    schedule = models.OneToOneField(Schedule, on_delete=models.CASCADE)
 
 
 class PollProposal(BaseModel):
     created_by = models.ForeignKey(GroupUser, on_delete=models.CASCADE)
     poll = models.ForeignKey(Poll, on_delete=models.CASCADE)
 
-    title = models.CharField(max_length=255, null=True, blank=True)
-    description = models.TextField(null=True, blank=True)
+    title = models.CharField(max_length=255, null=True, blank=True, validators=[FieldNotBlankValidator])
+    description = models.TextField(null=True, blank=True, validators=[FieldNotBlankValidator])
     attachments = models.ForeignKey(FileCollection, on_delete=models.CASCADE, null=True, blank=True)
     score = models.IntegerField(null=True, blank=True)
-
     blockchain_id = models.PositiveIntegerField(null=True, blank=True, default=None)
 
-    @property
-    def schedule_origin(self):
-        return 'group_poll_proposal'
+    active = models.BooleanField(default=True)
 
 
 class PollProposalTypeSchedule(BaseModel):
     proposal = models.OneToOneField(PollProposal, on_delete=models.CASCADE)
-    event = models.OneToOneField(ScheduleEvent, on_delete=models.CASCADE)
-
-    def clean(self):
-        if PollProposalTypeSchedule.objects.filter(event__start_date=self.event.start_date,
-                                                   event__end_date=self.event.end_date,
-                                                   proposal__poll=self.proposal.poll).exists():
-            raise ValidationError('Proposal event with same start_date and end_date already exists')
+    event_start_date = models.DateTimeField()
+    event_end_date = models.DateTimeField()
+    preliminary_score = models.IntegerField(default=0)
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=['proposal', 'event'], name='unique_proposaltypeschedule')]
-
-    @classmethod
-    def post_delete(cls, instance, **kwargs):
-        instance.event.delete()
-
-
-post_delete.connect(PollProposalTypeSchedule.post_delete, PollProposalTypeSchedule)
+        constraints = [models.UniqueConstraint(fields=['proposal', 'event_start_date', 'event_end_date'],
+                                               name='unique_proposaltypeschedule')]
 
 
 class PollVoting(BaseModel):
@@ -531,7 +498,7 @@ class PollPredictionBet(PredictionBet):
 
 class PollPhaseTemplate(BaseModel):
     created_by_group_user = models.ForeignKey(GroupUser, on_delete=models.CASCADE)
-    name = models.CharField(max_length=255)
+    name = models.CharField(max_length=255, validators=[FieldNotBlankValidator])
     poll_type = models.IntegerField(choices=Poll.PollType.choices)
     poll_is_dynamic = models.BooleanField(default=False)
 

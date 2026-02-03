@@ -20,6 +20,9 @@ class CharacterSeparatedField(serializers.ListField):
         # We override the default field access in order to support
         # lists in HTML forms.
         if html.is_html_input(dictionary):
+            # Don't return if the field is empty
+            if self.required == False and dictionary.get(self.field_name) is None:
+                return empty
             # Don't return [] if the update is partial
             if self.field_name not in dictionary:
                 if getattr(self.root, "partial", False):

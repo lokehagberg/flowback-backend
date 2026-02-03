@@ -14,8 +14,15 @@ def group_user_delegate(*, user: int, group: int, delegate_pool_id: int, tags: l
     delegator = group_user_permissions(user=user, group=group)
     delegate_pool = get_object(GroupUserDelegatePool, 'Delegate pool does not exist', id=delegate_pool_id, group=group)
 
-    if GroupUserDelegate.objects.filter(group_user=delegator).exists():
-        raise ValidationError('Delegator cannot be a delegate')
+    try:
+        delegate = GroupUserDelegate.objects.get(group_user=delegator)
+
+    except GroupUserDelegate.DoesNotExist:
+        pass
+
+    else:
+        if delegate.pool_id != delegate_pool_id:
+            raise ValidationError('Delegate cannot be a delegator beside to themselves')
 
     db_tags = GroupTags.objects.filter(id__in=tags, active=True).all()
 
@@ -31,10 +38,13 @@ def group_user_delegate(*, user: int, group: int, delegate_pool_id: int, tags: l
     if len(db_tags) < len(tags):
         raise ValidationError('Not all tags are available in the group')
 
-    delegate_rel = GroupUserDelegator(group_id=group, delegator_id=delegator.id,
-                                      delegate_pool_id=delegate_pool.id)
-    delegate_rel.full_clean()
-    delegate_rel.save()
+    delegate_rel, created = GroupUserDelegator.objects.get_or_create(group_id=group,
+                                                                     delegator_id=delegator.id,
+                                                                     delegate_pool_id=delegate_pool.id)
+
+    if not created:
+        raise ValidationError('User already delegated to this pool')
+
     delegate_rel.tags.add(*db_tags)
 
     return delegate_rel
@@ -53,7 +63,6 @@ def group_user_delegate_update(*, user_id: int, group_id: int, delegate_pool_id:
                                                      group_id=group_id,
                                                      delegate_pool__in=pools).all()
 
-
     if len(tags) == 0:
         GroupUserDelegator.objects.filter(delegator=group_user, group_id=group_id, delegate_pool__in=pools).delete()
         return
@@ -63,6 +72,9 @@ def group_user_delegate_update(*, user_id: int, group_id: int, delegate_pool_id:
 
     if len(delegate_rel) < len(pools):
         raise ValidationError('User is not delegator in all pools')
+
+    if GroupUserDelegator.objects.filter(~Q(delegate_pool_id=delegate_pool_id) & Q(tags__id__in=tags)):
+        raise ValidationError('User already delegated to same tag in another pool')
 
     TagsModel = GroupUserDelegator.tags.through
     TagsModel.objects.filter(groupuserdelegator__in=delegate_rel).delete()
@@ -120,14 +132,14 @@ def group_user_delegate_pool_delete(*, user: int, group: int):
     delegate_pool.delete()
 
 
-def group_user_delegate_pool_notification_subscribe(*, user: int, delegate_pool_id: int, tags: list[str] = None):
+def group_user_delegate_pool_notification_subscribe(*, user: int, delegate_pool_id: int, **kwargs):
     delegate_pool = GroupUserDelegatePool.objects.get(id=delegate_pool_id)
     group_user = group_user_permissions(user=user, group=delegate_pool.group)
 
     if not delegate_pool.groupuserdelegator_set.filter(delegator=group_user).exists():
         raise ValidationError('User is not a delegate in the pool')
 
-    delegate_pool.notification_channel.subscribe(user=user, tags=tags)
+    delegate_pool.notification_channel.subscribe(user=user, **kwargs)
 
 
 def group_delegate_pool_comment_create(*,

@@ -113,9 +113,9 @@ class GroupUserDelegatePoolCreateApi(APIView):
         serializer = self.InputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        group_user_delegate_pool_create(user=request.user.id, group=group, **serializer.validated_data)
+        delegate_pool = group_user_delegate_pool_create(user=request.user.id, group=group, **serializer.validated_data)
 
-        return Response(status=status.HTTP_200_OK)
+        return Response(status=status.HTTP_200_OK, data=delegate_pool.id)
 
 
 @extend_schema(tags=['group/delegate'])

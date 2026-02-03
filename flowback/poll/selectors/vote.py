@@ -1,4 +1,5 @@
 import django_filters
+from rest_framework.exceptions import ValidationError
 
 from flowback.common.services import get_object
 from flowback.poll.models import Poll, PollVotingTypeRanking, PollDelegateVoting, \
@@ -34,9 +35,11 @@ class BasePollVoteCardinalFilter(django_filters.FilterSet):
 
 
 class BasePollVoteForAgainstFilter(django_filters.FilterSet):
+    created_by_user_id = django_filters.NumberFilter(field_name='author__created_by__user_id')
+
     class Meta:
         model = PollVotingTypeForAgainst
-        fields = dict(proposal=['exact'])
+        fields = dict(proposal_id=['exact'])
 
 
 class BasePollDelegateVotingFilter(django_filters.FilterSet):
@@ -71,7 +74,7 @@ def poll_vote_list(*, fetched_by: User, poll_id: int, delegates: bool = False, f
 
         return BasePollVoteRankingFilter(filters, qs).qs
 
-    if poll.poll_type == Poll.PollType.CARDINAL:
+    elif poll.poll_type == Poll.PollType.CARDINAL:
         if delegates:
             qs = PollVotingTypeCardinal.objects.filter(proposal__poll=poll,
                                                        author_delegate__isnull=False).order_by('-score').all()
@@ -82,15 +85,15 @@ def poll_vote_list(*, fetched_by: User, poll_id: int, delegates: bool = False, f
         return BasePollVoteCardinalFilter(filters, qs).qs
 
     # Schedule (For Against)
-    if poll.poll_type == Poll.PollType.SCHEDULE:
-        if delegates:
-            qs = PollVotingTypeForAgainst.objects.filter(proposal__poll=poll,
-                                                         author_delegate__isnull=False).order_by('-vote').all()
-        else:
-            qs = PollVotingTypeForAgainst.objects.filter(proposal__poll=poll,
-                                                         author__created_by=group_user).order_by('-vote').all()
+    elif poll.poll_type == Poll.PollType.SCHEDULE:
+        qs = PollVotingTypeForAgainst.objects.filter(proposal__poll=poll).order_by('-vote').all()
+        if poll.created_by.group.hide_poll_users:
+            filters['created_by_user_id'] = fetched_by.id
 
         return BasePollVoteForAgainstFilter(filters, qs).qs
+
+    else:
+        raise ValidationError('Unknown poll type')
 
 
 def poll_delegates_list(*, fetched_by: User, poll_id: int, filters=None):

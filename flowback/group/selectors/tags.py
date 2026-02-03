@@ -12,7 +12,7 @@ from flowback.user.models import User
 
 # print(f"Tag: {tags.first()}, "
 #       f"Combined bets sum: {tags.first().sum_combined_bet}, "
-#       f"Has bets: {tags.first().sum_outcome}, "
+#       f"Has bets: {tags.first().number_of_evaluated_predictions}, "
 #       f"Outcome Sum: {tags.first().sum_outcome_score} "
 #       f"IMAC: {tags.first().imac}")
 
@@ -48,18 +48,21 @@ def group_tags_list(*, group_id: int, fetched_by: User = None, filters: dict = N
     update_poll_prediction_statement_outcomes(statements)
 
     # Calculate IMAC
-    tags = tags.annotate(sum_combined_bet=Sum('poll__pollpredictionstatement__combined_bet'),
+    tags = tags.annotate(sum_combined_bet=Sum('poll__pollpredictionstatement__combined_bet',
+                                              filter=Q(poll__pollpredictionstatement__outcome__isnull=False)),
 
-                         sum_outcome=Sum(Case(When(poll__pollpredictionstatement__outcome=True, then=1), default=0)),
+                         number_of_evaluated_predictions=Sum(
+                             Case(When(poll__pollpredictionstatement__outcome__isnull=False, then=1),
+                                  default=0,
+                                  output_field=models.DecimalField(max_digits=13, decimal_places=8))),
 
-                         sum_outcome_score=Sum(Case(When(poll__pollpredictionstatement__outcome=True, then=1),
-                                                    When(Q(poll__pollpredictionstatement__outcome=False)
-                                                         | Q(poll__pollpredictionstatement__outcome=None), then=0),
-                                                    output_field=models.DecimalField(max_digits=13, decimal_places=8))),
+                         sum_outcome=Sum(Case(When(poll__pollpredictionstatement__outcome=True, then=1),
+                                              default=0,
+                                              output_field=models.DecimalField(max_digits=13, decimal_places=8))),
 
-                         imac=Case(When(~Q(sum_outcome=0),
-                                        then=1 - (Abs(F('sum_combined_bet') - F('sum_outcome_score'))) / F(
-                                            'sum_outcome')),
+                         imac=Case(When(~Q(number_of_evaluated_predictions=0),
+                                        then=1 - (Abs(F('sum_combined_bet') - F('sum_outcome'))) / F(
+                                            'number_of_evaluated_predictions')),
                                    default=None, output_field=models.DecimalField(max_digits=13,
                                                                                   decimal_places=8,
                                                                                   null=True)))

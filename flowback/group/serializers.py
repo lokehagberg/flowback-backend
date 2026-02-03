@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from rest_framework.fields import SerializerMethodField
 
 from flowback.group.models import Group, GroupUser
 from flowback.user.serializers import BasicUserSerializer
@@ -16,11 +17,33 @@ class GroupUserSerializer(serializers.Serializer):
     is_admin = serializers.BooleanField(required=False)
     active = serializers.BooleanField(required=False)
 
-    permission_id = serializers.IntegerField(required=False, allow_null=True)
-    permission_name = serializers.CharField(required=False, source='permission.role_name', default='Member')
+    permission_id = SerializerMethodField()
+    permission_name = SerializerMethodField()
     group_id = serializers.IntegerField(required=False)
     group_name = serializers.CharField(required=False, source='group.name')
     group_image = serializers.CharField(required=False, source='group.image')
+
+    def get_permission_id(self, obj):
+        if isinstance(obj, int):
+            group_user = GroupUser.objects.get(id=obj)
+        else:
+            group_user = obj
+
+        if group_user.permission:
+            return group_user.permission_id
+
+        return group_user.group.default_permission_id
+
+    def get_permission_name(self, obj):
+        if isinstance(obj, int):
+            group_user = GroupUser.objects.get(id=obj)
+        else:
+            group_user = obj
+
+        if group_user.permission:
+            return group_user.permission.role_name
+
+        return group_user.group.default_permission.role_name
 
     def __init__(self, *args, hide_relevant_users=False, **kwargs):
         self.hide_relevant_users = hide_relevant_users

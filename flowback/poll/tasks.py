@@ -1,12 +1,14 @@
 import random
 from celery import shared_task
 from django.db import models
-from django.db.models import Count, Q, Sum, OuterRef, Case, When, F, Subquery
+from django.db.models import Count, Q, Sum, OuterRef, Case, When, F, Subquery, Max
 from django.db.models.functions import Cast
 from django.utils import timezone
 
+from backend.settings import DEBUG
 from flowback.common.services import get_object
 from flowback.group.models import GroupTags, GroupUser, GroupUserDelegatePool
+from flowback.group.selectors.permission import permission_q
 from flowback.group.selectors.tags import group_tags_list
 from flowback.notification.models import NotificationChannel
 from flowback.poll.models import Poll, PollAreaStatement, PollPredictionBet, PollPredictionStatement, \
@@ -16,11 +18,11 @@ from flowback.poll.models import Poll, PollAreaStatement, PollPredictionBet, Pol
 import numpy as np
 
 from flowback.poll.notify import notify_poll
-from flowback.schedule.services import create_event
 
 
 @shared_task
 def poll_area_vote_count(poll_id: int):
+    tag = None
     poll = get_object(Poll, id=poll_id)
     statement = PollAreaStatement.objects.filter(poll=poll).annotate(
         result=Count('pollareastatementvote', filter=Q(pollareastatementvote__vote=True)) -
@@ -39,15 +41,17 @@ def poll_area_vote_count(poll_id: int):
                 action=NotificationChannel.Action.UPDATED,
                 poll=poll)
 
-    return poll
+    return (f"Poll {poll_id} area task completed. "
+            f"{'No tags have won.' if not tag else
+            f'Tag: {tag.name} has won with {statement.pollareastatementvote_set.all().count()} points.'}")
 
 
 @shared_task
-def poll_prediction_bet_count(poll_id: int, debug_msg: bool = False):
+def poll_prediction_bet_count(poll_id: int):
     # For one prediction, assuming no bias and stationary predictors
 
     def dprint(*args, **kwargs):
-        if debug_msg:
+        if DEBUG:
             print(*args, **kwargs)
 
     # Get every predictor participating in poll
@@ -60,7 +64,8 @@ def poll_prediction_bet_count(poll_id: int, debug_msg: bool = False):
     statements = PollPredictionStatement.objects.filter(
         Q(Q(poll__tag=poll.tag,
             poll__end_date__lte=timestamp,
-            created_at__lte=timestamp) & ~Q(poll=poll)) | Q(poll=poll)
+            created_at__lte=timestamp) & ~Q(poll=poll)) | Q(poll=poll),
+        active=True
     ).annotate(
         outcome_sum=Sum(Case(When(pollpredictionstatementvote__vote=True, then=1),
                              When(pollpredictionstatementvote__vote=False, then=-1),
@@ -68,11 +73,12 @@ def poll_prediction_bet_count(poll_id: int, debug_msg: bool = False):
                              output_field=models.IntegerField())),
         outcome_scores=Case(When(outcome_sum__gt=0, then=1),
                             When(outcome_sum__lt=0, then=0),
-                            default=0.5,
-                            output_field=models.FloatField())
+                            default=None,
+                            output_field=models.FloatField(null=True))
     ).order_by('-created_at').all()
 
-    previous_outcomes = list(statements.filter(~Q(poll=poll)).values_list('outcome_scores', flat=True))
+    previous_outcomes = list(statements.filter(~Q(poll=poll) & Q(outcome_scores__isnull=False)
+                                               ).values_list('outcome_scores', flat=True))
     previous_outcome_avg = 0 if len(previous_outcomes) == 0 else sum(previous_outcomes) / len(previous_outcomes)
     poll_statements = statements.filter(poll=poll).all().values_list('id', flat=True)
 
@@ -82,6 +88,7 @@ def poll_prediction_bet_count(poll_id: int, debug_msg: bool = False):
     current_bets = []
     previous_bets = []
     for predictor in predictors:
+        # TODO check if statements include the current poll's statements
         bets = list(PollPredictionBet.objects.filter(
             created_by=predictor,
             prediction_statement__in=statements,
@@ -99,11 +106,20 @@ def poll_prediction_bet_count(poll_id: int, debug_msg: bool = False):
 
         current_bets.append(current_bet)
 
-        previous_bets.append(list(PollPredictionBet.objects.filter(
-            Q(created_by=predictor,
-              prediction_statement__in=statements)
+        unprocessed_previous_bets = PollPredictionBet.objects.filter(
+            Q(created_by=predictor, prediction_statement__in=statements.filter(outcome_scores__isnull=False))
             & ~Q(prediction_statement__poll=poll)).order_by('-prediction_statement__created_at').annotate(
-            real_score=Cast(F('score'), models.FloatField()) / 5).values_list('real_score', flat=True)))
+            real_score=Cast(F('score'), models.FloatField()) / 5)
+
+        bets = []
+        for statement in statements.filter(~Q(poll=poll) & Q(outcome_scores__isnull=False)):
+            try:
+                bets.append(unprocessed_previous_bets.get(prediction_statement=statement).real_score)
+
+            except PollPredictionBet.DoesNotExist:
+                bets.append(None)
+
+        previous_bets.append(bets)
 
     # Current
     # Bets: [[0.2, 0.2], [0.0, 0.0], [1.0, 0.0]]
@@ -112,28 +128,30 @@ def poll_prediction_bet_count(poll_id: int, debug_msg: bool = False):
     # Previous
     # Bets: [[0.0], [0.2], [1.0]]
 
-    previous_bets = [[] for _ in range(len(predictors))]
-    for i, statement in enumerate(statements.filter(~Q(poll=poll))):
-        for j, predictor in enumerate(predictors):
-            try:
-                bet = PollPredictionBet.objects.get(Q(created_by=predictor)
-                                                    & Q(prediction_statement=statement))
-                previous_bets[j].append(bet.score / 5)
+    # previous_bets = [[] for _ in range(len(predictors))]
+    # for i, statement in enumerate(statements.filter(~Q(poll=poll) & Q(outcome_scores__isnull=False))):  # For each previous statement (fix? weed out outcome_scores=None)
+    #     for j, predictor in enumerate(predictors):  # For each predictor
+    #
+    #         # Could be optimized
+    #         try:
+    #             bet = PollPredictionBet.objects.get(Q(created_by=predictor)
+    #                                                 & Q(prediction_statement=statement))  # Get bets from predictor for each statement
+    #             previous_bets[j].append(bet.score / 5)  # Divide all bets by 5
+    #
+    #         except PollPredictionBet.DoesNotExist:
+    #             previous_bets[j].append(None)  # If the bet does not exist, add None as a placeholder
 
-            except PollPredictionBet.DoesNotExist:
-                previous_bets[j].append(None)
-
-        # prediction_bets.append()
-        # print(PollPredictionBet.objects.filter(
-        #     Q(created_by=predictor,
-        #     prediction_statement__in=statements)
-        #     & ~Q(prediction_statement__poll=poll)).count())
-        #
-        # previous_bets.append(list(PollPredictionBet.objects.filter(
-        #     Q(created_by=predictor,
-        #     prediction_statement__in=statements)
-        #     & ~Q(prediction_statement__poll=poll)).order_by('-prediction_statement__poll__created_at').annotate(
-        #     real_score=Cast(F('score'), models.FloatField()) / 5).values_list('real_score', flat=True)))
+    # prediction_bets.append()
+    # print(PollPredictionBet.objects.filter(
+    #     Q(created_by=predictor,
+    #     prediction_statement__in=statements)
+    #     & ~Q(prediction_statement__poll=poll)).count())
+    #
+    # previous_bets.append(list(PollPredictionBet.objects.filter(
+    #     Q(created_by=predictor,
+    #     prediction_statement__in=statements)
+    #     & ~Q(prediction_statement__poll=poll)).order_by('-prediction_statement__poll__created_at').annotate(
+    #     real_score=Cast(F('score'), models.FloatField()) / 5).values_list('real_score', flat=True)))
 
     # Get bets
 
@@ -165,14 +183,13 @@ def poll_prediction_bet_count(poll_id: int, debug_msg: bool = False):
         current_bets = [u for i, u in enumerate(current_bets) if i not in to_delete]
         previous_bets = [u for i, u in enumerate(previous_bets) if i not in to_delete]
 
-    # Delete any previous_outcomes where outcome is 0.5 (that is, undecided)
+    # Delete any previous_outcomes where all corresponding previous bets are None
     to_delete = []
     for j, previous_outcome in enumerate(previous_outcomes):
-        if previous_outcome == 0.5:
+        if all(bets[j] is None for bets in previous_bets):
             to_delete.append(j)
 
     previous_outcomes = [j for n, j in enumerate(previous_outcomes) if n not in to_delete]
-    poll_statements = [j for n, j in enumerate(poll_statements) if n not in to_delete]
 
     for i in range(len(previous_bets)):
         previous_bets[i] = [j for n, j in enumerate(previous_bets[i]) if n not in to_delete]
@@ -180,6 +197,9 @@ def poll_prediction_bet_count(poll_id: int, debug_msg: bool = False):
     dprint("\n\n" + "#" * 50)
 
     # Assume previous_bets matches order of current_bets
+    dprint("Previous Statements count: ", statements.filter(~Q(poll=poll)).count())
+    dprint("Current statements count: ", statements.filter(poll=poll).count())
+    dprint("Total predictor count: ", predictors.count())
     dprint("Current Bets:", current_bets)
     dprint("Previous Outcomes:", previous_outcomes)
     dprint("Previous Bets:", previous_bets)
@@ -324,153 +344,116 @@ def poll_prediction_bet_count(poll_id: int, debug_msg: bool = False):
 
 @shared_task
 def poll_proposal_vote_count(poll_id: int) -> None:
-    poll = get_object(Poll, id=poll_id)
+    poll = Poll.objects.get(id=poll_id)
     group = poll.created_by.group
-    total_proposals = poll.pollproposal_set.count()
 
-    if poll.status:
+    if not poll.active:
         return
 
-    # Count delegators participating in poll
-    mandate = GroupUserDelegatePool.objects.filter(polldelegatevoting__poll=poll).aggregate(
+    # Update the delegate's mandate.
+    # Mandate is set to 0 by default
+    mandate = GroupUserDelegatePool.objects.filter(id=OuterRef('created_by')).annotate(
         mandate=Count('groupuserdelegator',
                       filter=~Q(groupuserdelegator__delegator__pollvoting__poll=poll)
                              & Q(groupuserdelegator__tags__in=[poll.tag])
                              & Q(groupuserdelegator__delegator__active=True)
-                             & Q(Q(groupuserdelegator__delegator__permission__isnull=False) & Q(groupuserdelegator__delegator__permission__allow_vote=True)
-                                 | Q(groupuserdelegator__delegator__permission__isnull=True) & Q(groupuserdelegator__delegator__group__default_permission__allow_vote=True))
-                      ))['mandate']
-
-    mandate_subquery = GroupUserDelegatePool.objects.filter(id=OuterRef('author_delegate__created_by')).annotate(
-        mandate=Count('groupuserdelegator',
-                      filter=~Q(groupuserdelegator__delegator__pollvoting__poll=poll)
-                             & Q(groupuserdelegator__tags__in=[poll.tag])
-                             & Q(groupuserdelegator__delegator__active=True)
-                             & Q(~Q(groupuserdelegator__delegator__permission__isnull=False) & Q(groupuserdelegator__delegator__permission__allow_vote=True)
-                                 | Q(groupuserdelegator__delegator__permission__isnull=True) & Q(groupuserdelegator__delegator__group__default_permission__allow_vote=True))
+                             & permission_q('groupuserdelegator__delegator', 'allow_vote')
                       )).values('mandate')
 
-    # Count mandate for each delegate, save it to PollDelegateVoting account
-    total_mandate = PollDelegateVoting.objects.filter(id=OuterRef('id')).annotate(
-        total_mandate=Count('created_by__groupuserdelegator',
-                            filter=~Q(created_by__groupuserdelegator__delegator__pollvoting__poll=poll
-                                      ) & Q(created_by__groupuserdelegator__tags__in=[poll.tag]
-                                            ) & Q(created_by__groupuserdelegator__delegator__active=True)
-                            )).values('total_mandate')
+    PollDelegateVoting.objects.filter(
+        permission_q('created_by__groupuserdelegate__group_user', 'allow_vote'),
+        poll=poll).update(mandate=Subquery(mandate))
 
-    PollDelegateVoting.objects.update(mandate=Subquery(total_mandate))
+    # Query to get a delegate's mandate
+    delegate_mandate = PollDelegateVoting.objects.filter(
+        id=OuterRef('author_delegate'),
+    ).values('mandate')
 
-    if poll.poll_type == Poll.PollType.RANKING:
-        if poll.tag:
-            delegate_votes = PollVotingTypeRanking.objects.filter(author_delegate__poll=poll).values('pk').annotate(
-                score=(total_proposals - (Count('author_delegate__pollvotingtyperanking') - F('priority'))
-                       ) * Subquery(mandate_subquery))
-
-            # Set score to the same as priority for user votes
-            user_votes = PollVotingTypeRanking.objects.filter(author__poll=poll
-                                                              ).values('pk').annotate(
-                score=total_proposals - (Count('author__pollvotingtyperanking') - F('priority')))
-
-            for i in user_votes:
-                PollVotingTypeRanking.objects.filter(id=i['pk']).update(score=i['score'])
-
-            for i in delegate_votes:
-                PollVotingTypeRanking.objects.filter(id=i['pk']).update(score=i['score'])
-
-            # TODO make this work, replace both above
-            # PollVotingTypeRanking.objects.bulk_update(delegate_votes | user_votes, fields=('score',))
-
-            # Update scores on each proposal, Summarize both regular votes and delegate votes
-            proposals = PollProposal.objects.filter(poll_id=poll_id).values('pk') \
-                .annotate(score=Sum('pollvotingtyperanking__score'))
-
-            for i in proposals:
-                PollProposal.objects.filter(id=i['pk']).update(score=i['score'])
-
-            # TODO make this work aswell, replace above
-            # PollProposal.objects.bulk_update(proposals, fields=('score',))
-
-            poll.participants = (mandate + PollVoting.objects.filter(poll=poll).all().count()) or 1
-            poll.save()
+    if poll.status or poll.poll_type == Poll.PollType.RANKING:
+        return
 
     if poll.poll_type == Poll.PollType.CARDINAL:
-        if poll.tag:
-            # Sets baseline scores to all votes
-            PollVotingTypeCardinal.objects.filter(author__isnull=False,
-                                                  proposal__poll=poll).update(score=F('raw_score'))
-            # Calculate final scores
-            multiplier = PollVotingTypeCardinal.objects.filter(id=OuterRef('id')).annotate(
-                multiplier=F('author_delegate__mandate')).values('multiplier')
+        # Update user vote scores
+        PollVotingTypeCardinal.objects.filter(
+            permission_q('author__created_by', 'allow_vote'),
+            proposal__active=True,
+            author__poll=poll).update(score=F('raw_score'))
 
-            PollVotingTypeCardinal.objects.filter(author_delegate__isnull=False, proposal__poll=poll
-                                                  ).update(score=F('raw_score') * Subquery(multiplier))
+        # Update delegate vote scores
+        PollVotingTypeCardinal.objects.filter(author_delegate__poll=poll,
+                                              proposal__active=True,
+                                              ).update(score=F('raw_score') * Subquery(delegate_mandate))
 
-            proposal_scores = PollProposal.objects.filter(id=OuterRef('id')).annotate(
-                final_score=Sum('pollvotingtypecardinal__score')).values('final_score')
-            PollProposal.objects.update(score=Subquery(proposal_scores))
+        # Update proposal scores
+        proposal_scores = PollVotingTypeCardinal.objects.filter(
+            proposal=OuterRef('id'),
+        ).values('proposal').annotate(
+            total_score=Sum('score')
+        ).values('total_score')
 
-            poll.participants = (mandate + PollVoting.objects.filter(poll=poll).all().count()) or 1
-            poll.save()
+        PollProposal.objects.filter(poll=poll, active=True).update(score=Subquery(proposal_scores))
 
     if poll.poll_type == Poll.PollType.SCHEDULE:
-        if poll.tag:
-            delegate_votes = PollVotingTypeForAgainst.objects.filter(author_delegate__poll=poll).values('pk').annotate(
-                score=(Count('author_delegate__pollvotingtypeforagainst',
-                             filter=Q(vote=True)) * Subquery(mandate_subquery) -
-                       Count('author_delegate__pollvotingtypeforagainst',
-                             filter=Q(vote=False)) * Subquery(mandate_subquery)))
+        # Update user vote scores
+        PollVotingTypeForAgainst.objects.filter(
+            permission_q('author__created_by', 'allow_vote'),
+            proposal__active=True,
+            author__poll=poll).update(score=Case(When(vote=True, then=1), default=-1))
 
-            # Set score to the same as priority for user votes
-            user_votes = PollVotingTypeForAgainst.objects.filter(author__poll=poll, vote=True).values('pk', 'vote')
+        # Update delegate vote scores
+        PollVotingTypeForAgainst.objects.filter(author_delegate__poll=poll,
+                                                proposal__active=True,
+                                                ).update(score=Case(When(vote=True, then=1), default=-1)
+                                                               * Subquery(delegate_mandate))
 
-            for i in user_votes:
-                PollVotingTypeForAgainst.objects.filter(id=i['pk']).update(score=int(i['vote']))
+        # Update proposal scores
+        proposal_scores = PollVotingTypeForAgainst.objects.filter(
+            proposal=OuterRef('id')
+        ).values('proposal').annotate(
+            total_score=Sum('score')
+        ).values('total_score')
 
-            for i in delegate_votes:
-                PollVotingTypeForAgainst.objects.filter(id=i['pk']).update(score=int(i['vote']))
+        PollProposal.objects.filter(poll=poll, active=True).update(score=Subquery(proposal_scores))
 
-            # TODO make this work, replace both above (Copied from ranking comment)
-            # PollVotingTypeSchedule.objects.bulk_update(delegate_votes | user_votes, fields=('score',))
-
-            # Update scores on each proposal, Summarize both regular votes and delegate votes
-            proposals = PollProposal.objects.filter(poll_id=poll_id).values('pk') \
-                .annotate(score=Sum('pollvotingtypeforagainst__score'))
-
-            for i in proposals:
-                PollProposal.objects.filter(id=i['pk']).update(score=i['score'])
-
-            # TODO make this work aswell, replace above
-            # PollProposal.objects.bulk_update(proposals, fields=('score',))
-
-            poll.participants = (mandate + PollVoting.objects.filter(poll=poll).all().count()) or 1
-            poll.save()
-
+    # Check if quorum is fulfilled
     total_group_users = GroupUser.objects.filter(group=group).count()
     quorum = (poll.quorum if poll.quorum is not None else group.default_quorum) / 100
 
-    if poll.finished and not poll.result:
-        if poll.poll_type == Poll.PollType.SCHEDULE:
-            winning_proposal = PollProposal.objects.filter(
-                poll_id=poll_id).order_by('-score', '-pollproposaltypeschedule__event__start_date').first()
-            if winning_proposal:
-                event = winning_proposal.pollproposaltypeschedule.event
-                create_event(schedule_id=group.schedule_id,
-                             title=poll.title,
-                             start_date=event.start_date,
-                             end_date=event.end_date,
-                             origin_name=poll.schedule_origin,
-                             origin_id=poll.id,
-                             description=poll.description)
+    # TODO participants will include dangling participants
+    #  (participants with only proposal votes that are active=False and removed votes)
+    user_participants = PollVoting.objects.filter(permission_q('created_by', 'allow_vote'),
+                                                  poll=poll).count()
+    delegate_participants = PollDelegateVoting.objects.filter(poll=poll).aggregate(mandate=Sum('mandate'))['mandate']
+    participants = ((user_participants if user_participants is not None else 0)
+                    + (delegate_participants if delegate_participants is not None else 0))
+    poll.participants = participants
+    poll.save()
 
-        print(f"Total Participants: {poll.participants}")
+    winning_proposal_score = PollProposal.objects.filter(poll_id=poll_id,
+                                                         active=True).aggregate(score=Max('score'))['score']
+    winning_proposal = PollProposal.objects.filter(poll_id=poll_id,
+                                                   active=True,
+                                                   score=winning_proposal_score).order_by('?').first()
+
+    if poll.finished and not poll.result:
+        print(f"Total Participants: {participants}")
         print(f"Total Group Users: {total_group_users}")
         print(f"Quorum: {quorum}")
-        poll.status = 1 if poll.participants > total_group_users * quorum else -1
+        poll.status = 1 if poll.participants >= total_group_users * quorum else -1
         poll.interval_mean_absolute_correctness = group_tags_list(group_id=poll.created_by.group_id,
                                                                   filters=dict(id=poll.tag_id)).first().imac
-        poll.result = True
+        poll.result = winning_proposal
         poll.save()
 
         notify_poll(message="Poll has ended and results have been counted",
                     action=NotificationChannel.Action.UPDATED,
                     poll=poll)
+
+        if poll.poll_type == Poll.PollType.SCHEDULE and poll.status == 1 and winning_proposal:
+            schedule = group.schedule if poll.work_group is None else poll.work_group.schedule
+            schedule.create_event(title=poll.title,
+                                  description=poll.description,
+                                  meeting_link=poll.schedule_poll_meeting_link,
+                                  start_date=winning_proposal.pollproposaltypeschedule.event_start_date,
+                                  end_date=winning_proposal.pollproposaltypeschedule.event_end_date,
+                                  created_by=poll)

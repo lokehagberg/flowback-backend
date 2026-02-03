@@ -1,17 +1,14 @@
 import django_filters
 from django.db import models
-from django.db.models import OuterRef, Q, Exists, Subquery, Count, F
+from django.db.models import OuterRef, Q, Exists, Subquery, F
 from django_filters import FilterSet
 from rest_framework.exceptions import ValidationError
 
-from flowback.comment.models import Comment
 from flowback.common.filters import NumberInFilter
-from flowback.common.services import get_object
 from flowback.group.models import Group, GroupUser, GroupThread, GroupThreadVote
-from flowback.poll.models import Poll, PollPredictionStatement, PollVoting
-from flowback.schedule.selectors import schedule_event_list
+from flowback.poll.models import Poll, PollVoting
 from flowback.kanban.selectors import kanban_entry_list
-from flowback.user.models import User, UserChatInvite
+from flowback.user.models import User, UserChatInvite, UserBookmark
 from backend.settings import env
 
 
@@ -51,14 +48,9 @@ def get_user(fetched_by: User, user_id: int = None):
                                    'banner_image', 'public_status', 'chat_status'))
 
 
-def user_schedule_event_list(*, fetched_by: User, filters=None):
-    filters = filters or {}
-    return schedule_event_list(schedule_id=fetched_by.schedule.id, filters=filters)
-
-
 def user_kanban_entry_list(*, fetched_by: User, filters=None):
     filters = filters or {}
-    return kanban_entry_list(kanban_id=fetched_by.kanban.id, filters=filters, subscriptions=True)
+    return kanban_entry_list(user=fetched_by, filters=filters)
 
 
 def user_list(*, fetched_by: User, filters=None):
@@ -80,14 +72,17 @@ class UserHomeFeedFilter(django_filters.FilterSet):
                                                      ('-pinned', 'pinned')))
     id = django_filters.NumberFilter(lookup_expr='exact')
     created_by_id = django_filters.NumberFilter(lookup_expr='exact')
-    work_group_ids = NumberInFilter()
-    title__icontains = django_filters.CharFilter(lookup_expr='icontains')
+    work_group_ids = NumberInFilter(field_name='work_group_id')
+    title__icontains = django_filters.CharFilter(field_name='title', lookup_expr='icontains')
     description = django_filters.CharFilter(lookup_expr='icontains')
+    created_at__gt = django_filters.DateTimeFilter(field_name='created_at', lookup_expr='gt')
+    created_at__lt = django_filters.DateTimeFilter(field_name='created_at', lookup_expr='lt')
     related_model = django_filters.CharFilter(lookup_expr='exact')
     group_joined = django_filters.BooleanFilter(lookup_expr='exact')
     user_vote = django_filters.BooleanFilter(lookup_expr='exact')
     pinned = django_filters.BooleanFilter(lookup_expr='exact')
     group_ids = NumberInFilter(field_name='created_by__group_id')
+    bookmarked = django_filters.BooleanFilter()
 
 
 # TODO add relevant Count (proposal, prediction, comments) to the home feed if possible
@@ -110,16 +105,22 @@ def user_home_feed(*, fetched_by: User, filters=None):
                       'related_model',
                       'group_joined',
                       'user_vote',
-                      'pinned']
+                      'pinned',
+                      'bookmarked']
 
     q = (Q(created_by__group__groupuser__user__in=[fetched_by])
          & Q(created_by__group__groupuser__active=True))  # User in group
 
     thread_qs = GroupThread.objects.filter(
-        Q(created_by__group__public=True)
-        & ~Q(created_by__group__groupuser__user__in=[fetched_by])  # Group is Public
+        q & Q(work_group__isnull=True)  # User in Group
+
+        | Q(created_by__group__public=True)
+        & ~Q(created_by__group__groupuser__user__in=[fetched_by])  # Group is Public and user not in group
         & Q(work_group__isnull=True)
         & Q(public=True)
+
+        | q & Q(work_group__isnull=False)  # User in workgroup
+        & Q(work_group__workgroupuser__group_user__user=fetched_by)
 
         | q & Q(created_by__group__public=True)
         & Q(created_by__group__groupuser__user__in=[fetched_by])
@@ -127,19 +128,18 @@ def user_home_feed(*, fetched_by: User, filters=None):
         & Q(work_group__isnull=True)
         & Q(public=True)
 
-        | q & Q(work_group__isnull=True)  # All threads without workgroup
-
-        | q & Q(work_group__isnull=False)  # User in workgroup
-        & Q(work_group__workgroupuser__group_user__user=fetched_by)
-
-        | q & Q(work_group__isnull=False)  # User is admin in group
-        & Q(created_by__group__groupuser__user=fetched_by)
-        & Q(created_by__group__groupuser__is_admin=True))
+        # | q & Q(work_group__isnull=False)  # User is admin in group
+        # & Q(created_by__group__groupuser__user=fetched_by)
+        # & Q(created_by__group__groupuser__is_admin=True)
+    )
 
     group_thread_vote = GroupThreadVote.objects.filter(thread_id=OuterRef('id'),
                                                        created_by__user=fetched_by).values('vote')
+    bookmarked = UserBookmark.objects.filter(user=fetched_by, content_type__model='groupthread', object_id=OuterRef('id'))
+
     thread_qs = thread_qs.annotate(related_model=models.Value('thread', models.CharField()),
                                    group_id=F('created_by__group_id'),
+                                   bookmarked=Exists(bookmarked),
                                    group_joined=Exists(joined_groups),
                                    user_vote=Subquery(group_thread_vote))
     thread_qs = thread_qs.values(*related_fields)
@@ -151,7 +151,7 @@ def user_home_feed(*, fetched_by: User, filters=None):
         q & Q(work_group__isnull=True)  # User in Group
 
         | Q(created_by__group__public=True)
-        & ~Q(created_by__group__groupuser__user__in=[fetched_by])  # Group is Public
+        & ~Q(created_by__group__groupuser__user__in=[fetched_by])  # Group is Public and Workgroup is null
         & Q(work_group__isnull=True)
         & Q(public=True)
 
@@ -164,14 +164,18 @@ def user_home_feed(*, fetched_by: User, filters=None):
         & Q(work_group__isnull=True)
         & Q(public=True)
 
-        | q & Q(work_group__isnull=False)  # User is admin in group
-        & Q(created_by__group__groupuser__user=fetched_by)
-        & ~Q(created_by__group__groupuser__user__in=[fetched_by])
-        & Q(created_by__group__groupuser__is_admin=True))
+        # | q & Q(work_group__isnull=False)  # User is admin in group
+        # & Q(created_by__group__groupuser__user=fetched_by)
+        # & ~Q(created_by__group__groupuser__user__in=[fetched_by])
+        # & Q(created_by__group__groupuser__is_admin=True)
+    )
 
     poll_user_vote = PollVoting.objects.filter(poll_id=OuterRef('id'), created_by__user=fetched_by)
+    bookmarked = UserBookmark.objects.filter(user=fetched_by, content_type__model='groupthread', object_id=OuterRef('id'))
+
     poll_qs = poll_qs.annotate(related_model=models.Value('poll', models.CharField()),
                                group_id=F('created_by__group_id'),
+                               bookmarked=Exists(bookmarked),
                                group_joined=Exists(joined_groups),
                                user_vote=Exists(poll_user_vote))
     poll_qs = poll_qs.values(*related_fields)

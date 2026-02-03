@@ -4,7 +4,7 @@ import sys
 import environ
 from pathlib import Path
 
-VERSION = "1.0"
+VERSION = "1.0.0"
 
 env = environ.Env(DEBUG=(bool, True),
                   DEBUG_REGISTER_BYPASS_EMAIL_VERIFICATION=(bool, False),
@@ -48,6 +48,7 @@ env = environ.Env(DEBUG=(bool, True),
                   FLOWBACK_SCORE_VOTE_CEILING=(int, 100),
                   FLOWBACK_SCORE_VOTE_FLOOR=(int, 0),
                   FLOWBACK_KANBAN_PRIORITY_LIMIT=(int, 5),
+                  FLOWBACK_PREDICTION_VOTE_ON_RESULT_PHASE=(bool, False),
                   FLOWBACK_KANBAN_LANES=(list, ['Backlog', 'Chosen For Execution', 'In Progress', 'Evaluation', 'Finished'])
                   )
 
@@ -333,6 +334,7 @@ else:
 FLOWBACK_SCORE_VOTE_CEILING = env('FLOWBACK_SCORE_VOTE_CEILING')
 FLOWBACK_SCORE_VOTE_FLOOR = env('FLOWBACK_SCORE_VOTE_FLOOR')
 FLOWBACK_ALLOW_DYNAMIC_POLL = env('FLOWBACK_ALLOW_DYNAMIC_POLL')
+FLOWBACK_PREDICTION_VOTE_ON_RESULT_PHASE = env('FLOWBACK_PREDICTION_VOTE_ON_RESULT_PHASE')
 FLOWBACK_PREDICTION_HISTORY_LIMIT = env('FLOWBACK_PREDICTION_HISTORY_LIMIT')
 
 # Group related settings

@@ -2,6 +2,7 @@ from django.contrib.auth import logout
 from drf_spectacular.utils import extend_schema
 from phonenumber_field.serializerfields import PhoneNumberField
 from rest_framework import serializers, status
+from rest_framework.authtoken.models import Token
 from rest_framework.permissions import AllowAny
 from tutorial.quickstart.serializers import UserSerializer
 
@@ -17,16 +18,14 @@ from flowback.user.serializers import BasicUserSerializer
 from flowback.user.services import (user_create, user_create_verify, user_forgot_password,
                                     user_forgot_password_verify, user_update, user_delete, user_get_chat_channel,
                                     user_chat_invite, user_chat_channel_leave, user_chat_channel_update,
-                                    user_notification_subscribe)
+                                    user_notification_subscribe, user_bookmark_create, user_bookmark_delete)
 
 
 class UserCreateApi(APIView):
     permission_classes = [AllowAny]
 
-    class InputSerializer(serializers.ModelSerializer):
-        class Meta:
-            model = OnboardUser
-            fields = ('email',)
+    class InputSerializer(serializers.Serializer):
+        email = serializers.EmailField()
 
     def post(self, request):
         serializer = self.InputSerializer(data=request.data)
@@ -53,9 +52,9 @@ class UserCreateVerifyApi(APIView):
         serializer = self.InputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        user_create_verify(**serializer.validated_data)
-
-        return Response(status=status.HTTP_201_CREATED)
+        user = user_create_verify(**serializer.validated_data)
+        token, created = Token.objects.get_or_create(user=user)
+        return Response(status=status.HTTP_201_CREATED, data={'token': token.key})
 
 
 class UserForgotPasswordApi(APIView):
@@ -68,9 +67,13 @@ class UserForgotPasswordApi(APIView):
         serializer = self.InputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        user_forgot_password(**serializer.validated_data)
+        password_reset = user_forgot_password(**serializer.validated_data)
 
-        return Response(status=status.HTTP_200_OK)
+        data = None
+        if DEBUG_REGISTER_BYPASS_EMAIL_VERIFICATION:
+            data = password_reset.verification_code
+
+        return Response(status=status.HTTP_200_OK, data=data)
 
 
 class UserForgotPasswordVerifyApi(APIView):
@@ -84,9 +87,10 @@ class UserForgotPasswordVerifyApi(APIView):
         serializers = self.InputSerializer(data=request.data)
         serializers.is_valid(raise_exception=True)
 
-        user_forgot_password_verify(**serializers.validated_data)
+        user = user_forgot_password_verify(**serializers.validated_data)
+        token, created = Token.objects.get_or_create(user=user)
 
-        return Response(status=status.HTTP_200_OK)
+        return Response(status=status.HTTP_200_OK, data={'token': token.key})
 
 
 class UserListApi(APIView):
@@ -152,17 +156,17 @@ class UserGetApi(APIView):
 class UserUpdateApi(APIView):
     class InputSerializer(serializers.Serializer):
         username = serializers.CharField(required=False)
-        profile_image = serializers.ImageField(required=False)
-        banner_image = serializers.ImageField(required=False)
-        bio = serializers.CharField(required=False)
-        website = serializers.CharField(required=False)
+        profile_image = serializers.ImageField(required=False, allow_null=True)
+        banner_image = serializers.ImageField(required=False, allow_null=True)
+        bio = serializers.CharField(required=False, allow_null=True)
+        website = serializers.CharField(required=False, allow_null=True)
         dark_theme = serializers.BooleanField(required=False)
-        contact_email = serializers.CharField(required=False)
-        contact_phone = PhoneNumberField(required=False)
+        contact_email = serializers.CharField(required=False, allow_null=True)
+        contact_phone = PhoneNumberField(required=False, allow_null=True)
         public_status = serializers.ChoiceField(required=False, choices=User.PublicStatus.choices)
         chat_status = serializers.ChoiceField(required=False, choices=User.PublicStatus.choices)
         email = serializers.CharField(required=False)
-        user_config = serializers.CharField(required=False)
+        user_config = serializers.CharField(required=False, allow_null=True)
 
     def post(self, request):
         serializer = self.InputSerializer(data=request.data)
@@ -278,4 +282,30 @@ class UserChatChannelUpdateAPI(APIView):
 class UserLogoutAPI(APIView):
     def post(self, request):
         logout(request)
+        return Response(status=status.HTTP_200_OK)
+
+
+class UserBookmarkCreateAPI(APIView):
+    class InputSerializer(serializers.Serializer):
+        object_id = serializers.IntegerField()
+        content_type = serializers.CharField()
+
+    def post(self, request):
+        serializer = self.InputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user_bookmark_create(user_id=request.user.id, **serializer.validated_data)
+
+        return Response(status=status.HTTP_201_CREATED)
+
+
+class UserBookmarkDeleteAPI(APIView):
+    class InputSerializer(serializers.Serializer):
+        object_id = serializers.IntegerField()
+        content_type = serializers.CharField()
+
+    def post(self, request):
+        serializer = self.InputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user_bookmark_delete(user_id=request.user.id, **serializer.validated_data)
+
         return Response(status=status.HTTP_200_OK)

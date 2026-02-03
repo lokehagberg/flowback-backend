@@ -3,8 +3,7 @@ from flowback.poll.models import Poll
 from flowback.kanban.models import KanbanEntry
 from flowback.notification.models import NotificationChannel
 from flowback.user.models import User
-from flowback.schedule.models import ScheduleEvent
-
+from flowback.comment.models import Comment
 
 def notify_group_kanban(message: str,
                         action: NotificationChannel.Action,
@@ -59,28 +58,8 @@ def notify_group_poll(message: str,
                                              poll_title=poll.title,
                                              work_group_id=poll.work_group_id if poll.work_group else None,
                                              work_group_name=poll.work_group.name if poll.work_group else None,
-                                             subscription_filters=subscription_filters)
-
-
-def notify_group_schedule_event(message: str,
-                                action: NotificationChannel.Action,
-                                schedule_event: ScheduleEvent,
-                                user_id_list: list[int] = None):
-    group = schedule_event.schedule.group_set.first()
-    users = user_id_list
-
-    if schedule_event.work_group and not user_id_list:
-        users = list(schedule_event.work_group.group_users.values_list('user_id', flat=True))
-
-    return group.notify_schedule_event(message=message,
-                                       action=action,
-                                       schedule_event_id=schedule_event.id,
-                                       schedule_event_title=schedule_event.title,
-                                       work_group_id=schedule_event.work_group_id
-                                       if schedule_event.work_group else None,
-                                       work_group_name=schedule_event.work_group.name
-                                       if schedule_event.work_group else None,
-                                       subscription_filters=dict(user_id__in=users) if users else None)
+                                             subscription_filters=subscription_filters,
+                                             exclude_subscription_filters=dict(user_id=poll.created_by.user_id))
 
 
 def notify_group_user_delegate_pool_poll_vote_update(message: str,
@@ -96,3 +75,22 @@ def notify_group_user_delegate_pool_poll_vote_update(message: str,
                                           poll_id=poll.id,
                                           poll_title=poll.title,
                                           subscription_filters=dict(user_id__in=user_ids))
+
+
+def notify_thread_comment(message: str,
+                        action: NotificationChannel.Action,
+                        thread: GroupThread,
+                        comment: Comment):
+    users = None
+    if thread.work_group:
+        users = list(thread.work_group.group_users.values_list('user_id', flat=True))
+
+    return thread.notify_thread_comment(message=message,
+                                        action=action,
+                                        work_group_id=thread.work_group_id
+                                        if thread.work_group else None,
+                                        work_group_name=thread.work_group.name
+                                        if thread.work_group else None,
+                                        comment_message=comment.message,
+                                        subscription_filters=dict(user_id__in=users) if users else None,
+                                        exclude_subscription_filters=dict(user_id=comment.author_id))

@@ -106,7 +106,6 @@ class GroupLeaveApi(APIView):
 class GroupUserUpdateApi(APIView):
     class InputSerializer(serializers.Serializer):
         target_user_id = serializers.IntegerField()
-        delegate = serializers.BooleanField(required=False, default=None, allow_null=True)
         permission = serializers.IntegerField(required=False, allow_null=True, source='permission_id')
         is_admin = serializers.BooleanField(required=False, allow_null=True, default=None)
 

@@ -1,4 +1,3 @@
-from django.shortcuts import render
 from drf_spectacular.utils import extend_schema
 
 # Create your views here.
@@ -6,6 +5,7 @@ from rest_framework import serializers, status
 from rest_framework.views import APIView, Response
 
 from flowback.common.pagination import LimitOffsetPagination, get_paginated_response
+from flowback.files.serializers import FileCollectionCreateSerializerMixin, FileCollectionListSerializerMixin
 
 from flowback.group.serializers import GroupUserSerializer
 from flowback.notification.views import NotificationSubscribeTemplateAPI
@@ -30,6 +30,7 @@ class PollListApi(APIView):
         order_by = serializers.CharField(default='start_date_desc',
                                          required=False)  # TODO add desc, add a way to limit order_by fields to two.
         pinned = serializers.BooleanField(required=False, default=None, allow_null=True)
+        bookmarked = serializers.BooleanField(required=False, default=None, allow_null=True)
 
         title = serializers.CharField(required=False)
         title__icontains = serializers.CharField(required=False)
@@ -62,7 +63,7 @@ class PollListApi(APIView):
         end_date__gt = serializers.DateTimeField(required=False)
         end_date__lt = serializers.DateTimeField(required=False)
 
-    class OutputSerializer(serializers.ModelSerializer):
+    class OutputSerializer(FileCollectionListSerializerMixin, serializers.ModelSerializer):
         class FileSerializer(serializers.Serializer):
             file = serializers.CharField()
             file_name = serializers.CharField()
@@ -74,8 +75,8 @@ class PollListApi(APIView):
         group_image = serializers.ImageField(source='created_by.group.image')
         tag_id = serializers.IntegerField(allow_null=True)
         tag_name = serializers.CharField(source='tag.name', allow_null=True)
-        attachments = FileSerializer(many=True, source="attachments.filesegment_set", allow_null=True)
         hide_poll_users = serializers.BooleanField(source='created_by.group.hide_poll_users')
+        winning_proposal_id = serializers.IntegerField(source='result.id', allow_null=True)
         total_comments = serializers.IntegerField()
         total_proposals = serializers.IntegerField()
         total_predictions = serializers.IntegerField()
@@ -111,12 +112,13 @@ class PollListApi(APIView):
                       'start_date',
                       'proposal_end_date',
                       'prediction_statement_end_date',
+                      'schedule_poll_meeting_link',
                       'area_vote_end_date',
                       'prediction_bet_end_date',
                       'delegate_vote_end_date',
                       'vote_end_date',
                       'end_date',
-                      'result',
+                      'winning_proposal_id',
                       'participants',
                       'pinned',
                       'dynamic',
@@ -127,7 +129,6 @@ class PollListApi(APIView):
                       'status',
                       'status_prediction',
                       'interval_mean_absolute_correctness',
-                      'attachments',
                       'work_group_id',
                       'work_group_name',
                       'phase')
@@ -149,11 +150,10 @@ class PollListApi(APIView):
 
 @extend_schema(tags=['poll'])
 class PollCreateAPI(APIView):
-    class InputSerializer(serializers.ModelSerializer):
+    class InputSerializer(FileCollectionCreateSerializerMixin, serializers.ModelSerializer):
         tag = serializers.IntegerField(required=False)
         quorum = serializers.IntegerField(required=False)
         public = serializers.BooleanField(default=False)
-        attachments = serializers.ListField(child=serializers.FileField(), required=False, max_length=10)
 
         proposal_end_date = serializers.DateTimeField(required=False)
         prediction_statement_end_date = serializers.DateTimeField(required=False)
@@ -176,6 +176,7 @@ class PollCreateAPI(APIView):
                       'delegate_vote_end_date',
                       'vote_end_date',
                       'end_date',
+                      'schedule_poll_meeting_link',
                       'poll_type',
                       'blockchain_id',
                       'public',
@@ -184,8 +185,7 @@ class PollCreateAPI(APIView):
                       'pinned',
                       'dynamic',
                       'quorum',
-                      'work_group_id',
-                      'attachments')
+                      'work_group_id')
 
     def post(self, request, group_id: int):
         serializer = self.InputSerializer(data=request.data)
@@ -199,6 +199,7 @@ class PollUpdateAPI(APIView):
     class InputSerializer(serializers.Serializer):
         title = serializers.CharField(required=False)
         pinned = serializers.BooleanField(required=False, allow_null=True, default=None)
+        schedule_poll_meeting_link = serializers.CharField(required=False, allow_null=True)
         description = serializers.CharField(required=False)
 
     def post(self, request, poll: int):
@@ -208,7 +209,7 @@ class PollUpdateAPI(APIView):
         return Response(status=status.HTTP_200_OK)
 
 
-@extend_schema(tags=['poll'], 
+@extend_schema(tags=['poll'],
                description="Forwards the poll into the next phase. For example: if the poll is in area vote, it will go to proposal creation")
 class PollFastForwardAPI(APIView):
     class InputSerializer(serializers.Serializer):
@@ -249,8 +250,8 @@ class PollUserScheduleListAPI(APIView):
         hide_poll_users = serializers.BooleanField(source='created_by.group.hide_poll_users')
         title = serializers.CharField(source='poll.title')
         description = serializers.CharField(source='poll.description')
-        start_date = serializers.DateTimeField(source='pollproposaltypeschedule.event.start_date')
-        end_date = serializers.DateTimeField(source='pollproposaltypeschedule.event.end_date')
+        start_date = serializers.DateTimeField(source='pollproposaltypeschedule.event_start_date')
+        end_date = serializers.DateTimeField(source='pollproposaltypeschedule.event_end_date')
 
         class Meta:
             model = PollProposal
@@ -275,8 +276,7 @@ class PollUserScheduleListAPI(APIView):
             serializer_class=self.OutputSerializer,
             queryset=proposals,
             request=request,
-            view=self
-        )
+            view=self)
 
 
 @extend_schema(tags=['poll'])

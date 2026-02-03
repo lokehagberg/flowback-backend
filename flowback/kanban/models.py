@@ -1,6 +1,6 @@
 import math
 
-from django.core.validators import MaxValueValidator, MinValueValidator
+from django.core.validators import MinValueValidator
 from django.utils.translation import gettext_lazy as _
 
 from django.db import models
@@ -8,11 +8,12 @@ from rest_framework.exceptions import ValidationError
 
 from backend.settings import FLOWBACK_KANBAN_PRIORITY_LIMIT, FLOWBACK_KANBAN_LANES
 from flowback.common.models import BaseModel
+from flowback.common.validators import FieldNotBlankValidator
 
 
 class Kanban(BaseModel):
-    name = models.CharField(max_length=255)
-    origin_type = models.CharField(max_length=255)
+    name = models.CharField(max_length=255, validators=[FieldNotBlankValidator])
+    origin_type = models.CharField(max_length=255, validators=[FieldNotBlankValidator])
     origin_id = models.IntegerField()
 
     class Meta:
@@ -25,12 +26,12 @@ class KanbanEntry(BaseModel):
     assignee = models.ForeignKey('user.User', null=True, blank=True, on_delete=models.SET_NULL, related_name='kanban_entry_assignee')
     end_date = models.DateTimeField(null=True, blank=True)
     priority = models.IntegerField(default=1)
-
-    title = models.CharField(max_length=255)
-    description = models.TextField(null=True, blank=True)
+    title = models.CharField(max_length=255, validators=[FieldNotBlankValidator])
+    description = models.TextField(null=True, blank=True, validators=[FieldNotBlankValidator])
     attachments = models.ForeignKey('files.FileCollection', on_delete=models.SET_NULL, null=True, blank=True)
     work_group = models.ForeignKey('group.WorkGroup', on_delete=models.CASCADE, null=True, blank=True)
     lane = models.IntegerField(validators=[MinValueValidator(1)])
+    active = models.BooleanField(default=True)
 
     def clean(self):
         if self.priority > FLOWBACK_KANBAN_PRIORITY_LIMIT:
@@ -41,13 +42,12 @@ class KanbanEntry(BaseModel):
 
     @classmethod
     def pre_save(cls, instance, *args, **kwargs):
-        if instance.pk is None:
-            if instance.priority is None:
-                instance.priority = math.floor(FLOWBACK_KANBAN_PRIORITY_LIMIT / 2)
+        if instance.pk is None and instance.priority is None:
+            instance.priority = math.floor(FLOWBACK_KANBAN_PRIORITY_LIMIT / 2)
 
 
 class KanbanEntryTag(BaseModel):
-    name = models.CharField(max_length=255)
+    name = models.CharField(max_length=255, validators=[FieldNotBlankValidator])
 
 
 class KanbanSubscription(BaseModel):
