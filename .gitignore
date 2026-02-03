@@ -11,6 +11,14 @@ flowback_addon/*
 general.log
 static/*
 
+# Celery
+celerybeat-schedule
+celerybeat-schedule.bak
+celerybeat-schedule.dat
+celerybeat-schedule.dir
+celerybeat-schedule-shm
+celerybeat-schedule-wal
+
 # Backup files #
 *.bak
 

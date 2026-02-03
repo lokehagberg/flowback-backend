@@ -6,26 +6,9 @@ from rest_framework.exceptions import ValidationError
 from backend.settings import env, DEFAULT_FROM_EMAIL, FLOWBACK_ALLOW_GROUP_CREATION, FLOWBACK_DEFAULT_GROUP_JOIN
 from flowback.common.services import get_object, model_update
 from flowback.group.models import Group, GroupUser, GroupPermissions, GroupUserInvite, WorkGroupUser
-from flowback.group.selectors import group_user_permissions
-from flowback.notification.services import NotificationManager
+from flowback.group.selectors.permission import group_user_permissions
+from flowback.schedule.services import schedule_event_create, schedule_event_update, schedule_event_delete
 from flowback.user.models import User
-
-group_notification = NotificationManager(sender_type='group',
-                                         possible_categories=['group', 'members', 'invite', 'delegate',
-
-                                                              'kanban',
-                                                              'kanban_self_assign',
-                                                              'kanban_priority_update',
-                                                              'kanban_lane_update',
-
-                                                              'thread',
-
-                                                              'poll',
-                                                              'poll_schedule',
-
-                                                              'schedule_event_create',
-                                                              'schedule_event_update',
-                                                              'schedule_event_delete',])
 
 
 def group_create(*,
@@ -58,22 +41,22 @@ def group_create(*,
     return group
 
 
-def group_update(*, user: int, group: int, data) -> Group:
-    group_user = group_user_permissions(user=user, group=group, permissions=['admin'])
+def group_update(*, user: int, group_id: int, data) -> Group:
+    group_user = group_user_permissions(user=user, group=group_id, permissions=['admin'])
     non_side_effect_fields = ['name', 'description', 'image', 'cover_image', 'hide_poll_users',
                               'public', 'direct_join', 'default_permission', 'default_quorum',
                               'poll_phase_minimum_space']
 
     # Check if group_permission exists to allow for a new default_permission
     if default_permission := data.get('default_permission'):
-        data['default_permission'] = get_object(GroupPermissions, id=default_permission, author_id=group)
+        data['default_permission'] = GroupPermissions.objects.get(id=default_permission, author_id=group_id)
 
     group, has_updated = model_update(instance=group_user.group,
-                                      fields=non_side_effect_fields,
-                                      data=data)
+                                         fields=non_side_effect_fields,
+                                         data=data)
 
-    group_notification.create(sender_id=group.id, action=group_notification.Action.update, category='group',
-                              message=f'{group_user.user.username} updated the group information in {group.name}')
+    group.notify_group(message=f"Group has been updated",
+                          action=group.notification_channel.Action.UPDATED)
 
     return group
 
@@ -134,8 +117,6 @@ def group_join(*, user: int, group: int) -> Union[GroupUser, GroupUserInvite]:
 
     if not group.direct_join:
         user_status = GroupUserInvite(user=user, group=group, external=True)
-        group_notification.create(sender_id=group.id, action=group_notification.Action.update,
-                                  category='invite', message=f'User {user.username} requested to join {group.name}')
 
         user_status.full_clean()
         user_status.save()
@@ -144,14 +125,11 @@ def group_join(*, user: int, group: int) -> Union[GroupUser, GroupUserInvite]:
         try:
             user_status = GroupUser.objects.get(user=user, group=group)
             user_status.active = True
-            user_status.save()
+            user_status.save(update_fields=['active'])
         except GroupUser.DoesNotExist:
             user_status = GroupUser(user=user, group=group)
             # user_status.full_clean() TODO fix
             user_status.save()
-
-    group_notification.create(sender_id=group.id, action=group_notification.Action.create,
-                              category='members', message=f'User {user.username} joined the group {group.name}')
 
     return user_status
 
@@ -163,10 +141,7 @@ def group_leave(*, user: int, group: int) -> None:
         raise ValidationError("Group owner isn't allowed to leave, deleting the group is an option")
 
     user.active = False
-    user.save()
-
-    group_notification.create(sender_id=group, action=group_notification.Action.create,
-                              category='members', message=f'User {user.user.username} left the group {user.group.name}')
+    user.save(update_fields=['active'])
 
 
 def group_user_update(*, fetched_by: User, group: int, target_user_id: int, data) -> GroupUser:
@@ -179,6 +154,11 @@ def group_user_update(*, fetched_by: User, group: int, target_user_id: int, data
     group_user, has_updated = model_update(instance=user_to_update,
                                            fields=non_side_effect_fields,
                                            data=data)
+
+    if fetched_by.id != target_user_id:
+        group_user.group.notify_group_user(_user_id=target_user_id,
+                                           message=f"An Admin has changed your permissions",
+                                           action=group_user.group.notification_channel.Action.CREATED)
 
     return group_user
 
@@ -197,10 +177,25 @@ def group_user_delete(*, user_id: int, group_id: int, target_user_id: int) -> No
     group_user_to_delete.delete()
 
 
-def group_notification_subscribe(*, user_id: int, group: int, categories: list[str]):
-    group_user = group_user_permissions(user=user_id, group=group)
+def group_notification_subscribe(*, user: User, group_id: int, **kwargs) -> None:
+    group_user = group_user_permissions(user=user, group=group_id)
+    group_user.group.notification_channel.subscribe(user=user, **kwargs)
 
-    if 'invite' in categories and (not group_user.is_admin or not group_user.check_permission(invite_user=True)):
-        raise ValidationError('Permission denied for invite notifications')
 
-    group_notification.channel_subscribe(user_id=user_id, sender_id=group, category=categories)
+def group_schedule_event_create(user: User, group_id: int, **data):
+    group_user = group_user_permissions(user=user, group=group_id, permissions=['admin', 'schedule_event_create'])
+    print(group_user)
+    data['schedule_id'] = group_user.group.schedule.id
+    return schedule_event_create(created_by=group_user.group.created_by, **data)
+
+
+def group_schedule_event_update(user: User, group_id: int, **data):
+    group_user = group_user_permissions(user=user, group=group_id, permissions=['admin', 'schedule_event_update'])
+    data['schedule_id'] = group_user.group.schedule.id
+    return schedule_event_update(**data)
+
+
+def group_schedule_event_delete(user: User, group_id: int, **data):
+    group_user = group_user_permissions(user=user, group=group_id, permissions=['admin', 'schedule_event_delete'])
+    data['schedule_id'] = group_user.group.schedule.id
+    return schedule_event_delete(**data)

@@ -2,7 +2,7 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
 from flowback.common.services import get_object, model_update
-from flowback.files.services import upload_collection
+from flowback.files.services import upload_collection, update_collection
 from flowback.kanban.models import Kanban, KanbanSubscription, KanbanEntry
 
 
@@ -15,7 +15,9 @@ def kanban_create(*, name: str, origin_type: str, origin_id: int):
 
 
 def kanban_delete(*, origin_type: str, origin_id: int):
-    get_object(Kanban, origin_type=origin_type, origin_id=origin_id).delete()
+    kanban = get_object(Kanban, origin_type=origin_type, origin_id=origin_id, active=True)
+    kanban.active = False
+    kanban.save()
 
 
 def kanban_subscription_create(*, kanban_id: int, target_id: int) -> None:
@@ -58,32 +60,39 @@ def kanban_entry_create(*,
 
     kanban.save()
 
-    # group_notification.create(sender_id=group_id, action=group_notification.Action.create, category='kanban',
-    #                           message=f'User {created_by.user.username} created a kanban in {created_by.group.name}')
-
     return kanban
 
 
 def kanban_entry_update(*, kanban_entry_id: int, data) -> KanbanEntry:
-    kanban = get_object(KanbanEntry, id=kanban_entry_id)
+    kanban = get_object(KanbanEntry, id=kanban_entry_id, active=True)
 
-    non_side_effect_fields = ['title', 'description', 'assignee_id', 'priority', 'lane', 'end_date', 'work_group_id',]
+    non_side_effect_fields = ['title', 'description', 'assignee_id', 'priority',
+                              'lane', 'end_date', 'work_group_id', 'attachments']
+
+    attachments_add = data.get('attachments_add')
+    attachments_remove = data.get('attachments_remove')
+
+    if kanban.attachments_id is not None:
+        update_collection(file_collection_id=kanban.attachments_id,
+                          attachments_remove=attachments_remove,
+                          attachments_add=attachments_add,
+                          upload_to='kanban')
+    elif attachments_add:
+        kanban.attachments = upload_collection(user_id=kanban.created_by_id,
+                                               file=attachments_add,
+                                               upload_to='kanban')
 
     kanban, has_updated = model_update(instance=kanban,
                                        fields=non_side_effect_fields,
                                        data=data)
 
-    # group_notification.create(sender_id=group_id, action=group_notification.Action.update, category='kanban',
-    #                           message=f'User {group_user.user.username} updated a kanban in {group_user.group.name}')
-
     return kanban
 
 
 def kanban_entry_delete(*, kanban_entry_id: int) -> None:
-    get_object(KanbanEntry, id=kanban_entry_id).delete()
-
-    # group_notification.create(sender_id=group_id, action=group_notification.Action.delete, category='kanban',
-    #                           message=f'User {group_user.user.username} deleted a kanban in {group_user.group.name}')
+    entry = get_object(KanbanEntry, id=kanban_entry_id, active=True)
+    entry.active = False
+    entry.save()
 
 
 class KanbanManager:
@@ -136,7 +145,7 @@ class KanbanManager:
                                    work_group_id=work_group_id,
                                    priority=priority,
                                    end_date=end_date,
-                                   lane=lane,)
+                                   lane=lane, )
 
     def kanban_entry_update(self,
                             *,

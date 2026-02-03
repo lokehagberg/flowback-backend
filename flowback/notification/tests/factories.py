@@ -3,23 +3,56 @@ import random
 import factory.django
 
 from flowback.common.tests import fake
-from flowback.notification.models import NotificationChannel, NotificationObject
+from flowback.group.tests.factories import GroupFactory
+from flowback.user.tests.factories import UserFactory
+from flowback.notification.models import (
+    NotificationChannel, 
+    NotificationObject, 
+    Notification, 
+    NotificationSubscription,
+    NotificationSubscriptionTag
+)
 
 
 class NotificationChannelFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = NotificationChannel
 
-    category = factory.LazyAttribute(lambda _: fake.unique.first_name.lower())
-    sender_type = "notification"
-    sender_id = factory.LazyAttribute(lambda _: random.randint(1, 1000))
+    content_object = factory.SubFactory(GroupFactory)
 
 
 class NotificationObjectFactory(factory.django.DjangoModelFactory):
     class Meta:
         model = NotificationObject
 
-    related_id = factory.LazyAttribute(lambda _: random.randint(1, 1000))
-    action = factory.LazyAttribute(lambda _: "create")
-    message = factory.LazyAttribute(lambda _: fake.description())
+    action = factory.LazyAttribute(lambda _: "CREATED")
+    message = factory.LazyAttribute(lambda _: fake.sentence())
+    channel = factory.SubFactory(NotificationChannelFactory)
+
+
+class NotificationFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = Notification
+
+    user = factory.SubFactory(UserFactory)
+    notification_object = factory.SubFactory(NotificationObjectFactory)
+    reminder = 0
+    read = False
+
+
+class NotificationSubscriptionFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = NotificationSubscription
+
+    user = factory.SubFactory(UserFactory)
+    channel = factory.SubFactory(NotificationChannelFactory)
+
+
+class NotificationSubscriptionTagFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = NotificationSubscriptionTag
+
+    subscription = factory.SubFactory(NotificationSubscriptionFactory)
+    name = factory.LazyAttribute(lambda _: fake.word())
+    reminders = factory.LazyAttribute(lambda _: [300, 600, 3600])
 

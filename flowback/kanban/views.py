@@ -8,7 +8,8 @@ from rest_framework import serializers
 
 from backend.settings import FLOWBACK_KANBAN_LANES, FLOWBACK_KANBAN_PRIORITY_LIMIT
 from flowback.common.pagination import LimitOffsetPagination
-from flowback.files.serializers import FileSerializer
+from flowback.files.serializers import FileSerializer, FileCollectionCreateSerializerMixin, \
+    FileCollectionUpdateSerializerMixin, FileCollectionListSerializerMixin
 from flowback.group.serializers import WorkGroupSerializer
 from flowback.kanban.models import KanbanEntry
 
@@ -30,7 +31,7 @@ class KanbanEntryListApi(APIView):
         priority = serializers.ChoiceField(range(1, FLOWBACK_KANBAN_PRIORITY_LIMIT + 1), required=False)
         lane = serializers.ChoiceField(range(1, len(FLOWBACK_KANBAN_LANES) + 1), required=False)
 
-    class OutputSerializer(serializers.Serializer):
+    class OutputSerializer(FileCollectionListSerializerMixin, serializers.Serializer):
         class UserSerializer(serializers.Serializer):
             id = serializers.IntegerField()
             profile_image = serializers.ImageField()
@@ -45,19 +46,17 @@ class KanbanEntryListApi(APIView):
         end_date = serializers.DateTimeField(required=False)
         title = serializers.CharField()
         description = serializers.CharField(allow_null=True, allow_blank=True)
-        attachments = FileSerializer(many=True, source="attachments.filesegment_set", allow_null=True)
         work_group = WorkGroupSerializer()
         lane = serializers.IntegerField()
         category = serializers.CharField(allow_null=True)
 
 
 class KanbanEntryCreateAPI(APIView):
-    class InputSerializer(serializers.Serializer):
+    class InputSerializer(FileCollectionCreateSerializerMixin, serializers.Serializer):
         assignee_id = serializers.IntegerField(required=False, allow_null=True)
         work_group_id = serializers.IntegerField(required=False, allow_null=True)
         title = serializers.CharField()
         end_date = serializers.DateTimeField(required=False, allow_null=True)
-        attachments = serializers.ListField(child=serializers.FileField(), required=False, max_length=10)
         description = serializers.CharField(required=False)
         priority = serializers.ChoiceField(range(1, FLOWBACK_KANBAN_PRIORITY_LIMIT + 1),
                                            default=math.floor(FLOWBACK_KANBAN_PRIORITY_LIMIT / 2))
@@ -65,9 +64,9 @@ class KanbanEntryCreateAPI(APIView):
 
 
 class KanbanEntryUpdateAPI(APIView):
-    class InputSerializer(serializers.Serializer):
+    class InputSerializer(FileCollectionUpdateSerializerMixin, serializers.Serializer):
         entry_id = serializers.IntegerField()
-        work_group_id = serializers.IntegerField(required=False)
+        work_group_id = serializers.IntegerField(required=False, allow_null=True)
         assignee_id = serializers.IntegerField(required=False)
         title = serializers.CharField(required=False)
         description = serializers.CharField(required=False, allow_null=True, allow_blank=True)

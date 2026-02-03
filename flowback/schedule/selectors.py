@@ -1,17 +1,31 @@
 # Schedule Event List (with multiple schedule id support)
 import django_filters
-from django.db.models import Q, F
+from django.contrib.postgres.aggregates import ArrayAgg
+from django.db.models import OuterRef, Subquery, Exists
 
 from flowback.common.filters import NumberInFilter
-from flowback.group.models import WorkGroupUser
-from flowback.schedule.models import ScheduleEvent, ScheduleSubscription
+from flowback.schedule.models import ScheduleEvent, ScheduleEventSubscription, ScheduleTagSubscription, Schedule
+from flowback.user.models import User
 
 
 class ScheduleEventBaseFilter(django_filters.FilterSet):
+    ids = NumberInFilter(field_name='id')
+    schedule_origin_name = django_filters.CharFilter(field_name='schedule__content_type__model',
+                                                     lookup_expr='iexact')
+    schedule_origin_id = NumberInFilter(field_name='schedule__object_id')
+    origin_name = django_filters.CharFilter(field_name='content_type__model', lookup_expr='iexact')
+    origin_ids = NumberInFilter(field_name='object_id')
+    schedule_ids = NumberInFilter(field_name='schedule_id')
     title = django_filters.CharFilter(lookup_expr='iexact')
-    work_group_ids = NumberInFilter(field_name='work_group_id')
-    assignee_ids = NumberInFilter(field_name='assignees__id')
+    description = django_filters.CharFilter(lookup_expr='icontains')
+    active = django_filters.BooleanFilter()
+    tag_ids = NumberInFilter(field_name='tag_id')
+    assignee_user_ids = NumberInFilter(field_name='assignees__user__id')
     repeat_frequency__isnull = django_filters.BooleanFilter(field_name='repeat_frequency', lookup_expr='isnull')
+    user_tags = django_filters.CharFilter(lookup_expr='iexact')
+    subscribed = django_filters.BooleanFilter()
+    locked = django_filters.BooleanFilter()
+    tag_name = django_filters.CharFilter(lookup_expr='iexact', field_name='tag__name')
 
     order_by = django_filters.OrderingFilter(fields=(('created_at', 'created_at_asc'),
                                                      ('-created_at', 'created_at_desc'),
@@ -20,22 +34,49 @@ class ScheduleEventBaseFilter(django_filters.FilterSet):
                                                      ('end_date', 'end_date_asc'),
                                                      ('-end_date', 'end_date_desc')))
 
-
     class Meta:
         model = ScheduleEvent
         fields = dict(start_date=['lt', 'gt', 'exact'],
-                      end_date=['lt', 'gt', 'exact'],
-                      origin_name=['exact'],
-                      origin_id=['exact'])
+                      end_date=['lt', 'gt', 'exact'])
 
 
-def schedule_event_list(*, schedule_id: int, group_user=None, filters=None):
+def schedule_event_list(*, user: User, filters=None):
     filters = filters or {}
-    subquery = ScheduleSubscription.objects.filter(schedule_id=schedule_id).values_list('target_id')
-    qs = ScheduleEvent.objects.filter(Q(schedule_id=schedule_id) | Q(schedule__in=subquery))
+    subscription_qs = ScheduleEventSubscription.objects.filter(event_id=OuterRef('id'),
+                                                               schedule_user__user=user)
 
-    if group_user is not None and not group_user.is_admin:
-        work_group_ids = WorkGroupUser.objects.filter(group_user=group_user).values_list('work_group_id')
-        qs = qs.exclude(Q(work_group__isnull=False) & ~Q(work_group_id__in=work_group_ids)).all()
+    subscribed_qs = ScheduleTagSubscription.objects.filter(schedule_user__user=user,
+                                                           schedule_tag=OuterRef('tag'))
+
+    qs = ScheduleEvent.objects.filter(
+        schedule__scheduleuser__user=user
+    ).annotate(reminders=Subquery(subscription_qs.values('reminders')),
+               user_tags=Subquery(subscription_qs.values('tags')),
+               locked=Subquery(subscription_qs.values('locked')),
+               subscribed=Exists(subscribed_qs)).all()
 
     return ScheduleEventBaseFilter(filters, qs).qs
+
+
+class ScheduleBaseFilter(django_filters.FilterSet):
+    ids = NumberInFilter(field_name='id')
+    origin_name = django_filters.CharFilter(field_name='content_type__model', lookup_expr='iexact')
+    origin_ids = NumberInFilter(field_name='object_id')
+    order_by = django_filters.OrderingFilter(fields=(('created_at', 'created_at_asc'),
+                                                     ('-created_at', 'created_at_desc'),
+                                                     ('content_type__model', 'origin_name_asc'),
+                                                     ('-content_type__model', 'origin_name_desc')))
+
+    class Meta:
+        model = Schedule
+        fields = dict(id=['exact'])
+
+
+# Schedule list (incl. info about subscriptions, reminders, user tags and tags)
+def schedule_list(*, user: User, filters=None):
+    filters = filters or {}
+    qs = Schedule.objects.filter(
+        scheduleuser__user=user
+    ).annotate(available_tags=ArrayAgg('scheduletag__name', distinct=True)).all()
+
+    return ScheduleBaseFilter(filters, qs).qs

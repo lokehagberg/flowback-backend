@@ -1,17 +1,18 @@
 from drf_spectacular.utils import extend_schema
-from rest_framework import serializers, status, generics
+from rest_framework import serializers, status
 from flowback.common.pagination import LimitOffsetPagination, get_paginated_response
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from flowback.group.models import Group
-from flowback.group.selectors import group_list, group_detail, group_folder_list, work_group_user_list, \
-    work_group_user_join_request_list, work_group_list
+from flowback.group.selectors.workgroup import work_group_list, work_group_user_list, work_group_user_join_request_list
+from flowback.group.selectors.group import group_list, group_folder_list, group_detail
 from flowback.group.serializers import GroupUserSerializer
-from flowback.group.services.group import group_notification_subscribe
-from flowback.group.services.group import group_notification, group_create, group_update, group_delete, group_mail
+from flowback.group.services.group import group_create, group_update, group_delete, group_mail, \
+    group_notification_subscribe
 from flowback.group.services.workgroup import work_group_create, work_group_update, work_group_delete, \
     work_group_user_join, work_group_user_leave, work_group_user_add, work_group_user_remove, work_group_user_update
+from flowback.notification.views import NotificationSubscribeTemplateAPI
 
 
 @extend_schema(tags=['group'])
@@ -46,6 +47,7 @@ class GroupListApi(APIView):
                       'cover_image',
                       'joined',
                       'chat_id',
+                      'default_quorum',
                       'member_count',
                       'pending_invite',
                       'pending_join',
@@ -156,10 +158,10 @@ class GroupUpdateApi(APIView):
         default_permission = serializers.IntegerField(required=False, allow_null=True)
         default_quorum = serializers.IntegerField(required=False, allow_null=True)
 
-    def post(self, request, group: int):
+    def post(self, request, group_id: int):
         serializer = self.InputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        group_update(user=request.user.id, group=group, data=serializer.validated_data)
+        group_update(user=request.user.id, group_id=group_id, data=serializer.validated_data)
         return Response(status=status.HTTP_200_OK)
 
 
@@ -170,15 +172,9 @@ class GroupDeleteApi(APIView):
         return Response(status=status.HTTP_200_OK)
 
 
-class GroupNotificationSubscribeApi(APIView):
-    class InputSerializer(serializers.Serializer):
-        categories = serializers.MultipleChoiceField(choices=group_notification.possible_categories)
-
-    def post(self, request, group: int):
-        serializer = self.InputSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        group_notification_subscribe(user_id=request.user.id, group=group, **serializer.validated_data)
-        return Response(status=status.HTTP_200_OK)
+@extend_schema(tags=['group'], description=Group.notification_docs())
+class GroupNotificationSubscribeAPI(NotificationSubscribeTemplateAPI):
+    lazy_action = group_notification_subscribe
 
 
 @extend_schema(tags=['group'])
@@ -221,6 +217,7 @@ class WorkGroupListAPI(APIView):
         joined = serializers.BooleanField()
         chat_id = serializers.IntegerField()
         requested_access = serializers.BooleanField()
+        group_id = serializers.IntegerField()
 
     def get(self, request, group_id: int):
         serializer = self.FilterSerializer(data=request.query_params)
@@ -278,9 +275,10 @@ class WorkGroupUserJoinRequestListAPI(APIView):
 
     class FilterSerializer(serializers.Serializer):
         id = serializers.IntegerField(required=False)
+        username = serializers.CharField(required=False)
         user_id = serializers.IntegerField(required=False)
         group_user_id = serializers.IntegerField(required=False)
-        username = serializers.CharField(required=False)
+        work_group = serializers.IntegerField(required=False)
 
     class OutputSerializer(serializers.Serializer):
         id = serializers.IntegerField()
@@ -288,11 +286,11 @@ class WorkGroupUserJoinRequestListAPI(APIView):
         work_group_name = serializers.CharField(source="work_group.name")
         group_user = GroupUserSerializer()
 
-    def get(self, request, work_group_id: int):
+    def get(self, request, group_id: int):
         serializer = self.FilterSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
 
-        work_group_join_requests = work_group_user_join_request_list(work_group_id=work_group_id,
+        work_group_join_requests = work_group_user_join_request_list(group_id=group_id,
                                                                      fetched_by=request.user,
                                                                      filters=serializer.validated_data)
 

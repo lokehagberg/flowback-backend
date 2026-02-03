@@ -2,6 +2,8 @@ import uuid
 
 from django.contrib.auth.base_user import BaseUserManager
 from django.contrib.auth.validators import UnicodeUsernameValidator
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
 from django.db.models.signals import post_save, post_delete
@@ -12,8 +14,10 @@ from django.utils.translation import gettext_lazy as _
 from rest_framework.authtoken.models import Token
 from flowback.chat.models import MessageChannelParticipant
 from flowback.common.models import BaseModel
+from flowback.common.validators import FieldNotBlankValidator
 from flowback.kanban.models import Kanban
-from flowback.schedule.models import Schedule
+from flowback.notification.models import NotifiableModel, NotificationChannel
+from flowback.schedule.models import ScheduleModel
 
 
 class CustomUserManager(BaseUserManager):
@@ -51,7 +55,7 @@ class CustomUserManager(BaseUserManager):
         return user
 
 
-class User(AbstractBaseUser, PermissionsMixin):
+class User(AbstractBaseUser, PermissionsMixin, NotifiableModel, ScheduleModel):
     class PublicStatus(models.TextChoices):
         PUBLIC = 'public', _('Public')  # Everyone can see/access
         GROUP_ONLY = 'group_only', _('Group Only')  # Only users in the same group can see/access
@@ -62,21 +66,20 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_staff = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
 
-    username = models.CharField(max_length=120, validators=[UnicodeUsernameValidator()], unique=True)
+    username = models.CharField(max_length=120, validators=[UnicodeUsernameValidator(), FieldNotBlankValidator], unique=True)
     profile_image = models.ImageField(null=True, blank=True, upload_to='user/profile_image')
     banner_image = models.ImageField(null=True, blank=True, upload_to='user/banner_image')
     email_notifications = models.BooleanField(default=False)
     dark_theme = models.BooleanField(default=False)
-    user_config = models.TextField(null=True, blank=True)
+    user_config = models.TextField(null=True, blank=True, validators=[FieldNotBlankValidator])
 
-    bio = models.TextField(null=True, blank=True)
-    website = models.TextField(null=True, blank=True)
+    bio = models.TextField(null=True, blank=True, validators=[FieldNotBlankValidator])
+    website = models.TextField(null=True, blank=True, validators=[FieldNotBlankValidator])
     contact_email = models.EmailField(null=True, blank=True)
-    contact_phone = models.CharField(max_length=20, null=True, blank=True)
+    contact_phone = models.CharField(max_length=20, null=True, blank=True, validators=[FieldNotBlankValidator])
     public_status = models.CharField(choices=PublicStatus.choices, default=PublicStatus.PRIVATE)
     chat_status = models.CharField(choices=PublicStatus.choices, default=PublicStatus.PRIVATE)
 
-    schedule = models.ForeignKey('schedule.Schedule', on_delete=models.SET_NULL, null=True, blank=True)
     kanban = models.ForeignKey('kanban.Kanban', on_delete=models.SET_NULL, null=True, blank=True)
 
     USERNAME_FIELD = 'email'
@@ -88,17 +91,41 @@ class User(AbstractBaseUser, PermissionsMixin):
     def message_channel_origin(self) -> str:
         return "user"
 
+    NOTIFICATION_DATA_FIELDS = (('user_id', int, 'The ID of the user'),
+                                ('username', str, "The user's username"))
+
+    @property
+    def notification_data(self) -> dict | None:
+        return dict(user_id=self.id,
+                    username=self.username)
+
+    def notify_chat(self,
+                    action: NotificationChannel.Action,
+                    message: str,
+                    message_channel_id,
+                    message_channel_title: str
+                    ):
+        """
+        Notifies chat users
+        :param action: FIGHT!
+        :param message:
+        :param message_channel_id: Chat channel ID
+        :param message_channel_title: Chat channel title
+        :return:
+        """
+        params = locals()
+        params.pop('self')
+
+        return self.notification_channel.notify(**params)
+
     @classmethod
-    # Updates Schedule name
     def post_save(cls, instance, created, update_fields, **kwargs):
         if created:
+            instance.schedule.add_user(user=instance)
             kanban = Kanban(name=instance.username, origin_type='user', origin_id=instance.id)
             kanban.save()
-            schedule = Schedule(name=instance.username, origin_name='user', origin_id=instance.id)
-            schedule.save()
 
             instance.kanban = kanban
-            instance.schedule = schedule
             instance.save()
             return
 
@@ -107,26 +134,33 @@ class User(AbstractBaseUser, PermissionsMixin):
 
         fields = [str(field) for field in update_fields]
         if 'name' in fields:
-            instance.schedule.name = instance.name
             instance.kanban.name = instance.name
             instance.kanban.save()
-            instance.schedule.save()
 
     @classmethod
     def post_delete(cls, instance, **kwargs):
         instance.kanban.delete()
-        instance.schedule.delete()
 
 
 post_save.connect(User.post_save, sender=User)
 post_delete.connect(User.post_delete, sender=User)
 
 
+class UserBookmark(BaseModel):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey('content_type', 'object_id')
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['user', 'content_type', 'object_id'], name='unique_bookmark')]
+
+
 class OnboardUser(BaseModel):
-    email = models.EmailField(max_length=120)
-    username = models.CharField(max_length=120, validators=[UnicodeUsernameValidator()])
-    verification_code = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    email = models.EmailField(max_length=120, unique=True)
+    verification_code = models.UUIDField(default=uuid.uuid4, editable=False)
     is_verified = models.BooleanField(default=False)
+
 
 
 class PasswordReset(BaseModel):
@@ -137,8 +171,12 @@ class PasswordReset(BaseModel):
 
 class Report(BaseModel):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    title = models.CharField(max_length=255)
-    description = models.TextField()
+    title = models.CharField(max_length=255, validators=[FieldNotBlankValidator])
+    description = models.TextField(validators=[FieldNotBlankValidator])
+    action_description = models.TextField(null=True, blank=True, validators=[FieldNotBlankValidator])
+    group_id = models.IntegerField(null=True, blank=True)
+    post_id = models.IntegerField(null=True, blank=True)
+    post_type = models.CharField(max_length=50, null=True, blank=True, validators=[FieldNotBlankValidator])
 
 
 class UserChatInvite(BaseModel):

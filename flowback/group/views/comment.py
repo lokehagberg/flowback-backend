@@ -1,7 +1,7 @@
 from drf_spectacular.utils import extend_schema
 
 from flowback.comment.views import CommentListAPI, CommentCreateAPI, CommentUpdateAPI, CommentDeleteAPI, CommentVoteAPI
-from flowback.group.selectors import group_delegate_pool_comment_list
+from flowback.group.selectors.user import group_delegate_pool_comment_list
 from flowback.group.services.delegate import (group_delegate_pool_comment_create,
                                               group_delegate_pool_comment_update,
                                               group_delegate_pool_comment_delete,

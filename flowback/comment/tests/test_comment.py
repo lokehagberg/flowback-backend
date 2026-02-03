@@ -1,16 +1,15 @@
 from rest_framework.exceptions import ValidationError
 from rest_framework import status
-from rest_framework.test import APITransactionTestCase, APIRequestFactory, force_authenticate
+from rest_framework.test import APIRequestFactory, force_authenticate, APITestCase
 
-from flowback.comment.models import Comment, CommentSection
-from flowback.comment.selectors import comment_list
+from flowback.comment.models import Comment
 from flowback.comment.services import comment_delete, comment_update
 from flowback.comment.tests.factories import CommentSectionFactory, CommentFactory, CommentVoteFactory
 from flowback.comment.views import CommentListAPI, CommentVoteAPI, CommentAncestorListAPI
 from flowback.user.tests.factories import UserFactory
 
 
-class CommentSectionTest(APITransactionTestCase):
+class CommentSectionTest(APITestCase):
     def setUp(self):
         self.comment_section = CommentSectionFactory()
 

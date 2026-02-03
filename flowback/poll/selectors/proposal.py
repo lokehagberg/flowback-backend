@@ -5,7 +5,7 @@ from flowback.common.filters import NumberInFilter, ExistsFilter
 from flowback.common.services import get_object
 from flowback.poll.models import Poll, PollProposal
 from flowback.user.models import User
-from flowback.group.selectors import group_user_permissions
+from flowback.group.selectors.permission import group_user_permissions
 
 
 class BasePollProposalFilter(django_filters.FilterSet):
@@ -36,13 +36,13 @@ class BasePollProposalScheduleFilter(django_filters.FilterSet):
 
     group = django_filters.NumberFilter(field_name='created_by.group_id', lookup_expr='exact')
 
-    start_date__lt = django_filters.DateTimeFilter(field_name='pollproposaltypeschedule.event.start_date',
+    start_date__lt = django_filters.DateTimeFilter(field_name='pollproposaltypeschedule.event_start_date',
                                                    lookup_expr='lt')
-    start_date__gte = django_filters.DateTimeFilter(field_name='pollproposaltypeschedule.event.start_date',
+    start_date__gte = django_filters.DateTimeFilter(field_name='pollproposaltypeschedule.event_start_date',
                                                    lookup_expr='gte')
-    end_date__lt = django_filters.DateTimeFilter(field_name='pollproposaltypeschedule.event.end_date',
+    end_date__lt = django_filters.DateTimeFilter(field_name='pollproposaltypeschedule.event_end_date',
                                                  lookup_expr='lt')
-    end_date__gte = django_filters.DateTimeFilter(field_name='pollproposaltypeschedule.event.end_date',
+    end_date__gte = django_filters.DateTimeFilter(field_name='pollproposaltypeschedule.event_end_date',
                                                  lookup_expr='gte')
 
     poll_title = django_filters.CharFilter(field_name='poll.title', lookup_expr='exact')
@@ -67,7 +67,7 @@ def poll_proposal_list(*, fetched_by: User, poll_id: int, filters=None):
             group_user = group_user_permissions(user=fetched_by, group=poll.created_by.group.id)
             admin = group_user.is_admin
 
-        qs = PollProposal.objects.filter(created_by__group_id=poll.created_by.group.id, poll=poll)\
+        qs = PollProposal.objects.filter(created_by__group_id=poll.created_by.group.id, poll=poll, active=True)\
             .order_by(F('score').desc(nulls_last=True))
 
         if poll.created_by.group.hide_poll_users and not admin:
@@ -85,7 +85,8 @@ def poll_user_schedule_list(*, fetched_by: User, filters=None):
     filters = filters or {}
     qs = PollProposal.objects.filter(created_by__group__groupuser__user__in=[fetched_by],
                                      poll__poll_type=Poll.PollType.SCHEDULE,
-                                     poll__status=1).order_by('poll', 'score')\
+                                     poll__status=1,
+                                     active=True).order_by('poll', 'score')\
         .distinct('poll').all()
 
     return BasePollProposalScheduleFilter(filters, qs).qs

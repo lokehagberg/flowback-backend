@@ -1,7 +1,7 @@
 from typing import Union
 
 import django_filters
-from django.db.models import Q, Exists, OuterRef, Count, Subquery, Case, When, Value, CharField
+from django.db.models import Q, Exists, OuterRef, Count, Subquery, Case, When, Value, CharField, F
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
@@ -9,9 +9,8 @@ from flowback.comment.models import Comment
 from flowback.common.filters import ExistsFilter, NumberInFilter
 from flowback.group.models import Group
 from flowback.poll.models import Poll, PollPhaseTemplate, PollPredictionStatement
-from flowback.user.models import User
-from flowback.group.models import WorkGroupUser
-from flowback.group.selectors import group_user_permissions
+from flowback.user.models import User, UserBookmark
+from flowback.group.selectors.permission import group_user_permissions
 
 
 class BasePollFilter(django_filters.FilterSet):
@@ -23,6 +22,7 @@ class BasePollFilter(django_filters.FilterSet):
     start_date = django_filters.DateTimeFilter()
     end_date = django_filters.DateTimeFilter()
     id_list = NumberInFilter(field_name='id')
+    bookmarked = django_filters.BooleanFilter()
     description = django_filters.CharFilter(field_name='description', lookup_expr='icontains')
     has_attachments = ExistsFilter(field_name='attachments')
     tag_name = django_filters.CharFilter(lookup_expr=['exact', 'icontains'], field_name='tag__name')
@@ -78,15 +78,13 @@ def poll_list(*, fetched_by: User, group_id: Union[int, None], filters=None):
         default=Value('waiting'),
         output_field=CharField()
     )
-    
+
     polls = Poll.objects.filter(
 
         ).values('id')
 
-
     q = (Q(created_by__group__groupuser__user__in=[fetched_by])
          & Q(created_by__group__groupuser__active=True))  # User in group
-
 
     base_qs = (
         q & Q(work_group__isnull=True)  # User in Group
@@ -94,27 +92,32 @@ def poll_list(*, fetched_by: User, group_id: Union[int, None], filters=None):
         | Q(created_by__group__public=True)
         & ~Q(created_by__group__groupuser__user__in=[fetched_by])  # Group is Public
         & Q(work_group__isnull=True)
-        
+        & Q(public=True)
+
         | q & Q(work_group__isnull=False)  # User in workgroup
         & Q(work_group__workgroupuser__group_user__user=fetched_by)
 
         | q & Q(created_by__group__public=True)
         & Q(created_by__group__groupuser__user__in=[fetched_by])
         & Q(created_by__group__groupuser__active=False)  # User in group but not active, and group is public
-    
+        & Q(public=True)
+
         | q & Q(work_group__isnull=False)  # User is admin in group
         & Q(created_by__group__groupuser__user=fetched_by)
         & ~Q(created_by__group__groupuser__user__in=[fetched_by])
         & Q(created_by__group__groupuser__is_admin=True))
 
+    joined_groups = Group.objects.filter(active=True, id=OuterRef('created_by__group_id'), groupuser__user__in=[fetched_by], groupuser__active=True)
 
-    joined_groups = Group.objects.filter(id=OuterRef('created_by__group_id'), groupuser__user__in=[fetched_by])
-    qs = Poll.objects.filter(base_qs).annotate(phase=poll_phase,
+    bookmarked = UserBookmark.objects.filter(user=fetched_by, content_type__model='poll', object_id=OuterRef('id'))
+    qs = Poll.objects.filter(base_qs, active=True).annotate(phase=poll_phase,
                 group_joined=Exists(joined_groups),
+                total_proposals=Count('pollproposal', distinct=True),
+                bookmarked=Exists(bookmarked),
                 total_comments=Coalesce(Subquery(
                     Comment.objects.filter(comment_section_id=OuterRef('comment_section_id'), active=True).values(
                         'comment_section_id').annotate(total=Count('*')).values('total')[:1]), 0),
-                total_proposals=Count('pollproposal', distinct=True),
+
                 total_predictions=Coalesce(Subquery(
                     PollPredictionStatement.objects.filter(poll_id=OuterRef('id')).values('poll_id')
                     .annotate(total=Count('*')).values('total')[:1]), 0)).all()

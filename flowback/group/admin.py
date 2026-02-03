@@ -22,6 +22,7 @@ class GroupAdmin(admin.ModelAdmin):
 class GroupPermissionsAdmin(admin.ModelAdmin):
     list_display = ('id',
                     'role_name',
+                    'author',
                     'invite_user',
                     'create_poll',
                     'poll_fast_forward',

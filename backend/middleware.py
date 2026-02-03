@@ -4,10 +4,9 @@ from channels.db import database_sync_to_async
 from channels.middleware import BaseMiddleware
 
 
-@database_sync_to_async
-def get_user(token_key):
+async def get_user(token_key):
     try:
-        token = Token.objects.get(key=token_key)
+        token = await Token.objects.prefetch_related('user').aget(key=token_key)
         return token.user
     except Token.DoesNotExist:
         return AnonymousUser()

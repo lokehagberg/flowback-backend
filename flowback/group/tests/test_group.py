@@ -2,33 +2,34 @@ import json
 from pprint import pprint
 
 from rest_framework import status
-from rest_framework.test import APIRequestFactory, force_authenticate, APITransactionTestCase
+from rest_framework.test import APIRequestFactory, force_authenticate, APITestCase
 
 from flowback.common.tests import generate_request
 from flowback.group.models import GroupUser, Group, GroupUserInvite
 from flowback.group.tests.factories import GroupFactory, GroupUserFactory, WorkGroupUserFactory
-from flowback.group.views.group import GroupListApi, GroupCreateApi
+from flowback.group.views.group import GroupListApi, GroupCreateApi, GroupUpdateApi
 from flowback.group.views.user import GroupInviteApi, GroupJoinApi, GroupInviteAcceptApi, GroupInviteListApi, \
     GroupUserListApi
+from flowback.notification.models import NotificationObject, Notification
 from flowback.user.models import User
 from flowback.user.tests.factories import UserFactory
 
 
-class GroupTest(APITransactionTestCase):
+class GroupTest(APITestCase):
     def setUp(self):
         (self.group_one,
          self.group_two,
          self.group_three) = [GroupFactory.create(public=True) for x in range(3)]
 
-        (self.group_user_creator_one,
-         self.group_user_creator_two,
-         self.group_user_creator_three) = GroupUser.objects.order_by('id').all()
+        self.group_user_creator_one = self.group_one.group_user_creator
+        self.group_user_creator_two = self.group_two.group_user_creator
+        self.group_user_creator_three = self.group_three.group_user_creator
 
         self.group_no_direct = GroupFactory.create(public=True, direct_join=False)
-        self.group_no_direct_user_creator = GroupUser.objects.get(user=self.group_no_direct.created_by)
+        self.group_no_direct_user_creator = self.group_no_direct.group_user_creator
 
         self.group_private = GroupFactory.create(public=False)
-        self.group_private_user_creator = GroupUser.objects.get(user=self.group_private.created_by)
+        self.group_private_user_creator = self.group_private.group_user_creator
 
         self.groupless_user = UserFactory()
 
@@ -49,7 +50,7 @@ class GroupTest(APITransactionTestCase):
         work_group_user = WorkGroupUserFactory(group_user=self.group_user_creator_one)
 
         response = generate_request(api=GroupUserListApi,
-                                    url_params=dict(group=self.group_user_creator_one.group.id),
+                                    url_params=dict(group_id=self.group_user_creator_one.group.id),
                                     user=self.group_user_creator_one.user)
 
         self.assertTrue(response.status_code == status.HTTP_200_OK)
@@ -62,6 +63,7 @@ class GroupTest(APITransactionTestCase):
         view = GroupCreateApi.as_view()
         data = dict(name="test",
                     description="test",
+                    public=True,
                     direct_join=True)
 
         request = factory.post('', data=data)
@@ -70,6 +72,19 @@ class GroupTest(APITransactionTestCase):
 
         data = json.loads(response.rendered_content)
         pprint(data)
+
+    def test_group_update(self):
+        self.group_one.notification_channel.subscribe(user=self.group_user_creator_one.user, tags=['group'])
+
+        response = generate_request(api=GroupUpdateApi,
+                                    data=dict(name="Hello everyone"),
+                                    url_params=dict(group_id=self.group_user_creator_one.group.id),
+                                    user=self.group_user_creator_one.user)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(Group.objects.get(id=self.group_user_creator_one.group.id).name, "Hello everyone")
+        self.assertTrue(Notification.objects.filter(notification_object__channel__object_id=self.group_user_creator_one.group.id,
+                                                    notification_object__channel__content_type__model="group").exists())
 
     def group_invite(self, group_user: GroupUser, to: User):
         factory = APIRequestFactory()

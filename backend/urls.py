@@ -1,9 +1,6 @@
 from django.contrib import admin
 from django.urls import path, include
-from django.views.generic import TemplateView
 from drf_spectacular.views import SpectacularRedocView, SpectacularAPIView
-from rest_framework import permissions
-from rest_framework.schemas import get_schema_view
 
 from backend.settings import DEBUG, MEDIA_URL, MEDIA_ROOT, URL_SUBPATH, INTEGRATIONS
 from flowback.poll.views.poll import PollUserScheduleListAPI, PollListApi
@@ -13,6 +10,7 @@ from flowback.poll.urls import group_poll_patterns, poll_patterns
 from flowback.chat.urls import chat_patterns
 from flowback.notification.urls import notification_patterns
 from flowback.server.urls import server_patterns
+from flowback.schedule.urls import schedule_patterns
 from django.conf.urls.static import static
 
 
@@ -24,6 +22,7 @@ api_urlpatterns = [
     path('group/poll/', include((poll_patterns, 'poll'))),
     path('notification/', include((notification_patterns, 'notification'))),
     path('server/', include((server_patterns, 'server'))),
+    path('schedule/', include((schedule_patterns, 'schedule'))),
 
     path('home/polls', PollListApi.as_view(), name='home_polls'),
     path('poll/user/schedule', PollUserScheduleListAPI.as_view(), name='poll_user_schedule'),

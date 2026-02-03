@@ -8,7 +8,7 @@ It is a decision-making platform.
 
 ## Installation
 
-### Docker Compose Example
+### Docker Compose
 To run Flowback backend using Docker Compose, follow these instructions: 
 1) [Download](https://github.com/Gofven/flowback/archive/refs/heads/master.zip) or [Clone](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) this repository to your local computer
 2) Download [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Windows, macOS and Linux) or [Docker Compose](https://docs.docker.com/compose/install/linux/) (Linux)
@@ -20,7 +20,7 @@ To run Flowback backend using Docker Compose, follow these instructions:
 You can find the api documenation at http://127.0.0.1:8000/schema/redoc/ once you have started the backend with docker.
 
 #### Create admin account
-To create an admin account that can be used in the frontend you will need to execute a command inside the backend docker container. By default, the container name is `<flowback_root_folder_name>_flowback_backend_1`.
+To create an admin account that can be used in the frontend you will need to execute a command inside the backend docker container. By default, the container name is `<flowback_root_folder_name>-flowback-backend-1`.
 
 You can enter the container through the docker desktop app, click on the container and then click on the terminal tab. There you can create an admin account by executing: 
 ```python

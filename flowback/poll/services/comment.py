@@ -1,14 +1,15 @@
 from flowback.comment.models import Comment
 from flowback.common.services import get_object
-from flowback.group.selectors import group_user_permissions
-from flowback.poll.models import Poll, PollDelegateVoting
+from flowback.group.selectors.permission import group_user_permissions
+from flowback.notification.models import NotificationChannel
+from flowback.poll.models import Poll
 from flowback.comment.services import comment_create, comment_update, comment_delete, comment_vote
-from flowback.poll.services.poll import poll_notification
+from flowback.poll.notify import notify_poll_comment
 
 
 def poll_comment_create(*, author_id: int, poll_id: int, message: str = None, attachments: list = None,
                         parent_id: int = None) -> Comment:
-    poll = get_object(Poll, id=poll_id)
+    poll = get_object(Poll, id=poll_id, active=True)
     group_user = group_user_permissions(user=author_id, group=poll.created_by.group.id)
 
     comment = comment_create(author_id=author_id,
@@ -18,27 +19,16 @@ def poll_comment_create(*, author_id: int, poll_id: int, message: str = None, at
                              attachments=attachments,
                              attachment_upload_to="group/poll/comment/attachments")
 
-    poll_notification.create(sender_id=poll_id,
-                             action=poll_notification.Action.create,
-                             category='comment_all',
-                             message=f'User {group_user.user.username} replied to your comment '
-                                     f'in poll {poll.title}',
-                             related_id=comment.id)
-
-    if poll_notification.is_subscribed(user_id=comment.author_id, sender_id=poll_id, category='comment_self'):
-        poll_notification.create(sender_id=poll_id,
-                                 action=poll_notification.Action.create,
-                                 category='comment_self',
-                                 message=f'User {group_user.user.username} replied to your comment '
-                                         f'in poll {poll.title}',
-                                 related_id=comment.id,
-                                 target_user_ids=comment.author_id)
+    notify_poll_comment(message="A new comment has been posted",
+                        action=NotificationChannel.Action.CREATED,
+                        poll=poll,
+                        comment=comment)
 
     return comment
 
 
 def poll_comment_update(*, fetched_by: int, poll_id: int, comment_id: int, data) -> Comment:
-    poll = get_object(Poll, id=poll_id)
+    poll = get_object(Poll, id=poll_id, active=True)
     group_user_permissions(user=fetched_by, group=poll.created_by.group.id)
 
     return comment_update(fetched_by=fetched_by,
@@ -49,7 +39,7 @@ def poll_comment_update(*, fetched_by: int, poll_id: int, comment_id: int, data)
 
 
 def poll_comment_delete(*, fetched_by: int, poll_id: int, comment_id: int):
-    poll = get_object(Poll, id=poll_id)
+    poll = get_object(Poll, id=poll_id, active=True)
 
     force = bool(group_user_permissions(user=fetched_by,
                                         group=poll.created_by.group,
@@ -63,7 +53,7 @@ def poll_comment_delete(*, fetched_by: int, poll_id: int, comment_id: int):
 
 
 def poll_comment_vote(*, fetched_by: int, poll_id: int, comment_id: int, vote: bool = None):
-    poll = Poll.objects.get(id=poll_id)
+    poll = Poll.objects.get(id=poll_id, active=True)
     group_user_permissions(user=fetched_by, group=poll.created_by.group)
 
     return comment_vote(fetched_by=fetched_by,

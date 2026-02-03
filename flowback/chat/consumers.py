@@ -2,21 +2,14 @@ import json
 from json import JSONDecodeError
 from typing import Union
 
-from asgiref.sync import sync_to_async
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
-from django.shortcuts import get_object_or_404
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
-from flowback.chat.models import MessageChannelParticipant, MessageChannel
-from flowback.chat.serializers import BasicMessageSerializer, MessageSerializer
-from flowback.chat.services import message_create, message_update, message_delete, user_message_channel_permission
-from flowback.common.services import get_object
-from flowback.user.models import User
-from flowback.group.models import Group
-from flowback.group.selectors import group_user_permissions
-from flowback.user.serializers import BasicUserSerializer
+from flowback.chat.models import MessageChannelParticipant
+from flowback.chat.serializers import MessageSerializer
+from flowback.chat.services import message_create, message_update, message_delete
 
 
 class ChatConsumer(AsyncWebsocketConsumer):
@@ -130,15 +123,34 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
         await self.send_message(channel_id=self.user_channel, message=message)
 
-    async def send_message(self, channel_id, message: Union[dict, str]):
+    async def send_message(self, channel_id: int | str | None, message: Union[dict, str]):
+        """
+        Sends a message to the specified channel.
+        :param channel_id: Channel to receive the message. Leave empty to send to the user's channel, accepts user_<id>.
+        :param message:
+        :return:
+        """
         if isinstance(message, dict):
             if not message.get("type"):
                 message["type"] = "message"
 
-        await self.channel_layer.group_send(
-            f"{channel_id}",
-            message
-        )
+        if isinstance(channel_id, int):
+            participants = MessageChannelParticipant.objects.filter(channel_id=channel_id)
+            message["status"] = "message_received"
+
+            participant = await participants.select_related('channel').afirst()
+            if participant.channel.origin_name in ['user', 'user_group']:
+                async for participant in participants:
+                    await self.channel_layer.group_send(
+                        f"user_{participant.user_id}",
+                        message)
+
+            else:
+                await self.channel_layer.group_send(f"{channel_id}", message)
+
+        else:
+            channel = self.user_channel if not channel_id else channel_id
+            await self.channel_layer.group_send(channel, message)
 
     @database_sync_to_async
     def _create_message(self, *,

@@ -4,7 +4,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
-from rest_framework.test import APIRequestFactory, force_authenticate, APITransactionTestCase
+from rest_framework.test import APIRequestFactory, force_authenticate, APITestCase
 from .factories import PollFactory, PollProposalFactory, PollPredictionStatementFactory
 
 from .utils import generate_poll_phase_kwargs
@@ -16,11 +16,13 @@ from ...common.tests import generate_request
 from ...files.tests.factories import FileSegmentFactory
 from ...group.models import GroupUser
 from ...group.tests.factories import GroupFactory, GroupUserFactory, GroupTagsFactory
-from ...notification.models import NotificationChannel
+from ...group.views.group import GroupNotificationSubscribeAPI
+from ...notification.models import NotificationChannel, NotificationObject, Notification
+from ...notification.views import NotificationListAPI
 from ...user.models import User
 
 
-class PollTest(APITransactionTestCase):
+class PollTest(APITestCase):
     def setUp(self):
         self.group = GroupFactory()
         self.group_tag = GroupTagsFactory(group=self.group)
@@ -30,8 +32,9 @@ class PollTest(APITransactionTestCase):
          self.group_user_three) = GroupUserFactory.create_batch(3, group=self.group)
         (self.poll_one,
          self.poll_two,
-         self.poll_three) = [PollFactory(created_by=x) for x in [self.group_user_creator, self.group_user_one,
-                                                                 self.group_user_two]]
+         self.poll_three) = [PollFactory(created_by=x, pinned=False) for x in
+                             [self.group_user_creator, self.group_user_one,
+                              self.group_user_two]]
         segment = FileSegmentFactory()
         self.poll_three.attachments = segment.collection
         self.poll_three.save()
@@ -59,6 +62,17 @@ class PollTest(APITransactionTestCase):
         self.assertEqual(response.data['results'][1]['total_proposals'], 12)
         self.assertEqual(response.data['results'][1]['total_predictions'], 15)
 
+    def test_list_polls_hide_users(self):
+        self.group.hide_poll_users = True
+        self.group.save()
+
+        response = generate_request(api=PollListApi,
+                                    data=dict(order_by='pinned,start_date_asc'),
+                                    user=self.group_user_creator.user)
+
+        self.assertTrue(all([not x['created_by'] for x in response.data['results']]),
+                        [[bool(x['created_by']), x['group_id']] for x in response.data['results']])
+
     def test_create_poll(self):
         factory = APIRequestFactory()
         user = self.group_user_creator.user
@@ -73,10 +87,58 @@ class PollTest(APITransactionTestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-        # Check if group notification channel is being created properly
-        NotificationChannel.objects.get(category='poll',
-                                        sender_type='group',
-                                        sender_id=self.group.id)
+    def test_create_poll_notification(self):
+        subscriber = self.group_user_one
+        poll_creator = self.group_user_two
+
+        # Subscribe group_user_one to the group notification channel
+        generate_request(GroupNotificationSubscribeAPI,
+                         data=dict(tags=['poll']),
+                         user=subscriber.user,
+                         url_params=dict(group_id=self.group.id))
+
+        # Check there's no notifications ahead of the test
+        response = generate_request(NotificationListAPI,
+                                    data=dict(order_by='timestamp_desc'),
+                                    user=subscriber.user)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data['count'], 0)
+
+        data = dict(title='notification test poll', description='testing notifications',
+                    poll_type=4, public=True, tag=self.group_tag.id,
+                    pinned=False, dynamic=False, attachments=[SimpleUploadedFile('test.txt',
+                                                                                 b'test',
+                                                                                 content_type='text/plain')],
+                    **generate_poll_phase_kwargs('base'))
+
+        # Use generate_request to create the poll
+        response = generate_request(
+            api=PollCreateAPI,
+            data=data,
+            url_params=dict(group_id=self.group.id),
+            user=poll_creator.user,
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+
+        # Check if the subscriber received a notification
+        notification = Notification.objects.get(
+            user=subscriber.user,
+            notification_object__channel=self.group.notification_channel,
+            notification_object__tag="poll",
+            notification_object__data__poll_id=response.data,
+            notification_object__action=NotificationObject.Action.CREATED,
+        )
+
+        # Also check if the API returns the Notification
+        response = generate_request(NotificationListAPI,
+                                    data=dict(order_by='timestamp_desc',
+                                              object_id=notification.notification_object.id),
+                                    user=subscriber.user)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data['count'], 1)
 
     def test_create_poll_below_phase_space_minimum(self):
         phases = generate_poll_phase_kwargs('base')
@@ -122,12 +184,12 @@ class PollTest(APITransactionTestCase):
         user = self.group_user_one.user
         view = PollUpdateAPI.as_view()
 
-        data = dict(title='new_title', description='new_description', pinned=False)
+        data = dict(title='new_title', description='new_description')
         request = factory.post('', data=data)
         force_authenticate(request, user)
 
         response = view(request, poll=self.poll_two.id)
-        self.assertTrue(response.status_code == 200, response.rendered_content)
+        self.assertEqual(response.status_code, 200, response.rendered_content)
 
         self.poll_two.refresh_from_db()
         self.assertTrue(self.poll_two.title == 'new_title')
@@ -197,11 +259,11 @@ class PollTest(APITransactionTestCase):
         response = self.delete_poll(poll=poll, user=self.group_user_one.user)
 
         self.assertTrue(response.status_code == 400)
-        self.assertTrue(Poll.objects.filter(id=poll.id).exists())
+        self.assertTrue(Poll.objects.get(id=poll.id).active)
 
     def test_delete_poll_in_progress_admin(self):
         poll = PollFactory(created_by=self.group_user_one, **generate_poll_phase_kwargs(poll_start_phase='proposal'))
         response = self.delete_poll(poll=poll, user=self.group_user_creator.user)
 
         self.assertTrue(response.status_code == 200)
-        self.assertTrue(not Poll.objects.filter(id=poll.id).exists())
+        self.assertFalse(Poll.objects.get(id=poll.id).active)

@@ -1,6 +1,8 @@
+from rest_framework.exceptions import ValidationError
+
 from flowback.common.services import get_object, model_update
 from flowback.group.models import GroupPermissions
-from flowback.group.selectors import group_user_permissions
+from flowback.group.selectors.permission import group_user_permissions
 
 
 def group_permission_create(*,
@@ -58,4 +60,9 @@ def group_permission_update(*, user: int, group: int, permission_id: int, data) 
 
 def group_permission_delete(*, user: int, group: int, permission_id: int) -> None:
     group_user_permissions(user=user, group=group, permissions=['admin'])
-    get_object(GroupPermissions, id=permission_id).delete()
+    permission = GroupPermissions.objects.get(id=permission_id, author_id=group)
+    if permission.group.default_permission == permission:
+        raise ValidationError("Unable to delete default permission, either update the group or the permission.")
+
+    permission.delete()
+
